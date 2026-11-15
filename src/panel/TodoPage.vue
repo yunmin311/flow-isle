@@ -1429,6 +1429,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: var(--ui-well);
   border: 1px solid var(--v2-line);
+  box-shadow: 0 2px 8px var(--v2-shadow);
   transition: all 0.2s;
   overflow: hidden;
   flex-shrink: 0;
@@ -1437,6 +1438,7 @@ onBeforeUnmount(() => {
 .task-card:hover {
   background: var(--ui-well);
   border-color: var(--v2-muted);
+  box-shadow: 0 4px 12px var(--v2-shadow);
 }
 
 .task-card.is-running {

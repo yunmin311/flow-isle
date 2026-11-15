@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { readTextFile, writeTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { shouldMirrorSystemNotification, rememberSystemNotificationSource, useSettings } from './useSettings'
@@ -40,6 +41,7 @@ export interface EmailNotificationPayload {
   date: string
   provider: string
   mailbox_key: string
+  historical?: boolean
 }
 
 export function systemNotificationRecordId(p: SystemNotificationPayload) {
@@ -126,7 +128,7 @@ function addAfterLoad(record: NotificationRecord) {
   const ready = loading ??= load()
   void ready.then(() => {
     if (records.value.some(item => item.id === record.id)) return
-    records.value = pruneByRetention([record, ...records.value])
+    records.value = pruneByRetention([record, ...records.value].sort((a, b) => b.time - a.time))
     save()
   })
 }
@@ -176,7 +178,7 @@ function addEmailRecord(p: EmailNotificationPayload) {
     kind: 'email',
     title: (p.subject || '').trim() || '(无主题)',
     detail: from,
-    time: Date.now(),
+    time: Number.isFinite(Date.parse(p.date)) ? Date.parse(p.date) : Date.now(),
     read: false,
     app: from,
     emailProvider: p.provider,
@@ -224,7 +226,7 @@ export function useNotifications() {
     // 邮箱 IMAP 新邮件
     void listen<EmailNotificationPayload>('email-notification', ({ payload }) => {
       if (payload) addEmailRecord(payload)
-    })
+    }).then(() => invoke('email_listener_ready')).catch(() => { listening = false })
   }
   return { records, unreadCount, markAllRead, clearAll }
 }

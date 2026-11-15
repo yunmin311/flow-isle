@@ -799,7 +799,10 @@ async function scrollToPlaying() {
 }
 
 .play-btn.is-playing {
-  background: linear-gradient(135deg, var(--focus-color) 0%, color-mix(in srgb, var(--focus-color) 85%, #000) 100%);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--focus-color) 82%, #fff) 0%,
+    var(--focus-color) 100%
+  );
   border-color: var(--focus-color);
   color: var(--v2-ink);
   box-shadow: 0 0 20px color-mix(in srgb, var(--focus-color) 40%, transparent),

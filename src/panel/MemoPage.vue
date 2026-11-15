@@ -435,6 +435,7 @@ function handleCloseCategoryDialog() {
   border-radius: 10px;
   background: var(--ui-well);
   border: 1px solid var(--v2-line);
+  box-shadow: 0 2px 8px var(--v2-shadow);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -442,6 +443,7 @@ function handleCloseCategoryDialog() {
 .memo-item:hover {
   background: var(--ui-well);
   border-color: var(--v2-muted);
+  box-shadow: 0 4px 12px var(--v2-shadow);
   transform: translateY(-1px);
 }
 

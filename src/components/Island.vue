@@ -271,6 +271,7 @@ function enqueueTaskReminder(payload: TaskReminderPayload) {
 }
 
 function enqueueEmailPeek(payload: EmailNotificationPayload) {
+    if (payload.historical) return;
     if (externalNotificationsSilent.value) return;
     const subject = (payload.subject ?? "").trim() || "(无主题)";
     const from = (payload.from ?? "").trim() || "未知发件人";

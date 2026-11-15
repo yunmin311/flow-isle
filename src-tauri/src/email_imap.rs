@@ -44,7 +44,7 @@ impl Error {
             Self::InvalidCredential => "邮箱地址或授权码含有不支持的控制字符",
             Self::Rejected => "IMAP 服务器拒绝了请求",
             Self::Mailbox => "无法打开 IMAP 收件箱",
-            Self::Search => "无法搜索 IMAP 收件箱的未读邮件",
+            Self::Search => "无法搜索 IMAP 收件箱邮件",
             Self::Authentication => match provider {
                 "qq" => "QQ 邮箱登录失败，请确认已开启 IMAP，并检查客户端授权码是否正确或已失效",
                 "163" | "126" => {
@@ -109,30 +109,45 @@ pub(crate) struct MailboxCursor {
 }
 
 impl MailboxCursor {
-    pub(crate) fn pending(&mut self, uid_validity: u32, unread: Vec<u32>) -> Vec<u32> {
+    // Selection must not acknowledge messages: failed FETCH is retried.
+    pub(crate) fn pending(&mut self, uid_validity: u32, mut uids: Vec<u32>) -> Vec<u32> {
+        uids.sort_unstable();
+        uids.dedup();
         if self.uid_validity != Some(uid_validity) {
             self.uid_validity = Some(uid_validity);
-            self.max_uid = unread.iter().copied().max().unwrap_or(0);
-            self.seen = unread.into_iter().collect();
-            return Vec::new();
+            self.seen.clear();
+            // Limit initial history to the latest 50 messages.
+            self.max_uid = if uids.len() > 50 { uids[uids.len() - 51] } else { 0 };
         }
-
-        // 只通知基线之后的新 UID。旧邮件被重新标成未读时 UID 仍小于基线，
-        // 不应再次触发通知。
-        let mut pending = Vec::new();
-        for uid in unread {
-            if uid > self.max_uid && self.seen.insert(uid) {
-                self.max_uid = uid;
-                pending.push(uid);
-            }
-        }
-        pending
+        self.seen.retain(|uid| uids.binary_search(uid).is_ok());
+        uids.into_iter().filter(|uid| *uid > self.max_uid && !self.seen.contains(uid)).collect()
     }
 
     pub(crate) fn mark_seen(&mut self, uid: u32) {
         self.seen.insert(uid);
-        self.max_uid = self.max_uid.max(uid);
     }
+}
+
+// Gregorian date from UTC days since Unix epoch; IMAP SINCE uses English months.
+fn recent_since() -> String {
+    let days = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default().as_secs() / 86400;
+    imap_date(days.saturating_sub(7) as i64)
+}
+
+fn imap_date(days: i64) -> String {
+    let z = days + 719468;
+    let era = z / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let mut year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = mp + if mp < 10 { 3 } else { -9 };
+    year += i64::from(month <= 2);
+    let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    format!("{day:02}-{}-{year}", names[(month - 1) as usize])
 }
 
 enum Frame<'a> {
@@ -204,8 +219,16 @@ impl<S: Read + Write> Imap<S> {
     }
 
     pub(crate) fn unread(&mut self) -> Result<Vec<u32>, Error> {
+        self.search("UID SEARCH UNSEEN")
+    }
+
+    pub(crate) fn recent(&mut self) -> Result<Vec<u32>, Error> {
+        self.search(&format!("UID SEARCH SINCE {}", recent_since()))
+    }
+
+    fn search(&mut self, query: &str) -> Result<Vec<u32>, Error> {
         let mut unread = self
-            .command("UID SEARCH UNSEEN")
+            .command(query)
             .map_err(|e| {
                 if e == Error::Rejected {
                     Error::Search
@@ -361,6 +384,17 @@ impl<S: Read + Write> Imap<S> {
             Ok(([], response)) => Ok(Frame::Standard(response)),
             _ => Err(Error::Protocol.into()),
         }
+    }
+}
+
+impl Imap<native_tls::TlsStream<TcpStream>> {
+    pub(crate) fn watch_idle(&mut self) -> Result<bool, Error> {
+        self.stream.get_ref().get_ref().set_read_timeout(Some(Duration::from_secs(5)))
+            .map_err(|_| Error::Transport)?;
+        let result = self.idle();
+        self.stream.get_ref().get_ref().set_read_timeout(Some(IO_TIMEOUT))
+            .map_err(|_| Error::Transport)?;
+        result
     }
 }
 
@@ -994,9 +1028,7 @@ mod tests {
         let validity = client.open_inbox("qq", "fixture", "fake").unwrap();
         assert_eq!(validity, 987);
         assert!(client.supports_idle().unwrap());
-        assert!(cursor
-            .pending(validity, client.unread().unwrap())
-            .is_empty());
+        for uid in cursor.pending(validity, client.unread().unwrap()) { cursor.mark_seen(uid); }
         assert!(client.idle().unwrap());
         let pending = cursor.pending(validity, client.unread().unwrap());
         assert_eq!(pending, [43]);
@@ -1006,21 +1038,36 @@ mod tests {
             (43, "测试", "中文")
         );
         cursor.mark_seen(mail[0].uid);
-        assert!(cursor
-            .pending(validity, client.unread().unwrap())
-            .is_empty());
+        assert!(cursor.pending(validity, client.unread().unwrap()).is_empty());
         let written = String::from_utf8(client.stream.into_inner().written).unwrap();
         assert!(written.contains("A6 IDLE\r\nDONE\r\nA7 UID SEARCH UNSEEN"));
         assert!(written.contains("A8 UID FETCH 43 (UID ENVELOPE)"));
     }
 
     #[test]
-    fn ignores_old_uid_marked_unread_after_baseline() {
+    fn recent_search_includes_read_mail_and_requests_a_date_window() {
+        let mut client = replay(b"* OK ready\r\n* SEARCH 20 10 20\r\nA1 OK done\r\n");
+        assert_eq!(client.recent().unwrap(), [10, 20]);
+        let written = String::from_utf8(client.stream.into_inner().written).unwrap();
+        assert!(written.starts_with("A1 UID SEARCH SINCE "));
+        assert!(!written.contains("UNSEEN"));
+    }
+
+    #[test]
+    fn history_retry_unordered_and_duplicate_delivery() {
         let mut cursor = MailboxCursor::default();
+        assert_eq!(cursor.pending(1, vec![20, 10]), [10, 20]);
+        // Failed fetch must not consume either message.
+        assert_eq!(cursor.pending(1, vec![10, 20]), [10, 20]);
+        cursor.mark_seen(20);
+        assert_eq!(cursor.pending(1, vec![20, 10]), [10]);
+        cursor.mark_seen(10);
         assert!(cursor.pending(1, vec![10, 20]).is_empty());
-        assert!(cursor.pending(1, vec![10, 20, 15]).is_empty());
-        assert_eq!(cursor.pending(1, vec![10, 20, 21]), vec![21]);
-        assert!(cursor.pending(1, vec![10, 15, 20, 21]).is_empty());
+        assert_eq!(cursor.pending(2, vec![1]), [1]);
+        let mut cursor = MailboxCursor::default();
+        assert_eq!(cursor.pending(1, (1..=100).collect()), (51..=100).collect::<Vec<_>>());
+        assert_eq!(imap_date(0), "01-Jan-1970");
+        assert_eq!(imap_date(19782), "29-Feb-2024");
     }
 
     #[test]
@@ -1029,12 +1076,10 @@ mod tests {
         let mut cursor = MailboxCursor::default();
         let validity = client.open_inbox("163", "fixture", "fake").unwrap();
         assert!(!client.supports_idle().unwrap());
-        assert!(cursor
-            .pending(validity, client.unread().unwrap())
-            .is_empty());
+        for uid in cursor.pending(validity, client.unread().unwrap()) { cursor.mark_seen(uid); }
         let pending = cursor.pending(validity, client.unread().unwrap());
         assert_eq!(client.fetch(&pending).unwrap()[0].subject, "poll fixture");
-        assert!(cursor.pending(validity + 1, vec![1]).is_empty());
+        assert_eq!(cursor.pending(validity + 1, vec![1]), [1]);
         let mut client =
             replay(b"* OK ready\r\nA1 BAD unsupported\r\n* SEARCH 1\r\nA2 OK done\r\n");
         assert!(!client.idle().unwrap());

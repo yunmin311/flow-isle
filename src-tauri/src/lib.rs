@@ -1760,6 +1760,7 @@ struct EmailNotificationEvent {
     date: String,
     provider: String,
     mailbox_key: String,
+    historical: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -1951,16 +1952,19 @@ fn run_email_imap_session<R: Runtime>(
     let mailbox_key = format!("{:016x}", hasher.finish());
     email_diagnostic(app, &config.provider, if supports_idle { "listening IDLE" } else { "listening poll" });
 
+    let mut history_uids: Option<std::collections::HashSet<u32>> = None;
     loop {
         if !current() {
             return Ok(());
         }
-        let pending = cursor.pending(uid_validity, session.unread()?);
+        let pending = cursor.pending(uid_validity, session.recent()?);
+        let history = history_uids.get_or_insert_with(|| pending.iter().copied().collect());
         for chunk in pending.chunks(50) {
             for mail in session.fetch(chunk)? {
                 if !current() {
                     return Ok(());
                 }
+                let historical = history.contains(&mail.uid);
                 let event = EmailNotificationEvent {
                     uid: mail.uid,
                     from: mail.from,
@@ -1968,23 +1972,31 @@ fn run_email_imap_session<R: Runtime>(
                     date: mail.date,
                     provider: config.provider.clone(),
                     mailbox_key: mailbox_key.clone(),
+                    historical,
                 };
                 if app.emit("email-notification", event).is_ok() {
                     cursor.mark_seen(mail.uid);
-                    email_diagnostic(app, &config.provider, "notification emitted");
+                    email_diagnostic(app, &config.provider, if historical { "history emitted" } else { "notification emitted" });
                 }
             }
         }
         if supports_idle {
-            supports_idle = session.idle()?;
+            supports_idle = session.watch_idle()?;
             if !supports_idle {
                 email_diagnostic(app, &config.provider, "IDLE rejected; listening poll");
             }
         }
         if !supports_idle {
-            std::thread::sleep(Duration::from_secs(10));
+            std::thread::sleep(Duration::from_secs(5));
         }
     }
+}
+
+static EMAIL_LISTENER_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+fn email_listener_ready() {
+    EMAIL_LISTENER_READY.store(true, std::sync::atomic::Ordering::Release);
 }
 
 #[cfg(target_os = "windows")]
@@ -1996,6 +2008,10 @@ fn start_email_watcher<R: Runtime>(app: AppHandle<R>) {
             let mut active_account = None;
             let mut failures = 0u32;
             loop {
+                if !EMAIL_LISTENER_READY.load(std::sync::atomic::Ordering::Acquire) {
+                    std::thread::sleep(Duration::from_millis(200));
+                    continue;
+                }
                 let Some(config) = read_email_config(&app) else {
                     std::thread::sleep(Duration::from_secs(2));
                     continue;
@@ -2020,7 +2036,11 @@ fn start_email_watcher<R: Runtime>(app: AppHandle<R>) {
                     Err(error) => {
                         failures = failures.saturating_add(1);
                         email_diagnostic(&app, &config.provider, error.message(&config.provider));
-                        let delay = match failures { 1 => 15, 2 => 30, 3 => 60, _ => 120 };
+                        let delay = if matches!(error, email_imap::Error::Authentication | email_imap::Error::InvalidCredential) {
+                            120
+                        } else {
+                            match failures { 1 => 2, 2 => 4, 3 => 8, _ => 30 }
+                        };
                         for _ in 0..delay / 2 {
                             std::thread::sleep(Duration::from_secs(2));
                             if read_email_config(&app).as_ref() != Some(&config)
@@ -2428,6 +2448,7 @@ pub fn run() {
             email_credential_status,
             delete_email_credential,
             test_email_connection,
+            email_listener_ready,
             probe_notification_sources,
             activate_notification_source,
             open_focus_assist_settings,
