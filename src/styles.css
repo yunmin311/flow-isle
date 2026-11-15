@@ -1967,6 +1967,28 @@ textarea:focus-visible,
   }
 }
 
+/* 面板打开时整张卡片会从岛尺寸缩放；像素数字在非整数缩放下会逐格抖动。
+   等缩放结束进入 steady 后再淡入，避免打开瞬间四个数字疯狂跳。 */
+#app .panel-root .pixel-time,
+#app .panel-root .pixel-progress {
+  transition: opacity 120ms ease;
+}
+
+#app .panel-root .motion-opening .pixel-time,
+#app .panel-root .motion-opening .pixel-progress,
+#app .panel-root .motion-opening-ready .pixel-time,
+#app .panel-root .motion-opening-ready .pixel-progress {
+  opacity: 0;
+  /* 即使 animationend 没触发、motion-opening 没被移除，也会在 300ms 后自己显示。 */
+  animation: pixel-time-in 120ms 300ms both;
+}
+
+@keyframes pixel-time-in {
+  to {
+    opacity: 1;
+  }
+}
+
 /* ===== 像素点缀：区块标记 / 取景角 / 硬边投影 ===== */
 #app .panel-root :is(.focus-zone .zone-header, .settings-page .section-title, .stats-page .section-title, .memo-page .section-title) {
   display: flex;
