@@ -191,6 +191,7 @@ async function scrollToPlaying() {
                 min="0"
                 max="100"
                 :value="volume"
+                :style="{ '--volume': `${volume}%` }"
                 @input="setVolume(Number(($event.target as HTMLInputElement).value))"
               />
               <span class="vol-value">{{ volume }}</span>
@@ -876,9 +877,10 @@ async function scrollToPlaying() {
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
+  /* 只比原来清楚一点：未填充轨道用低透明度 ink，已填充部分略深，不抢内容。 */
   background: linear-gradient(90deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.12) 100%
+    color-mix(in srgb, var(--v2-ink) 24%, transparent) 0 var(--volume, 0%),
+    color-mix(in srgb, var(--v2-ink) 12%, transparent) var(--volume, 0%) 100%
   );
   border-radius: 3px;
   outline: none;
@@ -893,8 +895,9 @@ async function scrollToPlaying() {
   background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.9) 100%);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3),
-              0 0 0 2px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28),
+              0 0 0 1px color-mix(in srgb, var(--v2-ink) 16%, transparent),
+              0 0 0 3px rgba(255, 255, 255, 0.08);
   transition: all 0.2s ease;
 }
 
