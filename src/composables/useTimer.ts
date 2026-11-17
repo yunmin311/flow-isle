@@ -63,7 +63,7 @@ function installDurationWatch() {
     watch(
       // settingsReady 也要作为依赖：设置是异步读文件的，首次挂载时可能还是默认值，
       // 只监听时长会漏掉“加载完成”这一次赋值，导致首页停在 25:00。
-      () => [settings.value.focusDuration, settings.value.breakDuration, settingsReady.value],
+      () => [settings.value.focusDuration, settings.value.breakDuration, settingsReady.value] as const,
       ([newFocus, newBreak, ready]) => {
         if (!ready) return
         const newDuration = phase.value === 'focus' ? newFocus * 60 : newBreak * 60

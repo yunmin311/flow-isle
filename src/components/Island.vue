@@ -4,6 +4,7 @@ import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
 import { emailInboxUrl } from "../utils/emailLinks";
+import { isTransientSocialNotification } from "../utils/notificationSources";
 import { useIslandState } from "../composables/useIslandState";
 import { useTimer, type NotificationType } from "../composables/useTimer";
 import { useSettings, shouldMirrorSystemNotification, type Settings } from "../composables/useSettings";
@@ -15,7 +16,7 @@ import NotificationBanner from "./NotificationBanner.vue";
 import SystemPeekBanner from "./SystemPeekBanner.vue";
 import {
     emailNotificationRecordId, systemNotificationRecordId, useExternalNotificationSilence,
-    type SystemNotificationPayload, type EmailNotificationPayload,
+    type SystemNotificationPayload, type EmailNotificationPayload, type EmailHistorySummary,
 } from "../composables/useNotifications";
 import type { TimerStatePayload } from "../composables/useTimerBridge";
 
@@ -34,6 +35,7 @@ let unlistenNotification: (() => void) | null = null;
 let unlistenSystemNotification: (() => void) | null = null;
 let unlistenTaskReminder: (() => void) | null = null;
 let unlistenEmail: (() => void) | null = null;
+let unlistenEmailHistory: (() => void) | null = null;
 let activityTimer: ReturnType<typeof setInterval> | null = null;
 let panelStateTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -44,7 +46,7 @@ const notificationType = ref<NotificationType>(null);
 interface SystemPeekItem {
     key: string;
     external: boolean;
-    kind: 'system' | 'email' | 'task';
+    kind: 'system' | 'email' | 'email-history' | 'task';
     app: string;
     aumid?: string;
     provider?: string;
@@ -195,6 +197,7 @@ function showNextSystemPeek() {
         if (Date.now() - next.receivedAt > SYSTEM_PEEK_MAX_AGE_MS) continue;
         if (next.external && externalNotificationsSilent.value) continue;
         systemPeek.value = next;
+        if (next.kind === 'system') void invoke("notification_delivery_metrics", { stage: "peek", delayMs: Math.max(0, Date.now() - next.receivedAt) }).catch(() => {});
         scheduleSystemPeekEnd(SYSTEM_PEEK_MS);
         return;
     }
@@ -216,6 +219,15 @@ function onSystemPeekResume() {
 function pushPeekItem(item: SystemPeekItem) {
     // 面板已打开时不再弹 peek：横幅会盖住面板顶部
     if (panelOpen.value) return;
+    if (systemPeek.value?.key === item.key || systemPeekQueue.some(p => p.key === item.key)) return;
+    // New external alerts replace an older external banner instead of waiting 5s.
+    // Preserve task reminders and a banner being hovered/clicked.
+    if (item.external && systemPeek.value?.external && systemPeekTimer !== null && !notificationType.value) {
+        closeSystemPeek();
+        for (let i = systemPeekQueue.length - 1; i >= 0; i--) {
+            if (systemPeekQueue[i].external) systemPeekQueue.splice(i, 1);
+        }
+    }
     if (systemPeekQueue.length >= SYSTEM_PEEK_QUEUE_LIMIT) {
         systemPeekQueue.shift();
     }
@@ -235,6 +247,7 @@ watch(externalNotificationsSilent, (silent) => {
 });
 
 function enqueueSystemPeek(payload: SystemNotificationPayload) {
+    void invoke("notification_delivery_metrics", { stage: "received", delayMs: Math.max(0, Date.now() - payload.created_ms) }).catch(() => {});
     // 设置页的镜像总开关 / 来源屏蔽
     if (!shouldMirrorSystemNotification(payload.app, payload.aumid)) return;
     if (externalNotificationsSilent.value) return;
@@ -288,6 +301,19 @@ function enqueueEmailPeek(payload: EmailNotificationPayload) {
     });
 }
 
+function enqueueEmailHistoryPeek(payload: EmailHistorySummary) {
+    if (externalNotificationsSilent.value || !payload.count) return;
+    pushPeekItem({
+        key: payload.recordId,
+        external: true,
+        kind: 'email-history',
+        app: "邮件同步",
+        title: `已补收 ${payload.count} 封邮件`,
+        body: `来自 ${payload.accounts} 个邮箱 · 点击查看通知中心`,
+        receivedAt: Date.now(),
+    });
+}
+
 async function openNotificationFallback(recordId?: string) {
     try {
         await emitTo("panel", "open-notifications", { recordId, openSource: true });
@@ -301,6 +327,25 @@ async function onSystemPeekOpen() {
     if (!item) return;
     const recordId = item.key;
     closeSystemPeek(true);
+
+    if (item.kind === "email-history") {
+        try {
+            await emitTo("panel", "open-notifications", { recordId, openSource: false });
+        } finally {
+            await invoke("show_panel", { focus: true });
+        }
+        return;
+    }
+
+    // Chat reminders have no notification-center record, including on failure.
+    if (item.kind === "system" && isTransientSocialNotification(item.app, item.aumid)) {
+        try {
+            await invoke("activate_notification_source", { app: item.app, aumid: item.aumid ?? "" });
+        } catch {
+            pushPeekItem({ ...item, title: `无法打开 ${item.app}`, body: "请从系统托盘打开应用，或点击重试", receivedAt: Date.now() });
+        }
+        return;
+    }
 
     // 系统通知：直接激活来源应用，不先打开面板
     if (item.kind === "system" && item.aumid) {
@@ -537,6 +582,10 @@ onMounted(async () => {
             if (payload) enqueueEmailPeek(payload);
         },
     );
+    unlistenEmailHistory = await listen<EmailHistorySummary>("email-history-ready", ({ payload }) => {
+        if (payload) enqueueEmailHistoryPeek(payload);
+    });
+    await invoke("email_listener_ready");
 });
 
 onUnmounted(() => {
@@ -554,6 +603,7 @@ onUnmounted(() => {
     unlistenSystemNotification?.();
     unlistenTaskReminder?.();
     unlistenEmail?.();
+    unlistenEmailHistory?.();
     stopLocalCountdown();
     if (panelMotionTimer) {
         window.clearTimeout(panelMotionTimer);

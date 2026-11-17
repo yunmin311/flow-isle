@@ -1,13 +1,13 @@
 //! The notification watcher uses a small, read-only subset of IMAP over implicit TLS.
 use imap_proto::{
-    AttributeValue, Capability, Envelope, MailboxDatum, RequestId, Response, ResponseCode, Status,
+    AttributeValue, BodyContentCommon, BodyStructure, Capability, Envelope, MailboxDatum, RequestId, Response, ResponseCode, Status, SectionPath,
 };
 use std::collections::HashSet;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
-const MAX_FRAME: usize = 256 * 1024;
+const MAX_FRAME: usize = 768 * 1024;
 const IO_TIMEOUT: Duration = Duration::from_secs(20);
 const ID_COMMAND: &str = concat!(
     "ID (\"name\" \"FlowIsle\" \"version\" \"",
@@ -29,11 +29,17 @@ pub(crate) enum Error {
     Authentication,
     Mailbox,
     Search,
+    BodyUnavailable,
+    BodyTooLarge,
+    BodyEncoding,
 }
 
 impl Error {
     pub(crate) fn message(&self, provider: &str) -> &'static str {
         match self {
+            Self::BodyUnavailable => "邮件已移除或没有可读取的正文，请在网页邮箱中查看",
+            Self::BodyTooLarge => "邮件正文超过 512 KB，请在网页邮箱中查看",
+            Self::BodyEncoding => "邮件正文编码无效或暂不支持，请在网页邮箱中查看",
             Self::Host => "不支持的邮箱服务商，或自定义 IMAP 服务器地址无效",
             Self::Dns => "无法解析 IMAP 服务器，请检查服务器地址和网络",
             Self::Connect => "无法连接 IMAP 服务器（端口 993）",
@@ -93,12 +99,115 @@ pub(crate) struct Mail {
     pub date: String,
 }
 
+// Adapted from Fly Island v3.0.8 (MIT); see THIRD_PARTY_NOTICES.md.
+#[derive(Debug)]
+struct TextPart {
+    path: Vec<u32>,
+    mime: &'static str,
+    octets: u32,
+    charset: String,
+    encoding: String,
+}
+
+fn is_attachment(common: &BodyContentCommon<'_>) -> bool {
+    common.disposition.as_ref().is_some_and(|disposition| {
+        !disposition.ty.eq_ignore_ascii_case("inline")
+            || disposition.params.as_ref().is_some_and(|params| {
+                params
+                    .iter()
+                    .any(|(key, _)| key.split('*').next().is_some_and(|name| name.eq_ignore_ascii_case("filename")))
+            })
+    }) || common.ty.params.as_ref().is_some_and(|params| {
+        params
+            .iter()
+            .any(|(key, _)| key.split('*').next().is_some_and(|name| name.eq_ignore_ascii_case("name")))
+    })
+}
+
+fn text_part(body: &BodyStructure<'_>, path: Vec<u32>) -> Option<TextPart> {
+    if path.len() > 16 {
+        return None;
+    }
+    match body {
+        BodyStructure::Text { common, other, .. } if !is_attachment(common) => {
+            let mime = if common.ty.subtype.eq_ignore_ascii_case("plain") {
+                "text/plain"
+            } else if common.ty.subtype.eq_ignore_ascii_case("html") {
+                "text/html"
+            } else {
+                return None;
+            };
+            Some(TextPart {
+                path: if path.is_empty() { vec![1] } else { path },
+                mime,
+                octets: other.octets,
+                charset: common.ty.params.as_ref().and_then(|p| p.iter().find(|(k, _)| k.eq_ignore_ascii_case("charset"))).map(|(_, v)| v.to_string()).unwrap_or_else(|| "us-ascii".into()),
+                encoding: match &other.transfer_encoding {
+                    imap_proto::ContentEncoding::Base64 => "base64",
+                    imap_proto::ContentEncoding::QuotedPrintable => "quoted-printable",
+                    imap_proto::ContentEncoding::SevenBit => "7bit",
+                    imap_proto::ContentEncoding::EightBit => "8bit",
+                    imap_proto::ContentEncoding::Binary => "binary",
+                    _ => "unsupported",
+                }.into(),
+            })
+        }
+        BodyStructure::Multipart { common, bodies, .. } if !is_attachment(common) => {
+            let mut fallback = None;
+            for (index, body) in bodies.iter().take(128).enumerate() {
+                let mut nested = path.clone();
+                nested.push(index as u32 + 1);
+                if let Some(part) = text_part(body, nested) {
+                    // 优先渲染 HTML 版本：纯文本副本里没有排版和图片，图片只有在 HTML 里才存在。
+                    if part.mime == "text/html" {
+                        return Some(part);
+                    }
+                    if fallback.is_none() {
+                        fallback = Some(part);
+                    }
+                }
+            }
+            fallback
+        }
+        // Forwarded messages and text attachments are separate from the mail's own body.
+        _ => None,
+    }
+}
+
+#[derive(Debug)]
+struct ImagePart { path: Vec<u32>, cid: String, mime: String, octets: u32 }
+fn image_parts(body: &BodyStructure<'_>, path: Vec<u32>, out: &mut Vec<ImagePart>) {
+    if path.len() > 16 || out.len() >= 8 { return; }
+    match body {
+        BodyStructure::Basic { common, other, .. }
+            if common.ty.ty.eq_ignore_ascii_case("image")
+                && ["png", "jpeg", "gif", "webp"].iter().any(|s| common.ty.subtype.eq_ignore_ascii_case(s))
+                && matches!(other.transfer_encoding, imap_proto::ContentEncoding::Base64)
+                && other.octets <= 512 * 1024
+                && !common.disposition.as_ref().is_some_and(|d| d.ty.eq_ignore_ascii_case("attachment")) => {
+            if let Some(cid) = other.id.filter(|id| !id.is_empty() && id.len() <= 256) {
+                out.push(ImagePart { path: if path.is_empty() { vec![1] } else { path }, cid: cid.trim_matches(['<', '>']).into(),
+                    mime: format!("image/{}", common.ty.subtype.to_ascii_lowercase()), octets: other.octets });
+            }
+        }
+        BodyStructure::Multipart { common, bodies, .. } if !is_attachment(common) => {
+            for (index, body) in bodies.iter().take(128).enumerate() {
+                let mut nested = path.clone(); nested.push(index as u32 + 1); image_parts(body, nested, out);
+            }
+        }
+        _ => ()
+    }
+}
+
 #[derive(Default)]
 struct Reply {
     uid_validity: Option<u32>,
     unread: Option<Vec<u32>>,
     supports_idle: Option<bool>,
     mail: Vec<Mail>,
+    parts: Vec<(u32, Option<TextPart>)>,
+    images: Vec<(u32, Vec<ImagePart>)>,
+    sections: Vec<(u32, Option<u32>, Option<SectionPath>, Vec<u8>)>,
 }
 
 #[derive(Default)]
@@ -262,6 +371,50 @@ impl<S: Read + Write> Imap<S> {
         Ok(result)
     }
 
+    pub(crate) fn fetch_body(&mut self, uid: u32) -> Result<(String, String), Error> {
+        if uid == 0 { return Err(Error::Protocol); }
+        let structure = self.command(&format!("UID FETCH {uid} (UID BODYSTRUCTURE)"))?;
+        let part = structure.parts.into_iter().find(|(id, _)| *id == uid)
+            .and_then(|(_, part)| part).ok_or(Error::BodyUnavailable)?;
+        if part.octets > 512 * 1024 { return Err(Error::BodyTooLarge); }
+        let section = part.path.iter().map(u32::to_string).collect::<Vec<_>>().join(".");
+        // Fetch the selected text part only, never attachments or the Seen flag.
+        // QQ may stall on partial BODY fetches; the structure and frame bounds limit size.
+        let reply = self.command(&format!("UID FETCH {uid} (UID BODY.PEEK[{section}])"))?;
+        let expected = Some(SectionPath::Part(part.path.clone(), None));
+        let bytes = reply.sections.into_iter().find(|(_, id, path, _)| *id == Some(uid) && *path == expected)
+            .map(|(_, _, _, data)| data).ok_or(Error::BodyUnavailable)?;
+        if bytes.len() != part.octets as usize { return Err(Error::Protocol); }
+        Ok((decode_body(&bytes, &part.encoding, &part.charset)?, part.mime.into()))
+    }
+
+    pub(crate) fn fetch_inline_images(&mut self, uid: u32) -> Result<Vec<(String, String)>, Error> {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        if uid == 0 { return Err(Error::Protocol); }
+        let structure = self.command(&format!("UID FETCH {uid} (UID BODYSTRUCTURE)"))?;
+        let parts = structure.images.into_iter().find(|(id, _)| *id == uid).map(|(_, parts)| parts).unwrap_or_default();
+        let mut images = Vec::new(); let mut total = 0usize;
+        for part in parts {
+            total += part.octets as usize;
+            if total > 2 * 1024 * 1024 { break; }
+            let section = part.path.iter().map(u32::to_string).collect::<Vec<_>>().join(".");
+            let reply = self.command(&format!("UID FETCH {uid} (UID BODY.PEEK[{section}])"))?;
+            let expected = Some(SectionPath::Part(part.path, None));
+            let data = reply.sections.into_iter().find(|(_, id, path, _)| *id == Some(uid) && *path == expected)
+                .map(|(_, _, _, data)| data).ok_or(Error::BodyUnavailable)?;
+            if data.len() != part.octets as usize { return Err(Error::Protocol); }
+            let bytes = STANDARD.decode(data.into_iter().filter(|b| !b.is_ascii_whitespace()).collect::<Vec<_>>()).map_err(|_| Error::BodyEncoding)?;
+            let valid = match part.mime.as_str() {
+                "image/png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+                "image/jpeg" => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+                "image/gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+                "image/webp" => bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"), _ => false,
+            };
+            if valid { images.push((part.cid, format!("data:{};base64,{}", part.mime, STANDARD.encode(bytes)))); }
+        }
+        Ok(images)
+    }
+
     // IDLE uses the socket read timeout. On either timeout or a mailbox change,
     // send DONE and consume the matching completion before issuing another command.
     pub(crate) fn idle(&mut self) -> Result<bool, Error> {
@@ -369,9 +522,8 @@ impl<S: Read + Write> Imap<S> {
             }
             return Ok(Frame::Id);
         }
-        // The pinned parser handles envelope grammar. Restrict FETCH attributes
-        // before calling it: unused branches include a panic on INTERNALDATE NIL
-        // and a recursive BODYSTRUCTURE grammar. METADATA can also panic on invalid UTF-8.
+        // Bound recursive BODYSTRUCTURE before parsing and exclude unused attributes:
+        // INTERNALDATE NIL and invalid UTF-8 METADATA panic in the pinned parser.
         if is_data_response(&self.frame, b"METADATA")
             || (is_fetch(&self.frame) && !valid_fetch_shape(&self.frame))
         {
@@ -546,16 +698,41 @@ fn observe(response: Response<'_>, reply: &mut Reply) -> Result<(), Error> {
             ))
         }
         Response::IDs(ids) => reply.unread = Some(ids),
-        Response::Fetch(_, attrs) => {
+        Response::Fetch(sequence, attrs) => {
             let mut uid = None;
             let mut envelope = None;
+            let mut part = None;
+            let mut images = Vec::new();
+            let mut sections = Vec::new();
             for attr in attrs {
                 match attr {
                     AttributeValue::Uid(value) => uid = Some(value),
                     AttributeValue::Envelope(value) => envelope = Some(value),
+                    AttributeValue::BodyStructure(body) => { part = Some(text_part(&body, Vec::new())); image_parts(&body, Vec::new(), &mut images); },
+                    AttributeValue::BodySection { section, index: None, data: Some(data) } => sections.push((section, data.to_vec())),
                     _ => (),
                 }
             }
+            if !images.is_empty() { reply.images.push((uid.filter(|uid| *uid != 0).ok_or(Error::Protocol)?, images)); }
+            if let Some(part) = part {
+                reply.parts.push((uid.filter(|uid| *uid != 0).ok_or(Error::Protocol)?, part));
+            }
+            // A continuation can omit UID, but must use a sequence explicitly
+            // associated with that UID earlier in this command.
+            if let Some(uid) = uid {
+                if uid == 0 { return Err(Error::Protocol); }
+                for (seq, previous_uid, _, _) in &mut reply.sections {
+                    if *seq == sequence {
+                        if previous_uid.is_some_and(|previous| previous != uid) { return Err(Error::Protocol); }
+                        *previous_uid = Some(uid);
+                    }
+                }
+            }
+            let resolved_uid = uid.or_else(|| reply.sections.iter().find(|(seq, id, _, _)| *seq == sequence && id.is_some()).and_then(|(_, id, _, _)| *id));
+            if sections.is_empty() && uid.is_some() {
+                reply.sections.push((sequence, uid, None, Vec::new()));
+            }
+            for (path, bytes) in sections { reply.sections.push((sequence, resolved_uid, path, bytes)); }
             if let Some(envelope) = envelope {
                 reply.mail.push(extract(
                     uid.filter(|uid| *uid != 0).ok_or(Error::Protocol)?,
@@ -720,7 +897,10 @@ fn valid_fetch_shape(bytes: &[u8]) -> bool {
             let Some(space) = rest.iter().position(|b| *b == b' ') else {
                 return false;
             };
-            if ![b"UID".as_slice(), b"ENVELOPE", b"FLAGS", b"MODSEQ"]
+            let name = &rest[..space];
+            let body_section = name.get(..5).is_some_and(|prefix| prefix.eq_ignore_ascii_case(b"BODY[")) && name.ends_with(b"]")
+                && name[5..name.len()-1].iter().all(|b| b.is_ascii_digit() || *b == b'.');
+            if !body_section && ![b"UID".as_slice(), b"ENVELOPE", b"FLAGS", b"MODSEQ", b"BODYSTRUCTURE"]
                 .iter()
                 .any(|name| rest[..space].eq_ignore_ascii_case(name))
             {
@@ -794,6 +974,33 @@ fn extract(uid: u32, envelope: &Envelope<'_>) -> Mail {
         subject,
         date,
     }
+}
+
+fn decode_body(data: &[u8], transfer: &str, charset: &str) -> Result<String, Error> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let bytes = match transfer {
+        "base64" => STANDARD.decode(data.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect::<Vec<_>>())
+            .map_err(|_| Error::BodyEncoding)?,
+        "quoted-printable" => {
+            let mut out = Vec::new();
+            let mut i = 0;
+            while i < data.len() {
+                if data[i] != b'=' { out.push(data[i]); i += 1; continue; }
+                if data.get(i + 1..i + 3) == Some(b"\r\n") { i += 3; continue; }
+                let high = data.get(i + 1).and_then(|b| (*b as char).to_digit(16)).ok_or(Error::BodyEncoding)?;
+                let low = data.get(i + 2).and_then(|b| (*b as char).to_digit(16)).ok_or(Error::BodyEncoding)?;
+                out.push((high * 16 + low) as u8);
+                i += 3;
+            }
+            out
+        },
+        "7bit" | "8bit" | "binary" => data.to_vec(),
+        _ => return Err(Error::BodyEncoding),
+    };
+    let encoding = encoding_rs::Encoding::for_label(charset.as_bytes()).ok_or(Error::BodyEncoding)?;
+    let (decoded, _, invalid) = encoding.decode(&bytes);
+    if invalid { return Err(Error::BodyEncoding); }
+    Ok(decoded.into_owned())
 }
 
 fn decode_q_header(data: &[u8]) -> Option<Vec<u8>> {
@@ -898,6 +1105,89 @@ mod tests {
             ..Default::default()
         })
         .unwrap()
+    }
+
+
+    fn body_fixture(structure: &str, response: &str) -> String {
+        format!("* OK ready\r\n* 1 FETCH (UID 42 BODYSTRUCTURE {structure})\r\nA1 OK done\r\n{response}A2 OK done\r\n")
+    }
+
+    #[test]
+    fn reader_inline_images_are_bounded_raster_and_read_only() {
+        let structure = r#"(("IMAGE" "PNG" NIL "<logo>" NIL "BASE64" 12)("IMAGE" "SVG+XML" NIL "<bad>" NIL "BASE64" 12)("IMAGE" "JPEG" NIL "<huge>" NIL "BASE64" 999999) "RELATED")"#;
+        let frame = body_fixture(structure, "* 1 FETCH (UID 42 BODY[1] {12}\r\niVBORw0KGgo=)\r\n");
+        let mut client = replay(frame.as_bytes());
+        assert_eq!(client.fetch_inline_images(42).unwrap(), vec![("logo".into(), "data:image/png;base64,iVBORw0KGgo=".into())]);
+        assert_eq!(String::from_utf8(client.stream.into_inner().written).unwrap(), "A1 UID FETCH 42 (UID BODYSTRUCTURE)\r\nA2 UID FETCH 42 (UID BODY.PEEK[1])\r\n");
+    }
+
+    #[test]
+    fn reader_selects_html_skips_attachments_and_only_uses_peek() {
+        // Synthetic multipart alternative plus a text attachment: no personal mail.
+        let frame = body_fixture(
+            r#"(("TEXT" "PLAIN" ("CHARSET" "UTF-8") NIL NIL "7BIT" 5 1)("TEXT" "HTML" ("CHARSET" "UTF-8") NIL NIL "8BIT" 9 1)("TEXT" "HTML" ("CHARSET" "UTF-8" "NAME" "secret.html") NIL NIL "8BIT" 900000 1) "MIXED")"#,
+            "* 1 FETCH (BODY[2] {9}\r\n<p>Hi</p> UID 42)\r\n",
+        );
+        let mut client = replay(frame.as_bytes());
+        assert_eq!(client.fetch_body(42).unwrap(), ("<p>Hi</p>".into(), "text/html".into()));
+        assert_eq!(String::from_utf8(client.stream.into_inner().written).unwrap(),
+            "A1 UID FETCH 42 (UID BODYSTRUCTURE)\r\nA2 UID FETCH 42 (UID BODY.PEEK[2])\r\n");
+    }
+
+    #[test]
+    fn reader_matches_split_uid_before_or_after_body_by_sequence() {
+        for response in [
+            "* 1 FETCH (UID 42)\r\n* 1 FETCH (BODY[1] {5}\r\nhello)\r\n",
+            "* 1 FETCH (BODY[1] {5}\r\nhello)\r\n* 1 FETCH (UID 42)\r\n",
+        ] {
+            let frame = body_fixture(r#"("TEXT" "PLAIN" ("CHARSET" "UTF-8") NIL NIL "7BIT" 5 1)"#, response);
+            assert_eq!(replay(frame.as_bytes()).fetch_body(42).unwrap(), ("hello".into(), "text/plain".into()));
+        }
+    }
+
+    #[test]
+    fn reader_rejects_wrong_uid_section_length_and_missing_body() {
+        let structure = r#"("TEXT" "PLAIN" ("CHARSET" "UTF-8") NIL NIL "7BIT" 5 1)"#;
+        for response in [
+            "* 1 FETCH (UID 99 BODY[1] {5}\r\nhello)\r\n",
+            "* 1 FETCH (UID 42 BODY[2] {5}\r\nhello)\r\n",
+            "* 2 FETCH (UID 42)\r\n* 1 FETCH (BODY[1] {5}\r\nhello)\r\n",
+            "* 1 FETCH (UID 42 BODY[1] NIL)\r\n",
+        ] {
+            assert_eq!(replay(body_fixture(structure, response).as_bytes()).fetch_body(42), Err(Error::BodyUnavailable));
+        }
+        assert_eq!(replay(body_fixture(structure, "* 1 FETCH (UID 42 BODY[1] {4}\r\noops)\r\n").as_bytes()).fetch_body(42), Err(Error::Protocol));
+        assert_eq!(replay(body_fixture(structure, "* 1 FETCH (UID 42)\r\n* 1 FETCH (UID 99 BODY[1] {5}\r\nhello)\r\n").as_bytes()).fetch_body(42), Err(Error::Protocol));
+    }
+
+    #[test]
+    fn reader_refuses_large_bodies_attachments_and_recursive_structures() {
+        for (structure, error) in [
+            (r#"("TEXT" "HTML" ("CHARSET" "UTF-8") NIL NIL "8BIT" 524289 1)"#, Error::BodyTooLarge),
+            (r#"("TEXT" "HTML" ("NAME" "attachment.html") NIL NIL "8BIT" 5 1)"#, Error::BodyUnavailable),
+            (r#"("TEXT" "HTML" ("NAME*" "utf-8''attachment.html") NIL NIL "8BIT" 5 1)"#, Error::BodyUnavailable),
+            (r#"("TEXT" "PLAIN" NIL NIL NIL "7BIT" 5 1 NIL ("ATTACHMENT" ("FILENAME" "a.txt")))"#, Error::BodyUnavailable),
+        ] {
+            let frame = body_fixture(structure, "");
+            let mut client = replay(frame.as_bytes());
+            assert_eq!(client.fetch_body(42), Err(error));
+            assert!(!String::from_utf8(client.stream.into_inner().written).unwrap().contains("PEEK"));
+        }
+        let deep = format!("{}\"TEXT\"{}", "(".repeat(18), ")".repeat(18));
+        assert_eq!(replay(body_fixture(&deep, "").as_bytes()).fetch_body(42), Err(Error::Protocol));
+    }
+
+    #[test]
+    fn reader_decodes_transfer_and_charset_without_header_underscore_rules() {
+        assert_eq!(decode_body(b"5Lit\r\n5paH", "base64", "utf-8").unwrap(), "中文");
+        assert_eq!(decode_body(b"=D6=D0=CE=C4_\r\nsoft=\r\nline", "quoted-printable", "gb18030").unwrap(), "中文_\r\nsoftline");
+        for (bytes, transfer, charset) in [
+            (b"bad!".as_slice(), "base64", "utf-8"),
+            (b"=", "quoted-printable", "utf-8"),
+            (b"=GG", "quoted-printable", "utf-8"),
+            (b"\xff", "8bit", "utf-8"),
+            (b"abc", "8bit", "unknown"),
+        ] { assert_eq!(decode_body(bytes, transfer, charset), Err(Error::BodyEncoding)); }
     }
 
     #[test]

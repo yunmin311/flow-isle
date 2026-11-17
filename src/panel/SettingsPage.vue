@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useSettings, presetThemes, type ColorMode, type IslandDisplayMode, type PanelGlass, type EmailProvider } from '../composables/useSettings'
+import { useSettings, presetThemes, type ColorMode, type IslandDisplayMode, type PanelGlass } from '../composables/useSettings'
 import { useNotifications } from '../composables/useNotifications'
-import { useUpdater } from '../composables/useUpdater'
 import { useForkUpdate } from '../composables/useForkUpdate'
 import AboutDialog from './AboutDialog.vue'
 import BackButton from './BackButton.vue'
+import EmailAccounts from './EmailAccounts.vue'
+import HintTip from './HintTip.vue'
+const settingsTab = ref('notifications')
+const emailEditing = ref(false)
+const settingsRoot = ref<HTMLElement | null>(null)
+watch([settingsTab, emailEditing], () => { void nextTick(() => settingsRoot.value?.scrollTo(0, 0)) })
+watch(settingsTab, () => { emailEditing.value = false })
+const settingsTabs = [{ id: 'notifications', label: '通知' }, { id: 'appearance', label: '外观' }, { id: 'focus', label: '专注' }, { id: 'general', label: '通用' }]
 
 const emit = defineEmits<{ back: [] }>()
-
-// 定制构建：应用内更新指向官方版会覆盖定制内容，已禁用
-const SHOW_UPDATER = false
 
 const { settings, resetSettings } = useSettings()
 const { records } = useNotifications()
@@ -120,163 +124,6 @@ function toggleSource(source: string) {
 
 // ---- 邮箱通知 ----
 
-const emailProviders: Array<{ id: EmailProvider; label: string }> = [
-  { id: 'qq', label: 'QQ' },
-  { id: '163', label: '163' },
-  { id: '126', label: '126' },
-  { id: 'gmail', label: 'Gmail' },
-  { id: 'outlook', label: 'Outlook' },
-  { id: 'custom', label: '自定义' },
-]
-const emailAuthCode = ref('')
-const emailSaving = ref(false)
-const emailTesting = ref(false)
-const emailHasCredential = ref(false)
-const emailStatus = ref('')
-const emailStatusOk = ref<boolean | null>(null)
-const emailExpanded = ref(false)
-
-const emailProviderLabel = computed(
-  () => emailProviders.find(provider => provider.id === settings.value.emailProvider)?.label ?? 'QQ',
-)
-
-const emailSummary = computed(() => {
-  const address = settings.value.emailAddress.trim()
-  if (!address) return '未配置'
-  const credential = emailHasCredential.value ? '已保存授权码' : '未保存授权码'
-  if (settings.value.emailProvider === 'custom') {
-    const host = settings.value.emailImapHost.trim() || '未填写服务器'
-    return `${host} · ${address} · ${credential}`
-  }
-  return `${emailProviderLabel.value} · ${address} · ${credential}`
-})
-
-const emailAuthPlaceholder = computed(() => {
-  switch (settings.value.emailProvider) {
-    case 'gmail':
-      return 'Gmail 应用专用密码'
-    case 'outlook':
-      return 'Outlook.com 需要 OAuth2'
-    case 'custom':
-      return '授权码 / 应用专用密码'
-    default:
-      return '授权码（不是登录密码）'
-  }
-})
-
-watch(
-  () => settings.value.emailEnabled,
-  (enabled) => {
-    if (enabled && !settings.value.emailAddress.trim()) {
-      emailExpanded.value = true
-    }
-  },
-)
-
-function emailEndpoint() {
-  const { emailProvider: provider, emailImapHost } = settings.value
-  return { provider, host: provider === 'custom' ? emailImapHost.trim() : '' }
-}
-
-let credentialStatusRequest = 0
-
-async function refreshEmailCredentialStatus() {
-  const request = ++credentialStatusRequest
-  const email = settings.value.emailAddress.trim()
-  if (!email) {
-    emailHasCredential.value = false
-    return
-  }
-  try {
-    const saved = await invoke<boolean>('email_credential_status', { email, ...emailEndpoint() })
-    if (request === credentialStatusRequest) emailHasCredential.value = saved
-  } catch {
-    if (request === credentialStatusRequest) emailHasCredential.value = false
-  }
-}
-
-watch(
-  () => [settings.value.emailProvider, settings.value.emailAddress, settings.value.emailImapHost],
-  () => {
-    emailHasCredential.value = false
-    emailAuthCode.value = ''
-    emailStatus.value = ''
-    void refreshEmailCredentialStatus()
-  },
-)
-
-async function saveEmailCredential() {
-  const email = settings.value.emailAddress.trim()
-  const code = emailAuthCode.value.trim()
-  if (!email || !code) {
-    emailStatus.value = '请填写邮箱地址和授权码'
-    emailStatusOk.value = false
-    return
-  }
-  emailSaving.value = true
-  try {
-    await invoke('save_email_credential', { email, password: code, ...emailEndpoint() })
-    emailAuthCode.value = ''
-    await refreshEmailCredentialStatus()
-    emailStatus.value = '授权码已保存到 Windows 凭据管理器'
-    emailStatusOk.value = true
-  } catch (e) {
-    emailStatus.value = typeof e === 'string' ? e : '保存授权码失败'
-    emailStatusOk.value = false
-  } finally {
-    emailSaving.value = false
-  }
-}
-
-async function testEmailConnection() {
-  const email = settings.value.emailAddress.trim()
-  if (!email) {
-    emailStatus.value = '请先填写邮箱地址'
-    emailStatusOk.value = false
-    return
-  }
-  if (settings.value.emailProvider === 'custom' && !settings.value.emailImapHost.trim()) {
-    emailStatus.value = '请填写 IMAP 服务器'
-    emailStatusOk.value = false
-    return
-  }
-  if (!emailAuthCode.value.trim() && !emailHasCredential.value) {
-    emailStatus.value = '请填写授权码后再测试'
-    emailStatusOk.value = false
-    return
-  }
-  emailTesting.value = true
-  emailStatus.value = '正在连接...'
-  emailStatusOk.value = null
-  try {
-    const message = await invoke<string>('test_email_connection', {
-      ...emailEndpoint(),
-      email,
-      password: emailAuthCode.value.trim() || null,
-    })
-    emailStatus.value = message
-    emailStatusOk.value = true
-  } catch (e) {
-    emailStatus.value = typeof e === 'string' ? e : '连接失败'
-    emailStatusOk.value = false
-  } finally {
-    emailTesting.value = false
-  }
-}
-
-async function clearEmailCredential() {
-  try {
-    await invoke('delete_email_credential')
-    emailAuthCode.value = ''
-    await refreshEmailCredentialStatus()
-    emailStatus.value = '已清除本机保存的授权码'
-    emailStatusOk.value = null
-  } catch (e) {
-    emailStatus.value = typeof e === 'string' ? e : '清除失败'
-    emailStatusOk.value = false
-  }
-}
-
 function resetAllSettings() {
   if (!window.confirm('恢复所有设置为默认？主题、透明度、显示模式、快捷键和标语都会重置。')) return
   resetSettings()
@@ -317,22 +164,6 @@ watch(
   },
   { deep: true },
 )
-const {
-  checking,
-  checked,
-  updateAvailable,
-  downloading,
-  installing,
-  downloadProgress,
-  error,
-  updateInfo,
-  installFinished,
-  installFailed,
-  downloadFailed,
-  checkForUpdate,
-  downloadAndInstall,
-  openReleasePage,
-} = useUpdater()
 
 const opacityPercent = (v: number) => Math.round(v * 100) + '%'
 
@@ -360,19 +191,6 @@ const glassOptions: Array<{ id: PanelGlass; label: string; hint: string }> = [
 const activeGlassHint = computed(
   () => glassOptions.find(opt => opt.id === settings.value.panelGlass)?.hint ?? '',
 )
-
-const updateStatusText = computed(() => {
-  if (downloading.value) return `下载中 ${downloadProgress.value}%`
-  if (installing.value) return '安装中，请稍候...'
-  if (updateAvailable.value) return `发现新版本 v${updateInfo.value?.version ?? ''}`
-  if (installFinished.value) return '更新已安装，正在准备重启'
-  if (error.value) return error.value
-  if (checked.value) return '已是最新版本'
-  return '自动检查开启后，启动时静默检查，有新版本会在面板顶部提示'
-})
-
-const showManualUpdateDownload = computed(() => installFailed.value && Boolean(error.value))
-const updateFailureLabel = computed(() => downloadFailed.value ? '下载失败' : '安装失败')
 
 function formatShortcut(key: string): string {
   if (!key) return '无'
@@ -461,18 +279,6 @@ function switchColorMode(mode: ColorMode) {
   settings.value.colorMode = mode
 }
 
-function manualCheckForUpdate() {
-  void checkForUpdate()
-}
-
-function installUpdate() {
-  void downloadAndInstall()
-}
-
-function openManualDownload() {
-  openReleasePage()
-}
-
 let recordListenersBound = false
 
 function bindRecordListeners() {
@@ -492,7 +298,6 @@ function unbindRecordListeners() {
 onMounted(() => {
   bindRecordListeners()
   syncMottoDraft()
-  void refreshEmailCredentialStatus()
   if (settings.value.autoCheckUpdates) {
     void checkForkUpdate(false)
   }
@@ -501,7 +306,6 @@ onMounted(() => {
 onActivated(() => {
   bindRecordListeners()
   syncMottoDraft()
-  void refreshEmailCredentialStatus()
 })
 
 onDeactivated(() => {
@@ -515,7 +319,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="settings-page" :class="{ 'blurred': showAbout }">
+  <div ref="settingsRoot" class="settings-page" :class="{ 'blurred': showAbout }">
     <div class="settings-header">
       <BackButton @click="goBack" />
       <button class="about-btn" @click="showAbout = true">
@@ -525,7 +329,10 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div class="settings-section">
+    <nav class="settings-tabs" aria-label="设置分类">
+      <button v-for="tab in settingsTabs" :key="tab.id" :aria-pressed="settingsTab === tab.id" @click="settingsTab = tab.id">{{ tab.label }}</button>
+    </nav>
+    <div v-show="settingsTab === 'appearance'" class="settings-section">
       <div class="section-title">显示模式</div>
       <div class="mode-toggle" role="group" aria-label="主题模式">
         <button
@@ -555,7 +362,7 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="section-subtitle">玻璃质感</div>
+      <div class="section-subtitle">玻璃质感<HintTip :text="activeGlassHint" /></div>
       <div class="mode-toggle" role="group" aria-label="面板玻璃质感">
         <button
           v-for="opt in glassOptions"
@@ -569,16 +376,14 @@ onUnmounted(() => {
           {{ opt.label }}
         </button>
       </div>
-      <div class="opacity-hint">{{ activeGlassHint }}</div>
     </div>
 
     <!-- 更新 -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'general'" class="settings-section">
       <div class="section-title">交互</div>
       <div class="update-toggle-row">
         <div class="update-copy">
-          <span class="update-label">点击刘海打开面板</span>
-          <span class="update-hint">关闭后仅通过快捷键或托盘图标打开面板</span>
+          <span class="update-label"><HintTip label="点击刘海打开面板" text="关闭后仅通过快捷键或托盘图标打开面板" /></span>
         </div>
         <label class="switch" aria-label="点击刘海打开面板">
           <input v-model="settings.notchClickOpensPanel" type="checkbox" />
@@ -586,79 +391,38 @@ onUnmounted(() => {
         </label>
       </div>
     </div>
-    <div class="settings-section">
+    <div v-show="settingsTab === 'general'" class="settings-section">
       <div class="section-title">声音与启动</div>
       <div class="update-toggle-row">
         <div class="update-copy">
-          <span class="update-label">通知提示音</span>
-          <span class="update-hint">番茄钟或休息结束时播放提示音</span>
+          <span class="update-label"><HintTip label="通知提示音" text="番茄钟或休息结束时播放提示音" /></span>
         </div>
         <label class="switch" aria-label="通知提示音">
           <input v-model="settings.notificationSound" type="checkbox" />
           <span class="switch-track"></span>
         </label>
       </div>
-      <div class="update-toggle-row" style="margin-top: 8px;">
+      <div class="update-toggle-row">
         <div class="update-copy">
-          <span class="update-label">开机自动启动</span>
-          <span class="update-hint">系统启动时自动运行 FlowIsle</span>
+          <span class="update-label"><HintTip label="开机自动启动" text="系统启动时自动运行 FlowIsle" /></span>
         </div>
         <label class="switch" aria-label="开机自动启动">
           <input v-model="settings.autoLaunch" type="checkbox" />
           <span class="switch-track"></span>
         </label>
       </div>
-      <div v-if="SHOW_UPDATER" class="update-toggle-row" style="margin-top: 8px;">
-        <div class="update-copy">
-          <span class="update-label">自动检查更新</span>
-          <span class="update-hint">启动后静默检查，不打断专注</span>
-        </div>
-        <label class="switch" aria-label="自动检查更新">
-          <input v-model="settings.autoCheckUpdates" type="checkbox" />
-          <span class="switch-track"></span>
-        </label>
-      </div>
-      <div v-if="SHOW_UPDATER" class="update-action-row">
-        <button
-          type="button"
-          class="update-btn"
-          :disabled="checking || downloading || installing"
-          @click="manualCheckForUpdate"
-        >
-          <span v-if="checking" class="mini-spinner"></span>
-          <span>{{ checking ? '检查中...' : '手动检查更新' }}</span>
-        </button>
-        <button
-          v-if="updateAvailable"
-          type="button"
-          class="update-btn primary"
-          :disabled="downloading || installing"
-          @click="installUpdate"
-        >
-          {{ installing ? '安装中...' : '下载并安装更新' }}
-        </button>
-        <span
-          class="update-status"
-          :class="{ error: Boolean(error), success: checked && !updateAvailable && !error }"
-        >
-          {{ updateStatusText }}
-        </span>
-      </div>
-      <div v-if="showManualUpdateDownload" class="update-recovery">
-        <span>{{ updateFailureLabel }}，可以从 GitHub Release 手动下载安装包。</span>
-        <button type="button" class="update-link-btn" @click="openManualDownload">
-          前往 GitHub Release
-        </button>
-      </div>
     </div>
 
     <!-- 系统通知镜像 -->
-    <div class="settings-section">
-      <div class="section-title">系统通知</div>
+    <div v-show="settingsTab === 'notifications' && !emailEditing" class="settings-section">
+      <div class="section-title">系统与社交通知</div>
+      <div class="update-toggle-row social-row">
+        <div class="update-copy"><span class="update-label">微信 / QQ 提醒<HintTip text="仅弹出提醒，不保存到通知中心；系统通知可显示预览，任务栏闪烁提供补充提醒。点击打开应用。" /></span></div>
+        <label class="switch" aria-label="微信和 QQ 提醒"><input v-model="settings.socialReminders" type="checkbox" /><span class="switch-track"></span></label>
+      </div>
       <div class="update-toggle-row">
         <div class="update-copy">
-          <span class="update-label">镜像 Windows 通知</span>
-          <span class="update-hint">记录到通知中心，并在岛上短暂提示；系统原生通知不受影响</span>
+          <span class="update-label">镜像 Windows 通知<HintTip text="记录到通知中心，并在岛上短暂提示；系统原生通知不受影响" /></span>
         </div>
         <label class="switch" aria-label="镜像 Windows 通知">
           <input v-model="settings.systemNotificationMirror" type="checkbox" />
@@ -751,8 +515,7 @@ onUnmounted(() => {
       </div>
       <div class="update-toggle-row row-spaced">
         <div class="update-copy">
-          <span class="update-label">专注时静默</span>
-          <span class="update-hint">专注计时运行中，FlowIsle 暂停系统通知和邮件的岛内提示及通知记录</span>
+          <span class="update-label"><HintTip label="专注时静默" text="专注计时运行中，暂停系统通知和邮件的岛内提示，通知记录仍保留" /></span>
         </div>
         <label class="switch" aria-label="专注时静默">
           <input v-model="settings.systemNotificationSilentInFocus" type="checkbox" />
@@ -772,103 +535,16 @@ onUnmounted(() => {
     </div>
 
     <!-- 邮箱通知 -->
-    <div class="settings-section email-settings-section">
-      <div class="section-title">邮箱通知</div>
-      <div class="update-toggle-row">
-        <div class="update-copy">
-          <span class="update-label">邮件提醒</span>
-          <span class="update-hint">只取发件人、主题和时间；专注时可随「专注时静默」暂停提醒</span>
-        </div>
-        <label class="switch" aria-label="邮件提醒">
-          <input v-model="settings.emailEnabled" type="checkbox" />
-          <span class="switch-track"></span>
-        </label>
-      </div>
-      <button type="button" class="collapsible-row row-spaced" @click="emailExpanded = !emailExpanded">
-        <span class="update-copy">
-          <span class="update-label">账号与授权码</span>
-          <span class="update-hint">{{ emailSummary }}</span>
-        </span>
-        <svg
-          class="collapsible-chevron"
-          :class="{ open: emailExpanded }"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-      <div v-if="emailExpanded" class="email-form">
-        <div class="email-provider-options">
-          <button
-            v-for="provider in emailProviders"
-            :key="provider.id"
-            type="button"
-            class="email-provider-option"
-            :class="{ active: settings.emailProvider === provider.id }"
-            @click="settings.emailProvider = provider.id"
-          >
-            {{ provider.label }}
-          </button>
-        </div>
-        <input
-          v-if="settings.emailProvider === 'custom'"
-          v-model="settings.emailImapHost"
-          class="email-input"
-          placeholder="IMAP 服务器，例如 imap.example.com"
-          autocomplete="off"
-        />
-        <input
-          v-model="settings.emailAddress"
-          class="email-input"
-          type="email"
-          placeholder="邮箱地址"
-          autocomplete="off"
-          @blur="refreshEmailCredentialStatus"
-        />
-        <input
-          v-model="emailAuthCode"
-          class="email-input"
-          type="password"
-          :placeholder="emailAuthPlaceholder"
-          autocomplete="off"
-        />
-        <div class="email-actions">
-          <button type="button" class="update-btn primary" :disabled="emailSaving" @click="saveEmailCredential">
-            {{ emailSaving ? '保存中...' : '保存授权码' }}
-          </button>
-          <button
-            type="button"
-            class="update-btn"
-            :disabled="emailTesting"
-            @click="testEmailConnection"
-          >
-            {{ emailTesting ? '测试中...' : '测试连接' }}
-          </button>
-          <button v-if="emailHasCredential" type="button" class="update-btn" @click="clearEmailCredential">
-            清除
-          </button>
-        </div>
-        <span class="email-status" :class="{ error: emailStatusOk === false, success: emailStatusOk === true }">
-          {{ emailStatus || (emailHasCredential ? '授权码已保存在本机' : '尚未保存授权码') }}
-        </span>
-        <span class="email-hint">
-          163 / 126 / QQ 需在网页版邮箱开启 IMAP，并使用客户端授权码，不能用登录密码；授权码失效后请重新生成。测试会直接使用当前输入的授权码，不会保存。Gmail 使用应用专用密码。Outlook.com 需要 OAuth2，当前版本尚未支持。自定义邮箱使用 IMAP 主机名和 TLS 端口 993。授权码只保存在本机 Windows 凭据管理器。
-        </span>
-      </div>
+    <div v-if="settingsTab === 'notifications'" class="settings-section email-settings-section">
+      <EmailAccounts @editing="emailEditing = $event" />
     </div>
 
     <!-- 更新（FlowIsle） -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'general'" class="settings-section">
       <div class="section-title">更新（FlowIsle）</div>
       <div class="setting-row">
         <div class="update-copy">
-          <span class="update-label">从 FlowIsle Release 检查更新</span>
-          <span class="update-hint">只查询 yunmin311/flow-isle，发现新版跳转下载页</span>
+          <span class="update-label"><HintTip label="版本更新" text="只查询 yunmin311/flow-isle，发现新版跳转下载页" /></span>
           <span class="update-status" :class="{ error: Boolean(forkUpdateStatus.startsWith('检查失败')) }">
             {{ forkUpdateStatus }}
           </span>
@@ -896,7 +572,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 外观 -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'appearance'" class="settings-section">
       <div class="section-title">外观</div>
       <div class="slider-row">
         <label class="slider-label">灵动岛不透明度</label>
@@ -938,7 +614,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 标语 -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'focus'" class="settings-section">
       <div class="section-title">标语</div>
       <textarea
         class="motto-editor"
@@ -951,7 +627,7 @@ onUnmounted(() => {
       ></textarea>
       <div class="motto-hint">空闲时在灵动岛轮播显示；每行一条，清空恢复默认</div>
     </div>
-    <div class="settings-section">
+    <div v-show="settingsTab === 'focus'" class="settings-section">
       <div class="section-title">番茄钟</div>
       <div class="duration-grid">
         <div class="duration-cell">
@@ -976,7 +652,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 快捷操作 -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'general'" class="settings-section">
       <div class="section-title">快捷操作</div>
       <div class="shortcut-row">
         <span class="shortcut-label">打开面板</span>
@@ -994,12 +670,11 @@ onUnmounted(() => {
     </div>
 
     <!-- 重置 -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'general'" class="settings-section">
       <div class="section-title">重置</div>
       <div class="setting-row">
         <div class="update-copy">
-          <span class="update-label">恢复默认设置</span>
-          <span class="update-hint">主题、透明度、显示模式、快捷键与标语</span>
+          <span class="update-label"><HintTip label="恢复默认设置" text="主题、透明度、显示模式、快捷键与标语" /></span>
         </div>
         <div class="setting-actions">
           <button type="button" class="update-btn danger" @click="resetAllSettings">恢复默认设置</button>
@@ -1008,7 +683,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 色彩主题 -->
-    <div class="settings-section">
+    <div v-show="settingsTab === 'appearance'" class="settings-section">
       <div class="section-title">色彩主题</div>
       <div class="theme-grid">
         <button

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { open } from '@tauri-apps/plugin-shell'
 import { getName, getVersion } from '@tauri-apps/api/app'
+import thirdPartyNotices from '../../THIRD_PARTY_NOTICES.md?raw'
 import appIcon from '../../src-tauri/icons/128x128.png'
 
 const emit = defineEmits<{ close: [] }>()
@@ -79,6 +80,11 @@ function onBackdropClick(event: MouseEvent) {
         </ul>
       </div>
 
+      <details class="third-party-notices">
+        <summary>第三方开源许可</summary>
+        <pre>{{ thirdPartyNotices }}</pre>
+      </details>
+
       <!-- 链接 -->
       <div class="links-row">
         <button class="link-btn" @click="openGitHub">
@@ -97,6 +103,9 @@ function onBackdropClick(event: MouseEvent) {
 
 <style scoped>
 @reference "../styles.css";
+.third-party-notices { margin: 12px 0; font-size: 11px; color: var(--v2-secondary); }
+.third-party-notices summary { cursor: pointer; }
+.third-party-notices pre { max-height: 160px; overflow: auto; white-space: pre-wrap; font: inherit; }
 
 .dialog-backdrop {
   position: fixed;

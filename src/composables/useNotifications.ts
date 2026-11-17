@@ -1,9 +1,10 @@
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { emitTo, listen } from '@tauri-apps/api/event'
 import { readTextFile, writeTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { shouldMirrorSystemNotification, rememberSystemNotificationSource, useSettings } from './useSettings'
 import { useTimer } from './useTimer'
+import { isTransientSocialNotification } from '../utils/notificationSources'
 
 export type NotificationKind = 'focus-done' | 'break-done' | 'system' | 'task-reminder' | 'email'
 
@@ -21,6 +22,8 @@ export interface NotificationRecord {
   /** 每日任务提醒：对应任务 id，供“打开来源”跳转 */
   taskId?: string
   emailProvider?: string
+  emailAccountId?: string
+  emailAccountAddress?: string
 }
 
 /** Rust 端 system-notification 事件的载荷 */
@@ -42,6 +45,8 @@ export interface EmailNotificationPayload {
   provider: string
   mailbox_key: string
   historical?: boolean
+  account_id?: string
+  account_address?: string
 }
 
 export function systemNotificationRecordId(p: SystemNotificationPayload) {
@@ -60,7 +65,8 @@ export function useExternalNotificationSilence() {
 }
 
 const NOTIF_FILE = 'focus-island/notifications.json'
-const LIMIT = 200
+// Separate budgets: a burst of system alerts must not evict offline mail.
+const LIMIT_PER_SOURCE = 200
 // 系统通知按系统逻辑短期缓存；专注提醒保留更久
 const SYSTEM_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const FOCUS_TTL_MS = 30 * 24 * 60 * 60 * 1000
@@ -73,12 +79,18 @@ let pendingSave = Promise.resolve()
 
 function pruneByRetention(list: NotificationRecord[]): NotificationRecord[] {
   const now = Date.now()
+  const counts = new Map<string, number>()
   return list
     .filter((record) => {
       const ttl = record.kind === 'system' ? SYSTEM_TTL_MS : FOCUS_TTL_MS
       return now - record.time <= ttl
     })
-    .slice(0, LIMIT)
+    .filter(record => {
+      const group = record.kind === 'email' ? 'email' : record.kind === 'system' ? 'system' : 'reminder'
+      const count = (counts.get(group) ?? 0) + 1
+      counts.set(group, count)
+      return count <= LIMIT_PER_SOURCE
+    })
 }
 
 /** 清理过期记录；有变化时落盘 */
@@ -89,7 +101,9 @@ export function pruneExpiredRecords() {
   if (records.value.length !== before) save()
 }
 
-const unreadCount = computed(() => records.value.filter(r => !r.read).length)
+// Hide legacy chat entries without deleting previously saved user data.
+const visibleRecords = computed(() => records.value.filter(r => r.kind !== 'system' || !isTransientSocialNotification(r.app, r.aumid)))
+const unreadCount = computed(() => visibleRecords.value.filter(r => !r.read).length)
 
 const KIND_LABELS: Record<
   'focus-done' | 'break-done' | 'task-reminder',
@@ -124,12 +138,21 @@ function save() {
   }).catch(() => console.error('Failed to save notifications'))
 }
 
-function addAfterLoad(record: NotificationRecord) {
+function addAfterLoad(record: NotificationRecord, onAdded?: () => void) {
   const ready = loading ??= load()
   void ready.then(() => {
-    if (records.value.some(item => item.id === record.id)) return
+    const existing = records.value.find(item => item.id === record.id)
+    if (existing) {
+      if (record.emailAccountAddress && (!existing.emailAccountAddress || existing.emailAccountId !== record.emailAccountId)) {
+        existing.emailAccountAddress = record.emailAccountAddress
+        existing.emailAccountId = record.emailAccountId
+        save()
+      }
+      return
+    }
     records.value = pruneByRetention([record, ...records.value].sort((a, b) => b.time - a.time))
     save()
+    onAdded?.()
   })
 }
 
@@ -153,6 +176,7 @@ export function addRecord(
 }
 
 function addSystemRecord(p: SystemNotificationPayload) {
+  if (isTransientSocialNotification(p.app, p.aumid)) return
   const appName = (p.app || '').trim()
   const title = (p.title || '').trim() || appName || '系统通知'
   const body = (p.body || '').trim()
@@ -171,6 +195,32 @@ function addSystemRecord(p: SystemNotificationPayload) {
   addAfterLoad(record)
 }
 
+export interface EmailHistorySummary {
+  count: number
+  accounts: number
+  recordId: string
+}
+const historyBatch = new Map<string, { mailbox: string; time: number }>()
+let historyTimer: ReturnType<typeof setTimeout> | undefined
+function queueHistorySummary(record: NotificationRecord, mailbox: string) {
+  historyBatch.set(record.id, { mailbox, time: record.time })
+  if (historyTimer !== undefined) clearTimeout(historyTimer)
+  historyTimer = setTimeout(() => {
+    historyTimer = undefined
+    const retainedIds = new Set(records.value.map(record => record.id))
+    const entries = [...historyBatch.entries()].filter(([id]) => retainedIds.has(id))
+    historyBatch.clear()
+    if (!entries.length) return
+    entries.sort((a, b) => b[1].time - a[1].time)
+    const summary: EmailHistorySummary = {
+      count: entries.length,
+      accounts: new Set(entries.map(([, item]) => item.mailbox)).size,
+      recordId: entries[0]![0],
+    }
+    void emitTo('main', 'email-history-ready', summary).catch(() => console.error('Failed to show mail sync summary'))
+  }, 1500)
+}
+
 function addEmailRecord(p: EmailNotificationPayload) {
   const from = (p.from || '').trim() || '未知发件人'
   const record: NotificationRecord = {
@@ -182,8 +232,12 @@ function addEmailRecord(p: EmailNotificationPayload) {
     read: false,
     app: from,
     emailProvider: p.provider,
+    emailAccountId: p.account_id,
+    emailAccountAddress: p.account_address,
   }
-  addAfterLoad(record)
+  addAfterLoad(record, () => {
+    if (p.historical) queueHistorySummary(record, p.mailbox_key)
+  })
 }
 
 function markAllRead() {
@@ -192,6 +246,9 @@ function markAllRead() {
 }
 
 function clearAll() {
+  if (historyTimer !== undefined) clearTimeout(historyTimer)
+  historyTimer = undefined
+  historyBatch.clear()
   records.value = []
   save()
 }
@@ -228,5 +285,5 @@ export function useNotifications() {
       if (payload) addEmailRecord(payload)
     }).then(() => invoke('email_listener_ready')).catch(() => { listening = false })
   }
-  return { records, unreadCount, markAllRead, clearAll }
+  return { records: visibleRecords, unreadCount, markAllRead, clearAll }
 }

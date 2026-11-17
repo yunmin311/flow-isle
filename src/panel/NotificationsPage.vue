@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-shell'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -16,6 +16,8 @@ import {
 } from '../composables/useSettings'
 import { useTasks } from '../composables/useTasks'
 import { emailInboxUrl } from '../utils/emailLinks'
+import EmailReader from './EmailReader.vue'
+import ScreenshotShelf from './ScreenshotShelf.vue'
 
 const props = defineProps<{ focusRequest?: { recordId?: string; openSource?: boolean; destination?: 'timer' } }>()
 const emit = defineEmits<{ back: []; openTask: [taskId: string]; openHome: []; openTodo: [] }>()
@@ -36,6 +38,17 @@ const notifGroups = computed(() =>
     },
   ].filter(group => group.items.length > 0),
 )
+
+const selectedEmail = ref<NotificationRecord | null>(null)
+function openRecord(record: NotificationRecord) {
+  if (record.kind === 'email') selectedEmail.value = record
+  else toggleRecord(record.id)
+}
+function closeEmail() {
+  const id = selectedEmail.value?.id
+  selectedEmail.value = null
+  if (id) void nextTick(() => recordNodes.get(id)?.focus({ preventScroll: true }))
+}
 
 // 每组默认只展示前 7 条，其余折叠
 const GROUP_VISIBLE_LIMIT = 7
@@ -124,6 +137,7 @@ function groupKeyForRecord(record: NotificationRecord): string {
 function focusRecord(record: NotificationRecord) {
   expandedGroups.value = { ...expandedGroups.value, [groupKeyForRecord(record)]: true }
   expandedRecords.value = { ...expandedRecords.value, [record.id]: true }
+  selectedEmail.value = null
   focusedRecordId.value = record.id
   if (focusTimer !== null) window.clearTimeout(focusTimer)
   focusTimer = window.setTimeout(() => {
@@ -184,10 +198,10 @@ async function openRecordSource(record: NotificationRecord) {
     } else if (inbox) {
       await open(inbox)
     }
-  } catch {
+  } catch (reason) {
     focusRecord(record)
     const message = record.kind === 'system'
-      ? '无法打开来源应用，已定位到这条通知'
+      ? (typeof reason === 'string' ? reason : '无法打开来源应用，已定位到这条通知')
       : '无法打开网页版收件箱，已定位到这条通知'
     showActionStatus(record.id, message, false)
   } finally {
@@ -273,6 +287,8 @@ onMounted(() => {
   pruneExpiredRecords()
 })
 onActivated(pruneExpiredRecords)
+// Cached pages must not retain mail bodies after leaving for account settings.
+onDeactivated(() => { selectedEmail.value = null })
 </script>
 
 <template>
@@ -304,6 +320,8 @@ onActivated(pruneExpiredRecords)
     </div>
     <div v-else class="volume-hint">{{ volumeError ?? '读取系统音量中…' }}</div>
 
+    <EmailReader v-if="selectedEmail" :record="selectedEmail" @back="closeEmail" />
+    <div v-show="!selectedEmail" class="records-view">
     <!-- 通知记录 -->
     <div class="section-head">
       <span ref="pageHeading" class="section-title" tabindex="-1">通知记录</span>
@@ -312,7 +330,8 @@ onActivated(pruneExpiredRecords)
         <button v-if="records.length" class="text-btn" @click="clearAll">清空</button>
       </div>
     </div>
-    <div v-if="records.length" class="notif-scroll">
+    <div class="notif-scroll">
+      <ScreenshotShelf />
       <section v-for="group in notifGroups" :key="group.key" class="notif-group">
         <div class="group-head">
           <span class="group-title">{{ group.title }}</span>
@@ -324,20 +343,23 @@ onActivated(pruneExpiredRecords)
             :key="r.id"
             :ref="el => setRecordNode(r.id, el)"
             class="notif-item"
-            tabindex="-1"
+            tabindex="0"
+            role="button"
+            @keydown.enter.self.prevent="openRecord(r)"
+            @keydown.space.self.prevent="openRecord(r)"
             :class="{
               unread: !r.read,
               expanded: isRecordExpanded(r.id),
               focused: focusedRecordId === r.id,
             }"
-            title="点击展开/收起"
-            @click="toggleRecord(r.id)"
+            :title="r.kind === 'email' ? '阅读邮件' : '点击展开/收起'"
+            @click="openRecord(r)"
           >
             <div class="notif-dot" />
             <div class="notif-body">
               <div class="notif-line">
                 <span
-                  v-if="((r.kind === 'system' || r.kind === 'email') && r.app) || (r.kind === 'system' && isRecordBlocked(r))"
+                  v-if="r.kind === 'system' && (r.app || isRecordBlocked(r))"
                   class="notif-app"
                 >
                   <span v-if="r.app">{{ r.app }}</span>
@@ -347,6 +369,7 @@ onActivated(pruneExpiredRecords)
                 <span class="notif-time">{{ formatNotifTime(r.time) }}</span>
               </div>
               <div class="notif-detail">{{ r.detail }}</div>
+              <div v-if="r.kind === 'email'" class="notif-account">收件 · {{ r.emailAccountAddress || r.emailProvider || '旧邮件账号未标记' }}</div>
               <div v-if="isRecordExpanded(r.id)" class="notif-actions" @click.stop>
                 <button type="button" class="copy-btn" @click.stop="copyRecord(r)">
                   {{ copiedId === r.id ? '已复制' : '复制' }}
@@ -391,13 +414,18 @@ onActivated(pruneExpiredRecords)
           {{ isGroupExpanded(group.key) ? '收起' : `展开剩余 ${group.items.length - GROUP_VISIBLE_LIMIT} 条` }}
         </button>
       </section>
+      <div v-if="!records.length" class="empty">还没有通知，完成番茄或收到系统通知后会记录在这里</div>
     </div>
-    <div v-else class="empty">还没有通知，完成番茄或收到系统通知后会记录在这里</div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 @reference "../styles.css";
+
+.notif-account { font-size: 11px; font-weight: 400; color: var(--v2-secondary); margin-top: 3px; overflow-wrap: anywhere; line-height: 1.5; }
+
+.records-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
 .notif-page {
   flex: 1;

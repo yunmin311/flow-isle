@@ -30,4 +30,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
       - run: npm run vite:build
+      - run: node scripts/test-email-history.mjs
+      - run: node scripts/test-notification-peek.mjs
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib email_imap::tests
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib email_credentials::tests
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib social_notifications::tests::matches_executable_not_substring

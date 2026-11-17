@@ -7,8 +7,8 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useTimerBridge } from '../composables/useTimerBridge'
 import { useSettings } from '../composables/useSettings'
 import { useNotifications } from '../composables/useNotifications'
+import { startScreenshotCollection } from '../composables/useScreenshots'
 import { useTaskReminders } from '../composables/useTaskReminders'
-import { useUpdater } from '../composables/useUpdater'
 import { useTasks } from '../composables/useTasks'
 import { useTaskGroups } from '../composables/useTaskGroups'
 import { useMemos } from '../composables/useMemos'
@@ -37,9 +37,10 @@ interface PanelTransitionMetrics {
 }
 
 const { startBridge } = useTimerBridge()
-const { settings, settingsReady } = useSettings()
+const { settings } = useSettings()
 // 面板启动即开始记录番茄通知，避免通知页未打开时漏记
 useNotifications()
+void startScreenshotCollection()
 // 每日任务 repeatTime 到点提醒
 useTaskReminders()
 const { tasks } = useTasks()
@@ -54,35 +55,11 @@ function prewarmPanelData() {
 
 prewarmPanelData()
 
-const {
-  updateAvailable,
-  updateInfo,
-  downloading,
-  installing,
-  downloadProgress,
-  error,
-  installFinished,
-  updateNoticeDismissed,
-  isMacOS,
-  macQuarantined,
-  macRepairCommand,
-  macRepairStatus,
-  copiedRepairCommand,
-  autoCheckForUpdate,
-  downloadAndInstall,
-  copyRepairCommand,
-  recheckAfterRepair,
-  dismissUpdateNotice,
-  openReleasePage,
-} = useUpdater()
 
-const REPOSITION_BURST_DELAYS = [0, 90, 220]
 const PANEL_CLOSE_DURATION = 130
 const CLOSE_FALLBACK_BUFFER = 140
 const IS_MACOS = navigator.userAgent.toLowerCase().includes('mac')
 
-// 定制构建：应用内更新指向官方版会覆盖定制内容，已禁用
-const SHOW_UPDATER = false
 
 const currentView = ref<'tasks' | 'todo' | 'taskDetail' | 'settings' | 'memos' | 'stats' | 'radio' | 'notifications'>('tasks')
 const notificationFocusRequest = ref<{ recordId?: string; openSource?: boolean; destination?: 'timer' }>()
@@ -172,10 +149,6 @@ const navItems = [
 const currentTitleMeta = computed(() =>
   navItems.find(item => item.key === (currentView.value === 'taskDetail' ? 'todo' : currentView.value)) ?? navItems[0]
 )
-const showUpdateBanner = computed(() => {
-  if (downloading.value || installing.value || (installFinished.value && isMacOS)) return true
-  return updateAvailable.value && !updateNoticeDismissed.value
-})
 const isClosing = ref(false)
 const panelRootRef = ref<HTMLElement | null>(null)
 const panelAnimState = ref<'hidden' | 'steady' | 'opening-ready' | 'opening' | 'closing'>('hidden')
@@ -188,9 +161,7 @@ let unlistenMove: (() => void) | null = null
 let unlistenTransition: (() => void) | null = null
 let unlistenOpenNotifications: (() => void) | null = null
 let unlistenOpenTask: (() => void) | null = null
-let repositionTimers: number[] = []
 let closeFallbackTimer: number | null = null
-let suppressMoveEventsUntil = 0
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v))
@@ -242,29 +213,6 @@ function scheduleCloseFallback() {
   closeFallbackTimer = window.setTimeout(() => {
     void finishCloseAnimation()
   }, PANEL_CLOSE_DURATION + CLOSE_FALLBACK_BUFFER)
-}
-
-async function repositionPanel() {
-  suppressMoveEventsUntil = Date.now() + 250
-  await invoke('position_panel_under_island')
-}
-
-function clearRepositionTimers() {
-  for (const timer of repositionTimers) {
-    window.clearTimeout(timer)
-  }
-  repositionTimers = []
-}
-
-function scheduleReposition() {
-  if (panelAnimState.value !== 'steady') return
-  clearRepositionTimers()
-  repositionTimers = REPOSITION_BURST_DELAYS.map(delay =>
-    window.setTimeout(() => {
-      if (panelAnimState.value !== 'steady') return
-      void repositionPanel()
-    }, delay),
-  )
 }
 
 async function finishCloseAnimation() {
@@ -397,19 +345,8 @@ onMounted(async () => {
 
 })
 
-watch(
-  [settingsReady, () => settings.value.autoCheckUpdates],
-  ([ready, autoCheck]) => {
-    if (ready && autoCheck && SHOW_UPDATER) {
-      void autoCheckForUpdate()
-    }
-  },
-  { immediate: true },
-)
-
 onUnmounted(() => {
   window.removeEventListener('keydown', onPanelKeydown)
-  clearRepositionTimers()
   clearCloseFallback()
   if (unlistenResize) unlistenResize()
   if (unlistenMove) unlistenMove()
@@ -474,76 +411,6 @@ async function closeWindow() {
           />
         </KeepAlive>
       </div>
-      <transition name="update-banner">
-        <div v-if="showUpdateBanner" class="update-banner" role="status" aria-live="polite">
-          <div class="update-banner-copy">
-            <span class="update-banner-title">
-              <template v-if="downloading">下载更新 {{ downloadProgress }}%</template>
-              <template v-else-if="installing">安装更新中...</template>
-              <template v-else-if="installFinished">更新已安装</template>
-              <template v-else>新版本 v{{ updateInfo?.version }}</template>
-            </span>
-            <span class="update-banner-detail">
-              <template v-if="installFinished && isMacOS && macQuarantined">
-                检测到隔离属性，需修复后重启
-              </template>
-              <template v-else-if="installFinished">{{ macRepairStatus || '正在准备重启应用' }}</template>
-              <template v-else-if="error">{{ error }}</template>
-              <template v-else>可在空闲时安装</template>
-            </span>
-          </div>
-          <div class="update-banner-actions">
-            <button
-              v-if="updateAvailable && !downloading"
-              type="button"
-              class="update-banner-btn primary"
-              @click="downloadAndInstall()"
-            >
-              安装
-            </button>
-            <button
-              v-if="updateAvailable && !downloading"
-              type="button"
-              class="update-banner-btn"
-              @click="openReleasePage()"
-            >
-              详情
-            </button>
-            <button
-              v-if="installFinished && isMacOS && macQuarantined"
-              type="button"
-              class="update-banner-btn"
-              @click="copyRepairCommand()"
-            >
-              {{ copiedRepairCommand ? '已复制' : '复制命令' }}
-            </button>
-            <button
-              v-if="installFinished && isMacOS && macQuarantined"
-              type="button"
-              class="update-banner-btn primary"
-              @click="recheckAfterRepair()"
-            >
-              重检
-            </button>
-            <button
-              v-if="updateAvailable && !downloading"
-              type="button"
-              class="update-banner-close"
-              aria-label="关闭更新提示"
-              @click="dismissUpdateNotice()"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <input
-            v-if="installFinished && isMacOS && macQuarantined"
-            v-model="macRepairCommand"
-            class="update-repair-input"
-          />
-        </div>
-      </transition>
       <nav class="panel-nav">
         <button
           v-for="item in navItems"
@@ -730,129 +597,7 @@ async function closeWindow() {
   overflow: clip;
 }
 
-.update-banner {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 56px;
-  z-index: 8;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px 8px;
-  align-items: center;
-  min-height: 40px;
-  padding: 6px 7px 6px 10px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--focus-color) 42%, rgba(255, 255, 255, 0.12));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--focus-color) 14%, rgba(24, 24, 28, 0.96)), rgba(16, 16, 20, 0.94));
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(14px);
-}
 
-.update-banner-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 2px;
-}
-
-.update-banner-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--v2-ink);
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.update-banner-detail {
-  font-size: 10px;
-  line-height: 1.2;
-  color: var(--v2-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.update-banner-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.update-banner-btn,
-.update-banner-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  border: 1px solid var(--v2-line);;
-  background: var(--ui-well);
-  color: var(--v2-ink);
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-
-.update-banner-btn {
-  height: 28px;
-  min-width: 44px;
-  padding: 0 9px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.update-banner-close {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-}
-
-.update-banner-close svg {
-  width: 14px;
-  height: 14px;
-}
-
-.update-banner-btn:hover,
-.update-banner-close:hover {
-  background: var(--ui-hover);
-  border-color: var(--v2-muted);
-  color: var(--v2-ink);
-}
-
-.update-banner-btn.primary {
-  background: var(--focus-color);
-  border-color: var(--focus-color);
-  color: var(--v2-ink);
-}
-
-.update-repair-input {
-  grid-column: 1 / -1;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  border: 1px solid var(--v2-line);;
-  background: var(--ui-well);
-  border-radius: 6px;
-  color: var(--v2-ink);
-  font-size: 10px;
-  line-height: 1.4;
-  padding: 7px 8px;
-}
-
-.update-banner-enter-active,
-.update-banner-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.update-banner-enter-from,
-.update-banner-leave-to {
-  opacity: 0;
-  transform: translate3d(0, 6px, 0);
-}
 
 .motion-opening {
   animation: panel-open 280ms cubic-bezier(0.165, 0.84, 0.44, 1) both;

@@ -23,6 +23,19 @@ export type SystemNotificationMirrorMode = 'all' | 'selected'
 
 export type EmailProvider = 'qq' | '163' | '126' | 'gmail' | 'outlook' | 'custom'
 
+export interface EmailAccount {
+  id: string
+  provider: EmailProvider
+  address: string
+  host: string
+  enabled: boolean
+}
+
+export function migrateEmailAccounts(value: Partial<Settings>): EmailAccount[] {
+  if (Array.isArray(value.emailAccounts)) return value.emailAccounts
+  return value.emailAddress?.trim() ? [{ id: 'legacy', provider: value.emailProvider ?? 'qq', address: value.emailAddress.trim(), host: value.emailImapHost ?? '', enabled: !!value.emailEnabled }] : []
+}
+
 export interface Settings {
   islandOpacity: number      // 灵动岛不透明度 0.4~1.0，值越大越不透明
   panelOpacity: number       // 面板不透明度 0.4~1.0，值越大越不透明
@@ -45,6 +58,8 @@ export interface Settings {
   systemNotificationAllowedApps: string[] // 只镜像模式下允许的来源（应用名或 AUMID）
   systemNotificationKnownSources: string[] // 自动/探针发现的来源，持久保留
   systemNotificationSilentInFocus: boolean // 番茄专注运行中暂停系统和邮件的岛内提示及通知记录
+  emailAccounts: EmailAccount[]
+  socialReminders: boolean
   emailEnabled: boolean        // 邮件提醒开关
   emailProvider: EmailProvider // QQ / 163 / 126 / Gmail / Outlook / 自定义
   emailAddress: string         // 邮箱地址（授权码存 Windows 凭据管理器）
@@ -85,6 +100,8 @@ const DEFAULT_SETTINGS: Settings = {
   systemNotificationAllowedApps: [],
   systemNotificationKnownSources: [],
   systemNotificationSilentInFocus: true,
+  emailAccounts: [],
+  socialReminders: true,
   emailEnabled: false,
   emailProvider: 'qq',
   emailAddress: '',
@@ -94,6 +111,8 @@ const DEFAULT_SETTINGS: Settings = {
 
 const settings = ref<Settings>({ ...DEFAULT_SETTINGS })
 const loaded = ref(false)
+let loading: Promise<void> | undefined
+let pendingSave = Promise.resolve()
 let suppressEmit = false
 let systemSchemeListenerBound = false
 
@@ -120,6 +139,7 @@ export function shouldMirrorSystemNotification(app: string, aumid: string): bool
   if (!settings.value.systemNotificationMirror) return false
   const appName = (app ?? '').trim().toLowerCase()
   const appId = (aumid ?? '').trim().toLowerCase()
+  if (!settings.value.socialReminders && (appId.startsWith('flowisle.social.') || ['qq', '微信', 'wechat', 'weixin'].includes(appName))) return false
   if (appId.includes('com.focus-island')) return false
 
   const matches = (entry: string) => {
@@ -156,6 +176,7 @@ export function systemNotificationSourceKey(app?: string, aumid?: string): strin
 export function isSystemNotificationSourceBlocked(app: string, aumid: string): boolean {
   const appName = (app ?? '').trim().toLowerCase()
   const appId = (aumid ?? '').trim().toLowerCase()
+  if (!settings.value.socialReminders && (appId.startsWith('flowisle.social.') || ['qq', '微信', 'wechat', 'weixin'].includes(appName))) return false
   if (!appName && !appId) return false
 
   const matches = (entry: string) => {
@@ -243,6 +264,7 @@ async function load() {
     settings.value = {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      emailAccounts: migrateEmailAccounts(parsed),
       colorMode: normalizeColorMode(parsed.colorMode),
       panelGlass: normalizePanelGlass(parsed.panelGlass),
       ...(legacyOpacity ? { islandOpacity: 0.92, panelOpacity: 0.92, settingsVersion: 2 } : {}),
@@ -263,14 +285,17 @@ async function load() {
   }
 }
 
-async function save() {
+function save() {
   if (!loaded.value) return
+  const snapshot = JSON.stringify(settings.value)
+  pendingSave = pendingSave.then(async () => {
   try {
     await mkdir('focus-island', { baseDir: BaseDirectory.AppData, recursive: true })
-    await writeTextFile(SETTINGS_FILE, JSON.stringify(settings.value), { baseDir: BaseDirectory.AppData })
+    await writeTextFile(SETTINGS_FILE, snapshot, { baseDir: BaseDirectory.AppData })
   } catch (e) {
-    console.error('Failed to save settings', e)
+    console.error('Failed to save settings')
   }
+  })
 }
 
 watch(settings, () => {
@@ -301,7 +326,9 @@ const activeTheme = computed(() =>
 function applyExternalSettings(newSettings: Settings) {
   suppressEmit = true
   settings.value = {
+    ...DEFAULT_SETTINGS,
     ...newSettings,
+    emailAccounts: migrateEmailAccounts(newSettings),
     colorMode: normalizeColorMode(newSettings.colorMode),
   }
   loaded.value = true
@@ -309,10 +336,10 @@ function applyExternalSettings(newSettings: Settings) {
 
 export function useSettings() {
   ensureSystemSchemeListener()
-  if (!loaded.value) load()
+  if (!loaded.value) loading ??= load()
 
   function resetSettings() {
-    settings.value = { ...DEFAULT_SETTINGS }
+    settings.value = { ...DEFAULT_SETTINGS, emailAccounts: settings.value.emailAccounts }
     applyThemeToDOM()
   }
 

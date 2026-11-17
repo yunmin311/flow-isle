@@ -2,13 +2,14 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  data: { key: string; kind?: 'system' | 'email' | 'task'; app: string; title: string; body: string } | null
+  data: { key: string; kind?: 'system' | 'email' | 'email-history' | 'task'; app: string; title: string; body: string } | null
   scale: number
 }>()
 
 const emit = defineEmits<{ open: []; hold: []; resume: [] }>()
 
 const openHint = computed(() => {
+  if (props.data?.kind === 'email-history') return '查看补收邮件'
   if (props.data?.kind === 'email') return '打开邮箱'
   if (props.data?.kind === 'task') return '打开任务'
   return '打开通知来源'

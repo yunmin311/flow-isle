@@ -187,7 +187,7 @@ const weekTrend = computed(() => {
     const d = new Date(now)
     d.setDate(d.getDate() - i)
     const dateStr = getDateString(d)
-    const stats = weekStats.value.find(s => s.date === dateStr)
+    const stats = allStatsMap.value.get(dateStr)
     result.push({
       day: weekDays[d.getDay()],
       pomodoros: stats?.pomodoros ?? 0,

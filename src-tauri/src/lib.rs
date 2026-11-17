@@ -1,3 +1,8 @@
+mod screenshot_clipboard;
+#[cfg(target_os = "windows")]
+mod social_notifications;
+#[cfg(target_os = "windows")]
+mod social_window;
 #[cfg(target_os = "windows")]
 mod email_imap;
 
@@ -1570,8 +1575,8 @@ fn get_macos_update_health<R: Runtime>(_app: AppHandle<R>) -> Option<MacosUpdate
 
 // ==== 系统通知镜像（Windows，MVP） ====
 // 免安装 Win32 应用通过 UserNotificationListener 读取通知中心里的 Toast 历史。
-// 采用轮询而非事件订阅：启动首轮只做 seed（不回放旧通知），之后每 1.5s
-// 读取一次，按 (id, created_ms) 去重，新通知以 "system-notification" 事件发给前端。
+// 尝试即时事件，失败则每次查询完成后等待 250ms。启动只记录已有 ID；
+// 仅解析新通知，按 (id, created_ms) 去重，以 "system-notification" 发给前端。
 // 注意：系统不允许拦截或关闭原生 Toast，这里只是镜像。
 
 #[cfg(target_os = "windows")]
@@ -1610,11 +1615,9 @@ fn read_system_notification_event(
                         if let Ok(t) = texts.GetAt(0) {
                             title = t.Text().map(|s| s.to_string()).unwrap_or_default();
                         }
-                        if texts.Size().unwrap_or(0) > 1 {
-                            if let Ok(t) = texts.GetAt(1) {
-                                body = t.Text().map(|s| s.to_string()).unwrap_or_default();
-                            }
-                        }
+                        body = (1..texts.Size().unwrap_or(0)).filter_map(|i| {
+                            texts.GetAt(i).and_then(|t| t.Text()).ok().map(|s| s.to_string())
+                        }).filter(|s| !s.trim().is_empty()).collect::<Vec<_>>().join("\n");
                     }
                 }
             }
@@ -1636,12 +1639,28 @@ fn read_system_notification_event(
     }
 }
 
+fn notification_diagnostic<R: Runtime>(app: &AppHandle<R>, message: &str) {
+    use std::io::Write;
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let dir = dir.join("focus-island"); let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("notification-timing.log");
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > 64 * 1024) { let _ = std::fs::remove_file(&path); }
+    let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) { let _ = writeln!(file, "{time} {message}"); }
+}
+#[tauri::command]
+fn notification_delivery_metrics(app: AppHandle, window: tauri::WebviewWindow, stage: String, delay_ms: u64) {
+    if window.label() == "main" && ["received", "peek"].contains(&stage.as_str()) {
+        notification_diagnostic(&app, &format!("{stage} delay_ms={}", delay_ms.min(86_400_000)));
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn start_system_notification_mirror<R: Runtime>(app: AppHandle<R>) {
     let spawned = std::thread::Builder::new()
         .name("system-notification-mirror".into())
         .spawn(move || {
-            use std::collections::{HashSet, VecDeque};
+            use std::collections::HashSet;
             use std::time::Duration;
             use windows::UI::Notifications::Management::{
                 UserNotificationListener, UserNotificationListenerAccessStatus,
@@ -1656,6 +1675,7 @@ fn start_system_notification_mirror<R: Runtime>(app: AppHandle<R>) {
                 );
             }
 
+            let started_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
             let listener = match UserNotificationListener::Current() {
                 Ok(listener) => listener,
                 Err(e) => {
@@ -1678,42 +1698,58 @@ fn start_system_notification_mirror<R: Runtime>(app: AppHandle<R>) {
                 }
             }
 
+            // Some desktop installations reject event subscription. Try the public
+            // event API and retain a bounded polling fallback instead of assuming support.
+            let (wake, changed) = std::sync::mpsc::sync_channel(1);
+            let handler = windows::Foundation::TypedEventHandler::<UserNotificationListener, windows::UI::Notifications::UserNotificationChangedEventArgs>::new(move |_, _| {
+                let _ = wake.try_send(()); Ok(())
+            });
+            let _event_token = match listener.NotificationChanged(&handler) {
+                Ok(token) => Some(token),
+                Err(error) => {
+                    notification_diagnostic(&app, &format!("subscription_hresult={:08x}", error.code().0));
+                    None
+                }
+            };
+            notification_diagnostic(&app, if _event_token.is_some() { "listener event+poll interval_ms=250" } else { "listener poll interval_ms=250" });
+            // Keep a sender alive when registration fails so recv_timeout does not spin.
+            let (_keep_alive, fallback) = std::sync::mpsc::sync_channel::<()>(1);
+            let wait = if _event_token.is_some() { changed } else { fallback };
             let mut seen: HashSet<(u32, i64)> = HashSet::new();
-            let mut seen_order: VecDeque<(u32, i64)> = VecDeque::new();
             let mut seeded = false;
             let mut last_error: Option<String> = None;
 
             loop {
+                let scan_started = std::time::Instant::now();
                 match listener
                     .GetNotificationsAsync(NotificationKinds::Toast)
                     .and_then(|op| op.get())
                 {
                     Ok(items) => {
+                        let query_ms = scan_started.elapsed().as_millis();
                         last_error = None;
                         let count = items.Size().unwrap_or(0);
+                        let mut present = HashSet::new();
                         for i in 0..count {
                             let Ok(n) = items.GetAt(i) else { continue };
+                            let key = (n.Id().unwrap_or(0), n.CreationTime().map(|t| t.UniversalTime / 10_000 - 11_644_473_600_000).unwrap_or(0));
+                            present.insert(key);
+                            // Seed historic IDs only; retain arrivals during a slow first query.
+                            // Never resolve hundreds of historic AppInfo entries.
+                            if (!seeded && key.1 < started_ms) || seen.contains(&key) { continue; }
+                            let parse_started = std::time::Instant::now();
                             let ev = read_system_notification_event(&n);
-                            let key = (ev.id, ev.created_ms);
-                            if seen.contains(&key) {
-                                continue;
-                            }
-                            seen.insert(key);
-                            seen_order.push_back(key);
-                            while seen_order.len() > 500 {
-                                if let Some(old) = seen_order.pop_front() {
-                                    seen.remove(&old);
-                                }
-                            }
-                            // 首轮只是记录已有通知，不往前端回放
-                            if seeded
-                                && !(ev.title.is_empty()
+                            social_notifications::note_toast(&ev.app);
+                            if !(ev.title.is_empty()
                                     && ev.body.is_empty()
                                     && ev.app.is_empty())
                             {
+                                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+                                notification_diagnostic(&app, &format!("detected age_ms={} scan_ms={} query_ms={} parse_ms={}", now.saturating_sub(ev.created_ms).max(0), scan_started.elapsed().as_millis(), query_ms, parse_started.elapsed().as_millis()));
                                 let _ = app.emit("system-notification", ev);
                             }
                         }
+                        seen = present;
                         seeded = true;
                     }
                     Err(e) => {
@@ -1724,9 +1760,7 @@ fn start_system_notification_mirror<R: Runtime>(app: AppHandle<R>) {
                         }
                     }
                 }
-                // 未打包 Win32 应用无法订阅 NotificationChanged，只能轮询；
-                // 1s 间隔在 CPU 开销和镜像延迟之间取平衡。
-                std::thread::sleep(Duration::from_millis(1000));
+                let _ = wait.recv_timeout(Duration::from_millis(250));
             }
         });
 
@@ -1737,14 +1771,15 @@ fn start_system_notification_mirror<R: Runtime>(app: AppHandle<R>) {
 
 // ==== 邮件通知（Windows）：IMAP 只取发件人/主题/时间 ====
 // 凭据存 Windows 凭据管理器；QQ/163 用授权码，Gmail 用应用专用密码。
-// 优先 IDLE；服务不支持时每 10 秒轮询。
+// 优先 IDLE；服务不支持时每 5 秒轮询。
 
 #[cfg(target_os = "windows")]
-const EMAIL_CRED_TARGET: &str = "FocusIsland/Email";
+mod email_credentials;
 
 #[cfg(target_os = "windows")]
 #[derive(Clone, PartialEq)]
 struct EmailConfig {
+    id: String,
     enabled: bool,
     provider: String,
     address: String,
@@ -1760,157 +1795,33 @@ struct EmailNotificationEvent {
     date: String,
     provider: String,
     mailbox_key: String,
+    account_id: String,
+    account_address: String,
     historical: bool,
 }
 
 #[cfg(target_os = "windows")]
-fn save_email_credential_blocking(email: &str, password: &str, endpoint: &str) -> Result<(), String> {
-    use windows::core::PWSTR;
-    use windows::Win32::Security::Credentials::{
-        CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
+fn read_email_configs<R: Runtime>(app: &AppHandle<R>) -> Vec<EmailConfig> {
+    let read = || -> Option<Vec<EmailConfig>> {
+        let raw = std::fs::read_to_string(app.path().app_data_dir().ok()?.join("focus-island/settings.json")).ok()?;
+        let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let text = |v: &serde_json::Value, key: &str| v.get(key).and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+        if let Some(accounts) = value.get("emailAccounts").and_then(|v| v.as_array()) {
+            return Some(accounts.iter().take(10).map(|v| EmailConfig {
+                id: text(v, "id"), provider: text(v, "provider"), address: text(v, "address"), custom_host: text(v, "host"),
+                enabled: v.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false),
+            }).filter(|v| !v.id.is_empty() && !v.address.is_empty()).collect());
+        }
+        Some(vec![EmailConfig {
+            id: "legacy".into(), provider: text(&value, "emailProvider"), address: text(&value, "emailAddress"), custom_host: text(&value, "emailImapHost"),
+            enabled: value.get("emailEnabled").and_then(|v| v.as_bool()).unwrap_or(false),
+        }])
     };
-
-    let mut target: Vec<u16> = EMAIL_CRED_TARGET
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let mut user: Vec<u16> = email
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let mut blob = password.as_bytes().to_vec();
-    let mut endpoint: Vec<u16> = endpoint.encode_utf16().chain([0]).collect();
-
-    let credential = CREDENTIALW {
-        Flags: Default::default(),
-        Type: CRED_TYPE_GENERIC,
-        TargetName: PWSTR(target.as_mut_ptr()),
-        Comment: PWSTR(endpoint.as_mut_ptr()),
-        LastWritten: Default::default(),
-        CredentialBlobSize: blob.len() as u32,
-        CredentialBlob: blob.as_mut_ptr(),
-        Persist: CRED_PERSIST_LOCAL_MACHINE,
-        AttributeCount: 0,
-        Attributes: std::ptr::null_mut(),
-        TargetAlias: PWSTR::null(),
-        UserName: PWSTR(user.as_mut_ptr()),
-    };
-
-    unsafe { CredWriteW(&credential, 0) }.map_err(|_| "保存 Windows 凭据失败".into())
+    read().unwrap_or_default()
 }
-
-#[cfg(target_os = "windows")]
-fn read_email_credential_blocking() -> Option<(String, String, String)> {
-    use windows::core::PCWSTR;
-    use windows::Win32::Security::Credentials::{
-        CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
-    };
-
-    let target: Vec<u16> = EMAIL_CRED_TARGET
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let mut credential_ptr: *mut CREDENTIALW = std::ptr::null_mut();
-    if unsafe { CredReadW(PCWSTR(target.as_ptr()), CRED_TYPE_GENERIC, None, &mut credential_ptr) }
-        .is_err()
-        || credential_ptr.is_null()
-    {
-        return None;
-    }
-
-    let credential = unsafe { &*credential_ptr };
-    let user = if credential.UserName.is_null() {
-        String::new()
-    } else {
-        unsafe { credential.UserName.to_string() }.unwrap_or_default()
-    };
-    let password = if credential.CredentialBlob.is_null() || credential.CredentialBlobSize == 0 {
-        String::new()
-    } else {
-        let bytes = unsafe {
-            std::slice::from_raw_parts(
-                credential.CredentialBlob,
-                credential.CredentialBlobSize as usize,
-            )
-        };
-        String::from_utf8_lossy(bytes).to_string()
-    };
-    let endpoint = if credential.Comment.is_null() {
-        String::new()
-    } else {
-        unsafe { credential.Comment.to_string() }.unwrap_or_default()
-    };
-    unsafe { CredFree(credential_ptr as *const _) };
-    Some((user, password, endpoint))
-}
-
-#[cfg(target_os = "windows")]
-fn delete_email_credential_blocking() -> Result<(), String> {
-    use windows::Win32::Foundation::ERROR_NOT_FOUND;
-    use windows::core::PCWSTR;
-    use windows::Win32::Security::Credentials::{CredDeleteW, CRED_TYPE_GENERIC};
-    let target: Vec<u16> = EMAIL_CRED_TARGET
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    match unsafe { CredDeleteW(PCWSTR(target.as_ptr()), CRED_TYPE_GENERIC, None) } {
-        Ok(()) => Ok(()),
-        Err(error) if error.code() == ERROR_NOT_FOUND.to_hresult() => Ok(()),
-        Err(_) => Err("清除 Windows 凭据失败".into()),
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn read_email_config<R: Runtime>(app: &AppHandle<R>) -> Option<EmailConfig> {
-    let dir = app.path().app_data_dir().ok()?.join("focus-island");
-    let raw = std::fs::read_to_string(dir.join("settings.json")).ok()?;
-    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
-    Some(EmailConfig {
-        enabled: value
-            .get("emailEnabled")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false),
-        provider: value
-            .get("emailProvider")
-            .and_then(|v| v.as_str())
-            .unwrap_or("qq")
-            .to_string(),
-        address: value
-            .get("emailAddress")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim()
-            .to_string(),
-        custom_host: value
-            .get("emailImapHost")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim()
-            .to_string(),
-    })
-}
-
 #[cfg(target_os = "windows")]
 fn stored_email_password(provider: &str, address: &str, host: &str) -> Option<String> {
-    let (stored_user, password, endpoint) = read_email_credential_blocking()?;
-    if !stored_user.eq_ignore_ascii_case(address) || password.is_empty() {
-        return None;
-    }
-    if endpoint == format!("{provider}:{host}") {
-        return Some(password);
-    }
-    // Legacy entries had no endpoint. Reuse only for the provider's own domains
-    // and fixed TLS host; a changed custom endpoint always requires a new save.
-    let (_, domain) = address.rsplit_once('@')?;
-    let legacy_provider = match domain.to_ascii_lowercase().as_str() {
-        "qq.com" | "foxmail.com" => "qq",
-        "163.com" => "163",
-        "126.com" => "126",
-        "gmail.com" | "googlemail.com" => "gmail",
-        "outlook.com" | "hotmail.com" | "live.com" => "outlook",
-        _ => return None,
-    };
-    (endpoint.is_empty() && provider == legacy_provider).then_some(password)
+    email_credentials::password(address, &format!("{provider}:{host}"))
 }
 
 #[cfg(target_os = "windows")]
@@ -1931,6 +1842,71 @@ fn email_diagnostic<R: Runtime>(app: &AppHandle<R>, provider: &str, message: &st
 }
 
 #[cfg(target_os = "windows")]
+fn email_mailbox_key(config: &EmailConfig, host: &str, uid_validity: u32) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (&config.provider, host, config.address.to_ascii_lowercase(), uid_validity).hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EmailBody {
+    content: String,
+    content_type: String,
+    images: Vec<(String, String)>,
+    image_warning: bool,
+}
+
+#[tauri::command]
+async fn read_email_body(app: AppHandle, window: tauri::WebviewWindow, record_id: String, account_id: Option<String>, account_address: Option<String>, include_images: Option<bool>) -> Result<EmailBody, String> {
+    if window.label() != "panel" { return Err("请在通知面板打开邮件".into()); }
+    #[cfg(target_os = "windows")]
+    {
+        // One bounded read at a time; repeated clicks cannot create unlimited connections.
+        static READING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if READING.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            return Err("上一封邮件仍在加载，请稍后重试".into());
+        }
+        return tauri::async_runtime::spawn_blocking(move || {
+            struct ReadingGuard;
+            impl Drop for ReadingGuard {
+                fn drop(&mut self) { READING.store(false, std::sync::atomic::Ordering::Release); }
+            }
+            let _guard = ReadingGuard;
+            let (key, uid) = record_id.strip_prefix("email-").and_then(|id| id.rsplit_once('-'))
+                .and_then(|(key, uid)| uid.parse::<u32>().ok().filter(|uid| *uid > 0).map(|uid| (key, uid)))
+                .filter(|(key, _)| key.len() == 16 && key.bytes().all(|b| b.is_ascii_hexdigit()))
+                .ok_or("邮件标识无效，请重新打开通知")?;
+            let configs = read_email_configs(&app);
+            let config = configs.iter().find(|c| account_id.as_deref().is_some_and(|id| c.id == id))
+                .or_else(|| configs.iter().find(|c| account_address.as_deref().is_some_and(|address| c.address.eq_ignore_ascii_case(address))))
+                .or_else(|| (account_id.is_none() && account_address.is_none() && configs.len() == 1).then(|| &configs[0]))
+                .ok_or("这条旧记录没有收件账号信息，请等待同步或在网页邮箱查看")?.clone();
+            let host = email_imap::email_imap_host(&config.provider, &config.custom_host).ok_or("邮箱服务器地址无效")?;
+            let password = stored_email_password(&config.provider, &config.address, &host).ok_or("请在设置中保存当前邮箱的授权码")?;
+            let map_error = |error: email_imap::Error| error.message(&config.provider).to_owned();
+            let mut session = email_imap::connect_imap(&host).map_err(map_error)?;
+            let validity = session.open_inbox(&config.provider, &config.address, &password).map_err(map_error)?;
+            if key != email_mailbox_key(&config, &host, validity) {
+                return Err("这条记录属于其他邮箱或已失效的收件箱，请在对应网页邮箱中查看".into());
+            }
+            let (content, content_type) = session.fetch_body(uid).map_err(map_error)?;
+            if !read_email_configs(&app).contains(&config) {
+                return Err("邮箱设置已改变，请重新打开邮件".into());
+            }
+            email_diagnostic(&app, &config.provider, "body loaded");
+            let (images, image_warning) = if include_images.unwrap_or(false) {
+                match session.fetch_inline_images(uid) { Ok(images) => (images, false), Err(_) => (Vec::new(), true) }
+            } else { (Vec::new(), false) };
+            Ok(EmailBody { content, content_type, images, image_warning })
+        }).await.map_err(|_| "邮件读取任务失败，请重试".to_owned())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    { let _ = (app, record_id, account_id, account_address, include_images); Err("邮件正文阅读目前仅支持 Windows".into()) }
+}
+
+#[cfg(target_os = "windows")]
 fn run_email_imap_session<R: Runtime>(
     app: &AppHandle<R>,
     config: &EmailConfig,
@@ -1938,18 +1914,14 @@ fn run_email_imap_session<R: Runtime>(
     password: &str,
     cursor: &mut email_imap::MailboxCursor,
 ) -> Result<(), email_imap::Error> {
-    use std::hash::{Hash, Hasher};
-
     let current = || {
-        read_email_config(app).as_ref() == Some(config)
+        read_email_configs(app).contains(config)
             && stored_email_password(&config.provider, &config.address, host).as_deref() == Some(password)
     };
     let mut session = email_imap::connect_imap(host)?;
     let uid_validity = session.open_inbox(&config.provider, &config.address, password)?;
     let mut supports_idle = session.supports_idle()?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (&config.provider, host, config.address.to_ascii_lowercase(), uid_validity).hash(&mut hasher);
-    let mailbox_key = format!("{:016x}", hasher.finish());
+    let mailbox_key = email_mailbox_key(config, host, uid_validity);
     email_diagnostic(app, &config.provider, if supports_idle { "listening IDLE" } else { "listening poll" });
 
     let mut history_uids: Option<std::collections::HashSet<u32>> = None;
@@ -1972,6 +1944,8 @@ fn run_email_imap_session<R: Runtime>(
                     date: mail.date,
                     provider: config.provider.clone(),
                     mailbox_key: mailbox_key.clone(),
+                    account_id: config.id.clone(),
+                    account_address: config.address.clone(),
                     historical,
                 };
                 if app.emit("email-notification", event).is_ok() {
@@ -1992,71 +1966,49 @@ fn run_email_imap_session<R: Runtime>(
     }
 }
 
-static EMAIL_LISTENER_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static EMAIL_LISTENER_READY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 #[tauri::command]
-fn email_listener_ready() {
-    EMAIL_LISTENER_READY.store(true, std::sync::atomic::Ordering::Release);
+fn email_listener_ready(window: tauri::WebviewWindow) {
+    // Both windows must have registered their listeners before startup replay.
+    let bit = match window.label() { "main" => 1, "panel" => 2, _ => 0 };
+    EMAIL_LISTENER_READY.fetch_or(bit, std::sync::atomic::Ordering::Release);
 }
 
 #[cfg(target_os = "windows")]
 fn start_email_watcher<R: Runtime>(app: AppHandle<R>) {
-    let spawned = std::thread::Builder::new()
-        .name("email-imap".into())
-        .spawn(move || {
-            let mut cursor = email_imap::MailboxCursor::default();
-            let mut active_account = None;
-            let mut failures = 0u32;
-            loop {
-                if !EMAIL_LISTENER_READY.load(std::sync::atomic::Ordering::Acquire) {
-                    std::thread::sleep(Duration::from_millis(200));
-                    continue;
-                }
-                let Some(config) = read_email_config(&app) else {
-                    std::thread::sleep(Duration::from_secs(2));
-                    continue;
-                };
-                let host = email_imap::email_imap_host(&config.provider, &config.custom_host);
-                let account = (config.provider.clone(), config.address.to_ascii_lowercase(), host.clone());
-                if active_account.as_ref() != Some(&account) {
-                    cursor = email_imap::MailboxCursor::default();
-                    failures = 0;
-                    active_account = Some(account);
-                }
-                let Some(host) = host.filter(|_| config.enabled && !config.address.is_empty()) else {
-                    std::thread::sleep(Duration::from_secs(2));
-                    continue;
-                };
-                let Some(password) = stored_email_password(&config.provider, &config.address, &host) else {
-                    std::thread::sleep(Duration::from_secs(2));
-                    continue;
-                };
-                match run_email_imap_session(&app, &config, &host, &password, &mut cursor) {
-                    Ok(()) => failures = 0,
-                    Err(error) => {
-                        failures = failures.saturating_add(1);
-                        email_diagnostic(&app, &config.provider, error.message(&config.provider));
-                        let delay = if matches!(error, email_imap::Error::Authentication | email_imap::Error::InvalidCredential) {
-                            120
-                        } else {
-                            match failures { 1 => 2, 2 => 4, 3 => 8, _ => 30 }
-                        };
-                        for _ in 0..delay / 2 {
-                            std::thread::sleep(Duration::from_secs(2));
-                            if read_email_config(&app).as_ref() != Some(&config)
-                                || stored_email_password(&config.provider, &config.address, &host).as_deref() != Some(&password)
-                            {
-                                failures = 0;
-                                break;
-                            }
+    let _ = std::thread::Builder::new().name("email-supervisor".into()).spawn(move || {
+        let mut workers: std::collections::HashMap<String, std::thread::JoinHandle<()>> = std::collections::HashMap::new();
+        loop {
+            workers.retain(|_, worker| !worker.is_finished());
+            if EMAIL_LISTENER_READY.load(std::sync::atomic::Ordering::Acquire) == 3 {
+                for config in read_email_configs(&app).into_iter().filter(|c| c.enabled) {
+                    if workers.contains_key(&config.id) || workers.len() >= 10 { continue; }
+                    let Some(host) = email_imap::email_imap_host(&config.provider, &config.custom_host) else { continue };
+                    let app = app.clone(); let id = config.id.clone();
+                    if let Ok(worker) = std::thread::Builder::new().name("email-account".into()).spawn(move || {
+                        let mut cursor = email_imap::MailboxCursor::default(); let mut failures = 0u32;
+                        while read_email_configs(&app).contains(&config) {
+                            let Some(password) = stored_email_password(&config.provider, &config.address, &host) else {
+                                std::thread::sleep(Duration::from_secs(2)); continue;
+                            };
+                            if let Err(error) = run_email_imap_session(&app, &config, &host, &password, &mut cursor) {
+                                failures = failures.saturating_add(1);
+                                email_diagnostic(&app, &config.provider, error.message(&config.provider));
+                                let delay = if matches!(error, email_imap::Error::Authentication | email_imap::Error::InvalidCredential) { 120 }
+                                    else { match failures { 1 => 2, 2 => 4, 3 => 8, _ => 30 } };
+                                for _ in 0..delay / 2 {
+                                    std::thread::sleep(Duration::from_secs(2));
+                                    if !read_email_configs(&app).contains(&config) || stored_email_password(&config.provider, &config.address, &host).as_deref() != Some(&password) { break; }
+                                }
+                            } else { failures = 0; }
                         }
-                    }
+                    }) { workers.insert(id, worker); }
                 }
             }
-        });
-    if let Err(e) = spawned {
-        app_log!("[email] failed to start watcher: {e}");
-    }
+            std::thread::sleep(Duration::from_secs(2));
+        }
+    });
 }
 
 #[cfg(target_os = "windows")]
@@ -2079,7 +2031,7 @@ fn test_email_connection_blocking(
     let mut session = email_imap::connect_imap(&host).map_err(error_message)?;
     session.open_inbox(provider, email, &password).map_err(error_message)?;
     let unseen = session.unread().map_err(error_message)?.len();
-    let mode = if session.supports_idle().map_err(error_message)? { "支持 IDLE" } else { "10 秒轮询" };
+    let mode = if session.supports_idle().map_err(error_message)? { "支持 IDLE" } else { "5 秒轮询" };
     Ok(format!("连接成功：收件箱可用，未读 {unseen} 封（{mode}）"))
 }
 
@@ -2093,7 +2045,7 @@ fn save_email_credential(email: String, password: String, provider: String, host
     }
     let host = email_imap::email_imap_host(&provider, &host)
         .ok_or_else(|| email_imap::Error::Host.message(&provider).to_owned())?;
-    save_email_credential_blocking(email, password, &format!("{provider}:{host}"))
+    email_credentials::write(&email_credentials::target(email, &format!("{provider}:{host}")), email, password, &format!("{provider}:{host}"))
 }
 
 #[cfg(target_os = "windows")]
@@ -2106,8 +2058,9 @@ fn email_credential_status(email: String, provider: String, host: String) -> Res
 
 #[cfg(target_os = "windows")]
 #[tauri::command]
-fn delete_email_credential() -> Result<(), String> {
-    delete_email_credential_blocking()
+fn delete_email_credential(email: String, provider: String, host: String) -> Result<(), String> {
+    let host = email_imap::email_imap_host(&provider, &host).ok_or("邮箱服务器地址无效")?;
+    email_credentials::clear(email.trim(), &format!("{provider}:{host}"))
 }
 
 #[cfg(target_os = "windows")]
@@ -2263,8 +2216,12 @@ fn activate_notification_source_blocking(aumid: &str) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 #[tauri::command]
 async fn activate_notification_source(app: String, aumid: String) -> Result<(), String> {
-    let _ = app;
-    tauri::async_runtime::spawn_blocking(move || activate_notification_source_blocking(&aumid))
+    tauri::async_runtime::spawn_blocking(move || {
+        let social = if aumid == "flowisle.social.qq" || app.eq_ignore_ascii_case("qq") { Some("qq") }
+            else if aumid == "flowisle.social.wechat" || ["微信", "WeChat", "Weixin"].contains(&app.as_str()) { Some("wechat") } else { None };
+        if let Some(source) = social { return social_notifications::activate(source); }
+        activate_notification_source_blocking(&aumid)
+    })
         .await
         .map_err(|_| "无法打开来源应用".to_owned())?
 }
@@ -2363,7 +2320,7 @@ fn email_credential_status(_email: String, _provider: String, _host: String) -> 
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-fn delete_email_credential() -> Result<(), String> {
+fn delete_email_credential(_email: String, _provider: String, _host: String) -> Result<(), String> {
     Err("仅支持 Windows".into())
 }
 
@@ -2393,7 +2350,6 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_autostart::init(
@@ -2413,6 +2369,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            screenshot_clipboard::clipboard_image_state,
+            screenshot_clipboard::copy_screenshot_image,
+            screenshot_clipboard::start_clipboard_watch,
             set_click_through,
             set_island_layout,
             set_peek_layout,
@@ -2449,7 +2408,9 @@ pub fn run() {
             delete_email_credential,
             test_email_connection,
             email_listener_ready,
+            notification_delivery_metrics,
             probe_notification_sources,
+            read_email_body,
             activate_notification_source,
             open_focus_assist_settings,
         ])
@@ -2465,6 +2426,24 @@ pub fn run() {
             // 邮件通知：IMAP IDLE 监听收件箱
             #[cfg(target_os = "windows")]
             start_email_watcher(app.handle().clone());
+            #[cfg(target_os = "windows")]
+            {
+                let social_app = app.handle().clone();
+                let _ = std::thread::Builder::new().name("social-reminders".into()).spawn(move || {
+                    let result = social_notifications::run(|source| {
+                        let enabled = social_app.path().app_data_dir().ok().and_then(|dir| std::fs::read_to_string(dir.join("focus-island/settings.json")).ok())
+                            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+                            .is_some_and(|value| value.get("socialReminders").and_then(|v| v.as_bool()).unwrap_or(true));
+                        if !enabled { return; }
+                        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+                        let _ = social_app.emit("system-notification", SystemNotificationEvent { id: u32::MAX,
+                            app: if source == "qq" { "QQ" } else { "微信" }.into(), aumid: format!("flowisle.social.{source}"),
+                            title: "有新提醒".into(), body: "任务栏正在提醒你 · 点击打开应用（不读取聊天内容）".into(), created_ms: now });
+                    });
+                    if result.is_err() { app_log!("[social] shell listener unavailable"); }
+                });
+            }
+
 
             #[cfg(desktop)]
             {

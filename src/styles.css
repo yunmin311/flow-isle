@@ -2118,3 +2118,23 @@ textarea:focus-visible,
   font-size: 11px;
   color: var(--v2-muted);
 }
+
+/* Settings: content-first groups, using the notification page's quiet rhythm. */
+#app .panel-root .settings-page .settings-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+#app .panel-root .settings-tabs button { flex: 1; padding: 8px 4px; font: inherit; font-size: 12px; color: var(--v2-secondary); border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
+#app .panel-root .settings-tabs button[aria-pressed="true"] { color: var(--v2-ink); font-weight: 600; background: var(--ui-hover); }
+#app .panel-root .settings-page .settings-section { padding: 10px 12px 12px; margin: 0 0 8px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--v2-shell) 94%, transparent); backdrop-filter: blur(12px); box-shadow: 0 2px 8px #00000008; }
+#app .panel-root .settings-page .section-title { font-family: inherit; font-size: 12px; font-weight: 650; color: var(--v2-ink); margin-bottom: 6px; }
+#app .panel-root .settings-page .section-title::before { content: none; }
+#app .panel-root .settings-page .update-toggle-row { padding-top: 5px; padding-bottom: 5px; }
+#app .panel-root .settings-page .update-label { display: inline-flex; align-items: center; min-height: 24px; line-height: 24px; }
+#app .panel-root .settings-page :is(.setting-row, .setting-option-row:has(.update-copy)) { align-items: flex-start; }
+#app .panel-root .settings-page :is(.setting-actions, .source-probe-btn) { min-height: 24px; }
+#app .panel-root .settings-page .setting-actions .update-btn { min-height: 24px; padding-top: 2px; padding-bottom: 2px; }
+#app .panel-root .settings-page .social-row { border-bottom: 1px solid var(--v2-line); margin-bottom: 6px; }
+#app .panel-root .settings-page :is(.update-hint, .section-subtitle, .shortcut-hint, .opacity-hint) { font-size: 11px; line-height: 1.6; color: var(--v2-secondary); }
+#app .panel-root .settings-page :is(.update-label, .slider-label) { font-size: 12px; font-weight: 400; }
+#app .panel-root .notif-page .section-head .section-title,
+#app .panel-root .notif-page .record-tools .text-btn { font-family: inherit; font-size: 11px; }
+#app .panel-root .notif-page .section-head .section-title { font-weight: 650; }
+#app .panel-root .notif-page .record-tools .text-btn { font-weight: 400; }
