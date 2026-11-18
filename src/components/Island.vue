@@ -8,6 +8,7 @@ import { isTransientSocialNotification } from "../utils/notificationSources";
 import { useIslandState } from "../composables/useIslandState";
 import { useTimer, type NotificationType } from "../composables/useTimer";
 import { useSettings, shouldMirrorSystemNotification, type Settings } from "../composables/useSettings";
+import { useCompanion, type CompanionSyncPayload } from "../composables/useCompanion";
 import { useDockMode } from "../composables/useDockMode";
 import CapsuleIdle from "./CapsuleIdle.vue";
 import DockStrip from "./DockStrip.vue";
@@ -24,11 +25,13 @@ const { state, setState, setNotificationVisible } = useIslandState();
 const timer = useTimer();
 const externalNotificationsSilent = useExternalNotificationSilence();
 const { settings, applyExternalSettings } = useSettings();
+const { applyExternalCompanionState } = useCompanion();
 const { dockCollapsed, stripProgress, stripColor, DOCK_STRIP_WINDOW_H } = useDockMode();
 const showStrip = computed(() => dockCollapsed.value);
 
 let unlisten: (() => void) | null = null;
 let unlistenSettings: (() => void) | null = null;
+let unlistenCompanion: (() => void) | null = null;
 let unlistenPanelMotion: (() => void) | null = null;
 let unlistenRadio: (() => void) | null = null;
 let unlistenNotification: (() => void) | null = null;
@@ -431,12 +434,26 @@ const progressScale = computed(() => {
     return v;
 });
 
+const ringPath = computed(() => {
+    const w = capsuleWidth.value;
+    const h = capsuleHeight.value;
+    const scale = settings.value.islandScale ?? 1;
+    const inset = 1.5 * scale;
+    const left = inset;
+    const top = inset;
+    const right = w - inset;
+    const bottom = h - inset;
+    const r = Math.max(0, Math.min((right - left) / 2, (bottom - top) / 2, capsuleRadius.value - inset));
+    const cx = w / 2;
+    return `M ${cx} ${top} H ${right - r} A ${r} ${r} 0 0 1 ${right} ${top + r} V ${bottom - r} A ${r} ${r} 0 0 1 ${right - r} ${bottom} H ${left + r} A ${r} ${r} 0 0 1 ${left} ${bottom - r} V ${top + r} A ${r} ${r} 0 0 1 ${left + r} ${top} Z`;
+});
+
 const ringColor = computed(() => {
     if (timer.phase.value === "focus" && timer.running.value)
         return "var(--focus-color)";
     if (timer.phase.value === "break" && timer.running.value)
         return "var(--break-color)";
-    return "rgba(255,255,255,0.45)";
+    return "transparent";
 });
 
 function runPanelMotion(phase: "open" | "close") {
@@ -447,7 +464,7 @@ function runPanelMotion(phase: "open" | "close") {
     panelMotionTimer = window.setTimeout(() => {
         panelMotionState.value = "idle";
         panelMotionTimer = null;
-    }, phase === "open" ? 280 : 160);
+    }, phase === "open" ? 200 : 140);
 }
 
 function stopLocalCountdown() {
@@ -483,7 +500,7 @@ onMounted(async () => {
         } catch {
             // ignore
         }
-    }, 1000);
+    }, 400);
 
     // 面板可见状态以 Rust 为准兜底同步，避免漏掉 close 事件后永久吞掉 peek。
     panelStateTimer = setInterval(async () => {
@@ -509,6 +526,8 @@ onMounted(async () => {
             timer.running.value = payload.running;
             timer.activeTaskId.value = payload.activeTaskId;
             timer.activeTaskTitle.value = payload.activeTaskTitle ?? null;
+            timer.activeSubtaskId.value = payload.activeSubtaskId ?? null;
+            timer.activeSubtaskTitle.value = payload.activeSubtaskTitle ?? null;
             if (payload.phase !== timer.phase.value) {
                 timer.phase.value = payload.phase;
             }
@@ -537,6 +556,14 @@ onMounted(async () => {
 
     // 拉取 panel 当前计时快照，避免窗口晚启动时错过状态。
     emit("timer-state-request").catch(() => {});
+
+    unlistenCompanion = await listen<CompanionSyncPayload>(
+        "companion-state-update",
+        ({ payload }) => {
+            if (payload) applyExternalCompanionState(payload);
+        },
+    );
+    emit("companion-state-request").catch(() => {});
 
     unlistenSettings = await listen<Settings>("settings-changed", ({ payload }) => {
         applyExternalSettings(payload);
@@ -597,6 +624,7 @@ onUnmounted(() => {
     void invoke("clear_peek_layout").catch(() => {});
     unlisten?.();
     unlistenSettings?.();
+    unlistenCompanion?.();
     unlistenPanelMotion?.();
     unlistenRadio?.();
     unlistenNotification?.();
@@ -654,13 +682,9 @@ onUnmounted(() => {
                         <CapsuleIdle v-if="state === 'idle' || state === 'alert'" :radio-playing="radioPlaying" />
                         <CapsuleFocus v-else-if="state === 'focus' || state === 'break'" :radio-playing="radioPlaying" />
                         <svg class="progress-ring" :viewBox="`0 0 ${capsuleWidth} ${capsuleHeight}`" aria-hidden="true">
-                            <rect
+                            <path
                                 class="ring-progress"
-                                :x="1.5 * settings.islandScale"
-                                :y="1.5 * settings.islandScale"
-                                :width="capsuleWidth - 3 * settings.islandScale"
-                                :height="capsuleHeight - 3 * settings.islandScale"
-                                :rx="capsuleRadius - 1.5 * settings.islandScale"
+                                :d="ringPath"
                                 pathLength="1"
                             />
                         </svg>
@@ -740,18 +764,18 @@ onUnmounted(() => {
     backdrop-filter: blur(16px) saturate(1.2);
     -webkit-backdrop-filter: blur(16px) saturate(1.2);
     transition:
-        width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-        height 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-        border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+        width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+        border-radius 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     contain: layout style;
 }
 
 .capsule-shell.strip-mode {
-    /* 收回刘海：快速动画（比展开更短） */
+    /* 收回刘海：快速收拢，干净克制 */
     transition:
-        width 0.15s cubic-bezier(0.3, 0, 0.2, 1),
-        height 0.15s cubic-bezier(0.3, 0, 0.2, 1),
-        border-radius 0.15s cubic-bezier(0.3, 0, 0.2, 1);
+        width 0.14s cubic-bezier(0.4, 0, 0.2, 1),
+        height 0.14s cubic-bezier(0.4, 0, 0.2, 1),
+        border-radius 0.14s cubic-bezier(0.4, 0, 0.2, 1);
     background: var(--island-shell-bg, var(--v2-shell));
 }
 
@@ -780,189 +804,55 @@ onUnmounted(() => {
     background: var(--v2-line);
 }
 
-/* 玻璃光效层：顶部光条 + 斜向色散高光（纯装饰，不拦截事件） */
-.capsule-glass-fx {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    overflow: hidden;
-    pointer-events: none;
-}
-
-.capsule-shell.strip-mode .capsule-glass-fx {
-    display: none;
-}
-
-.capsule-glass-fx::before {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    width: 42%;
-    height: 2px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.82), transparent);
-    filter: blur(0.4px);
-    transform: translateX(-50%);
-}
-
-.capsule-glass-fx::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-    mix-blend-mode: overlay;
-    opacity: 0.10;
-}
-
-.capsule-shell::before,
-.capsule-shell::after {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-}
-
-.capsule-shell::before {
-    inset: 1px;
-    border-radius: inherit;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 56%);
-    opacity: 0;
-    transform: scale(0.88, 0.82);
-}
-
-.capsule-shell::after {
-    left: 50%;
-    top: 56%;
-    width: 42%;
-    height: 46%;
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
-    opacity: 0;
-    transform: translate(-50%, -42%) scale(0.42, 0.16);
-}
-
 /* ring-focus/ring-break 不再加 box-shadow，避免胶囊四周出现浅色矩形光晕 */
 
 .panel-launching {
     will-change: transform;
-    animation: island-release 280ms cubic-bezier(0.2, 0.88, 0.26, 1) both;
-}
-
-.panel-launching .capsule-shell::before {
-    animation: island-core-open 280ms cubic-bezier(0.2, 0.88, 0.26, 1) both;
-}
-
-.panel-launching .capsule-shell::after {
-    animation: island-tail-open 280ms cubic-bezier(0.2, 0.88, 0.26, 1) both;
+    animation: island-release 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .panel-receiving {
     will-change: transform;
-    animation: island-receive 160ms cubic-bezier(0.34, 0, 0.72, 0.2) both;
-}
-
-.panel-receiving .capsule-shell::before {
-    animation: island-core-close 160ms cubic-bezier(0.34, 0, 0.72, 0.2) both;
-}
-
-.panel-receiving .capsule-shell::after {
-    animation: island-tail-close 160ms cubic-bezier(0.34, 0, 0.72, 0.2) both;
+    animation: island-receive 140ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 @keyframes island-release {
     0% {
-        transform: scale(1, 1);
+        transform: translate3d(0, 0, 0);
     }
 
-    38% {
-        transform: scale(0.96, 0.9);
+    40% {
+        transform: translate3d(0, 2px, 0);
     }
 
     100% {
-        transform: scale(1, 1);
+        transform: translate3d(0, 0, 0);
     }
 }
 
 @keyframes island-receive {
     0% {
-        transform: scale(1, 1);
+        transform: translate3d(0, 0, 0);
     }
 
-    42% {
-        transform: scale(0.93, 0.84);
+    45% {
+        transform: translate3d(0, -1px, 0);
     }
 
     100% {
-        transform: scale(1, 1);
+        transform: translate3d(0, 0, 0);
     }
 }
 
-@keyframes island-core-open {
-    0% {
-        opacity: 0;
-        transform: scale(0.86, 0.8);
+@media (prefers-reduced-motion: reduce) {
+    .capsule-shell,
+    .capsule-shell.strip-mode {
+        transition-duration: 0.01ms !important;
     }
 
-    52% {
-        opacity: 1;
-        transform: scale(1.02, 0.96);
-    }
-
-    100% {
-        opacity: 0;
-        transform: scale(1.08, 1.02);
-    }
-}
-
-@keyframes island-core-close {
-    0% {
-        opacity: 0;
-        transform: scale(1.02, 0.96);
-    }
-
-    56% {
-        opacity: 1;
-        transform: scale(0.94, 0.86);
-    }
-
-    100% {
-        opacity: 0;
-        transform: scale(0.82, 0.74);
-    }
-}
-
-@keyframes island-tail-open {
-    0% {
-        opacity: 0;
-        transform: translate(-50%, -42%) scale(0.42, 0.16);
-    }
-
-    46% {
-        opacity: 0.78;
-        transform: translate(-50%, -16%) scale(0.8, 0.46);
-    }
-
-    100% {
-        opacity: 0;
-        transform: translate(-50%, -2%) scale(0.96, 0.68);
-    }
-}
-
-@keyframes island-tail-close {
-    0% {
-        opacity: 0;
-        transform: translate(-50%, -2%) scale(0.9, 0.62);
-    }
-
-    52% {
-        opacity: 0.82;
-        transform: translate(-50%, -18%) scale(0.72, 0.34);
-    }
-
-    100% {
-        opacity: 0;
-        transform: translate(-50%, -42%) scale(0.38, 0.14);
+    .panel-launching,
+    .panel-receiving {
+        animation: none !important;
     }
 }
 

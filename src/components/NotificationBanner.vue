@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { NotificationType } from '../composables/useTimer'
+import { useCompanion, resolveIslandCompanionSprite } from '../composables/useCompanion'
 
 const props = defineProps<{
   type: NotificationType
@@ -14,13 +15,13 @@ const emit = defineEmits<{
   dismiss: []
 }>()
 
+const { selectedCompanion } = useCompanion()
 const isFocusDone = computed(() => props.type === 'focus-done')
+const companionSprite = computed(() =>
+  resolveIslandCompanionSprite(selectedCompanion.value, isFocusDone.value ? 'done' : 'idle'),
+)
 
-// Primary color guides the recommended next step:
-// - focus-done → recommend break (green)
-// - break-done → recommend focus (orange)
 const primaryColor = computed(() => isFocusDone.value ? 'var(--break-color)' : 'var(--focus-color)')
-
 const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'var(--break-color)')
 </script>
 
@@ -36,11 +37,37 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
         '--extend-color': extendColor,
       }"
     >
-      <div class="notif-icon">{{ isFocusDone ? '✅' : '⏰' }}</div>
-      <div class="notif-text" role="button" tabindex="0" title="打开计时区"
-        @keydown.enter.prevent="emit('open')" @keydown.space.prevent="emit('open')">
+      <div class="notif-icon" aria-hidden="true">
+        <img
+          v-if="companionSprite.url"
+          class="notif-companion"
+          :src="companionSprite.url"
+          alt=""
+          :style="{
+            width: `calc(${companionSprite.width}px * var(--notif-scale, 1))`,
+            height: `calc(${companionSprite.height}px * var(--notif-scale, 1))`,
+          }"
+        />
+        <svg
+          v-else
+          class="pixel-done"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          shape-rendering="crispEdges"
+        >
+          <path d="M0 8h4v4H0zm4 4h4v4H4zm4-4h4v4H8zm4-4h4v4h-4z" />
+        </svg>
+      </div>
+      <div
+        class="notif-text"
+        role="button"
+        tabindex="0"
+        title="打开计时区"
+        @keydown.enter.prevent="emit('open')"
+        @keydown.space.prevent="emit('open')"
+      >
         <div class="notif-title">{{ isFocusDone ? '完成了一个番茄' : '休息结束' }}</div>
-        <div class="notif-sub">{{ isFocusDone ? '休息一下吧' : '准备开启下一个番茄钟吗' }}</div>
+        <div class="notif-sub">{{ isFocusDone ? `${selectedCompanion.name} · 休息一下吧` : '准备开启下一个番茄钟吗' }}</div>
       </div>
       <div class="notif-actions">
         <button class="notif-btn primary" @click.stop="emit('confirm')">
@@ -61,29 +88,39 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
 .notif-banner {
   width: calc(352px * var(--notif-scale, 1));
   height: calc(60px * var(--notif-scale, 1));
-  border-radius: calc(24px * var(--notif-scale, 1));
+  border-radius: calc(22px * var(--notif-scale, 1));
   background: var(--notif-bg);
   border: 1px solid var(--notif-border);
   box-shadow: var(--notif-shadow);
   display: flex;
   align-items: center;
-  gap: calc(8px * var(--notif-scale, 1));
+  gap: calc(10px * var(--notif-scale, 1));
   padding: 0 calc(12px * var(--notif-scale, 1));
   pointer-events: auto;
   contain: layout style paint;
 }
 
 .notif-icon {
-  width: calc(36px * var(--notif-scale, 1));
-  height: calc(36px * var(--notif-scale, 1));
-  border-radius: 6px;
+  width: calc(34px * var(--notif-scale, 1));
+  height: calc(34px * var(--notif-scale, 1));
+  border-radius: 10px;
   background: var(--notif-icon-bg);
   border: 1px solid var(--notif-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(18px * var(--notif-scale, 1));
+  color: var(--v2-accent);
   flex-shrink: 0;
+}
+
+.notif-companion {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.pixel-done {
+  width: calc(16px * var(--notif-scale, 1));
+  height: calc(16px * var(--notif-scale, 1));
 }
 
 .notif-text {
@@ -99,16 +136,16 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
   font-size: calc(12px * var(--notif-scale, 1));
   font-weight: 700;
   color: var(--notif-title-color);
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .notif-sub {
-  font-size: calc(10px * var(--notif-scale, 1));
+  font-size: calc(11px * var(--notif-scale, 1));
   color: var(--notif-sub-color);
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -116,19 +153,19 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
 
 .notif-actions {
   display: flex;
-  gap: calc(5px * var(--notif-scale, 1));
+  gap: calc(4px * var(--notif-scale, 1));
   flex-shrink: 0;
 }
 
 .notif-btn {
   height: calc(28px * var(--notif-scale, 1));
-  padding: 0 calc(10px * var(--notif-scale, 1));
+  padding: 0 calc(9px * var(--notif-scale, 1));
   border-radius: calc(8px * var(--notif-scale, 1));
   font-size: calc(11px * var(--notif-scale, 1));
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background-color 160ms ease, filter 160ms ease;
   white-space: nowrap;
   font-family: inherit;
 }
@@ -140,18 +177,17 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
 }
 
 .notif-btn.primary:hover {
-  filter: brightness(1.15);
+  filter: brightness(1.08);
 }
 
 .notif-btn.extend {
-  background: transparent;
-  border: 1px solid var(--extend-color);
-  color: var(--extend-color);
+  background: var(--ui-well);
+  border: 1px solid var(--notif-border);
+  color: var(--notif-title-color);
 }
 
 .notif-btn.extend:hover {
-  background: color-mix(in srgb, var(--extend-color) 15%, transparent);
-  color: var(--notif-title-color);
+  background: var(--ui-hover);
 }
 
 .notif-btn.dismiss {
@@ -166,34 +202,43 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
   color: var(--notif-dismiss-hover-color);
 }
 
-/* Transition animation */
+/* MOTION-SPEC：无 scale 变形，纯合成层位移与透明度 */
 .notif-enter-active {
-  animation: notif-in 300ms ease-out both;
+  animation: notif-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .notif-leave-active {
-  animation: notif-out 200ms ease-in both;
+  animation: notif-out 140ms ease-in both;
 }
 
 @keyframes notif-in {
   from {
     opacity: 0;
-    transform: scale(0.85);
+    transform: translate3d(0, -6px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes notif-out {
   from {
     opacity: 1;
-    transform: scale(1);
+    transform: translate3d(0, 0, 0);
   }
   to {
     opacity: 0;
-    transform: scale(0.9);
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-enter-active,
+  .notif-leave-active,
+  .notif-btn {
+    animation: none;
+    transition: none;
   }
 }
 </style>

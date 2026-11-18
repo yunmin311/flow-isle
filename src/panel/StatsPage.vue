@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useDailyStats } from '../composables/useDailyStats'
-import { useAchievements } from '../composables/useAchievements'
+import { useAchievements, type Achievement } from '../composables/useAchievements'
 import { useTasks, getTaskTimeCategory, todayString, isRepeatActiveOn } from '../composables/useTasks'
+import { useCompanion } from '../composables/useCompanion'
 import BackButton from './BackButton.vue'
+import CompanionPanel from './CompanionPanel.vue'
+import StatNumber from '../components/StatNumber.vue'
 
 type TimeRange = 'today' | 'week' | 'month' | 'all'
 
@@ -12,11 +15,13 @@ const emit = defineEmits<{ back: [] }>()
 const { todayStat, weekStats, monthStats, allTimeStats, summarizeStats, getDateString, getMonthStats, dailyStats } = useDailyStats()
 const { starAchievements, streakAchievements, specialAchievements, state } = useAchievements()
 const { tasks } = useTasks()
+const { statsSection, selectedBadges } = useCompanion()
 
 const timeRange = ref<TimeRange>('today')
 const currentMonth = ref(new Date())
 const heatExpanded = ref(false)
 const selectedDate = ref<string | null>(getDateString())
+const selectedBadge = ref<Achievement | null>(null)
 
 // 跨天后如果仍停留在“今天”，自动跟随到新的一天
 watch(todayString, (next, prev) => {
@@ -43,8 +48,16 @@ const currentStats = computed(() => {
   }
 })
 
+const allAchievements = computed(() => [
+  ...starAchievements.value,
+  ...streakAchievements.value,
+  ...specialAchievements.value,
+])
+
+const unlockedCount = computed(() => allAchievements.value.filter(a => a.unlockedAt !== null).length)
+
 const formatDuration = (minutes: number) => {
-  if (minutes < 60) return `${minutes}分钟`
+  if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   return mins > 0 ? `${hours}.${Math.round(mins / 6)}h` : `${hours}h`
@@ -163,6 +176,10 @@ function selectDay(day: { date: string; day: number }) {
   selectedDate.value = selectedDate.value === day.date ? null : day.date
 }
 
+function toggleBadge(item: Achievement) {
+  selectedBadge.value = selectedBadge.value?.id === item.id ? null : item
+}
+
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const hoveredIndex = ref<number | null>(null)
@@ -198,6 +215,13 @@ const weekTrend = computed(() => {
 })
 
 const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomodoros), 1))
+
+function steppedBarHeight(pomodoros: number): string {
+  if (pomodoros <= 0) return '4px'
+  const raw = (pomodoros / maxPomodoros.value) * 72
+  const quantized = Math.max(8, Math.round(raw / 4) * 4)
+  return `${quantized}px`
+}
 </script>
 
 <template>
@@ -205,249 +229,265 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
     <!-- Header -->
     <div class="page-header">
       <BackButton @click="emit('back')" />
-      <h2 class="page-title">统计</h2>
-      <div class="time-range-tabs">
+      <h2 class="page-title">记录与陪伴</h2>
+      <div class="section-tabs" role="tablist" aria-label="记录板块">
         <button
-          v-for="opt in timeRangeOptions"
-          :key="opt.value"
-          :class="['tab', { active: timeRange === opt.value }]"
-          @click="timeRange = opt.value"
+          role="tab"
+          :aria-selected="statsSection === 'stats'"
+          :class="['tab', { active: statsSection === 'stats' }]"
+          @click="statsSection = 'stats'"
         >
-          {{ opt.label }}
+          专注记录
+        </button>
+        <button
+          role="tab"
+          :aria-selected="statsSection === 'companions'"
+          :class="['tab', { active: statsSection === 'companions' }]"
+          @click="statsSection = 'companions'"
+        >
+          陪伴相册
         </button>
       </div>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="stats-cards">
-      <div class="stat-card">
-        <div class="stat-value">{{ currentStats.pomodoros }}</div>
-        <div class="stat-label">番茄</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ formatDuration(currentStats.focusMinutes) }}</div>
-        <div class="stat-label">专注时长</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ currentStats.tasksCompleted }}</div>
-        <div class="stat-label">完成任务</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ state.streakDays }}</div>
-        <div class="stat-label">连续天数</div>
-      </div>
-    </div>
+    <CompanionPanel v-if="statsSection === 'companions'" />
 
-    <!-- Heatmap -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-title">专注热力图 · {{ monthYear }}</span>
-        <div class="heat-actions">
-          <button class="expand-btn" :class="{ active: heatExpanded }" @click="heatExpanded = !heatExpanded">
-            {{ heatExpanded ? '收起' : '展开明细' }}
+    <template v-else>
+      <div class="range-bar">
+        <span class="range-caption">时间范围</span>
+        <div class="time-range-tabs">
+          <button
+            v-for="opt in timeRangeOptions"
+            :key="opt.value"
+            :class="['tab', { active: timeRange === opt.value }]"
+            @click="timeRange = opt.value"
+          >
+            {{ opt.label }}
           </button>
-          <div class="month-nav">
-            <button class="nav-btn" @click="prevMonth">&lt;</button>
-            <button class="nav-btn" @click="nextMonth">&gt;</button>
-          </div>
         </div>
       </div>
-      <div class="heatmap">
-        <div class="heatmap-weekdays">
-          <span v-for="d in weekDays" :key="d" class="weekday">{{ d }}</span>
+
+      <!-- 4-Up Overview -->
+      <div class="stats-cards">
+        <div class="stat-card">
+          <StatNumber :value="currentStats.pomodoros" :size="20" class="stat-value" />
+          <div class="stat-label">番茄</div>
         </div>
-        <div class="heatmap-grid" :class="{ detailed: heatExpanded }">
-          <div
-            v-for="(day, i) in calendarDays"
-            :key="i"
-            :class="['heat-cell', `intensity-${day.intensity}`, { empty: !day.day, selected: selectedDate === day.date }]"
-            @click="selectDay(day)"
-            @mouseenter="hoveredIndex = day.day ? i : null"
-            @mouseleave="hoveredIndex = null"
-          >
-            <span v-if="day.day" class="day-number">{{ day.day }}</span>
-            <span v-if="heatExpanded && day.day && (day.pomodoros > 0 || day.tasks > 0)" class="cell-count">
-              <span v-if="day.pomodoros > 0">{{ day.pomodoros }}🍅</span>
-              <span v-if="day.tasks > 0" class="cell-task-count">{{ day.tasks }}✓</span>
-            </span>
-            <div v-if="!heatExpanded && hoveredIndex === i && (day.pomodoros > 0 || day.tasks > 0)" class="cell-tooltip">
-              {{ day.pomodoros }}🍅<template v-if="day.tasks > 0"> · {{ day.tasks }}✓</template>
+        <div class="stat-card">
+          <StatNumber
+            :value="currentStats.focusMinutes < 60 ? currentStats.focusMinutes : Number((currentStats.focusMinutes / 60).toFixed(1))"
+            :unit="currentStats.focusMinutes < 60 ? 'm' : 'h'"
+            :size="20"
+            class="stat-value"
+          />
+          <div class="stat-label">专注时长</div>
+        </div>
+        <div class="stat-card">
+          <StatNumber :value="currentStats.tasksCompleted" :size="20" class="stat-value" />
+          <div class="stat-label">完成任务</div>
+        </div>
+        <div class="stat-card">
+          <StatNumber :value="state.streakDays" :size="20" class="stat-value" />
+          <div class="stat-label">连续天数</div>
+        </div>
+      </div>
+
+      <!-- Heatmap Calendar -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">专注日历 · {{ monthYear }}</span>
+          <div class="heat-actions">
+            <button class="expand-btn" :class="{ active: heatExpanded }" @click="heatExpanded = !heatExpanded">
+              {{ heatExpanded ? '收起' : '明细' }}
+            </button>
+            <div class="month-nav">
+              <button class="nav-btn" aria-label="上一月" @click="prevMonth">&lt;</button>
+              <button class="nav-btn" aria-label="下一月" @click="nextMonth">&gt;</button>
             </div>
           </div>
         </div>
-      </div>
-      <div class="heatmap-legend">
-        <span class="legend-hint">点击日期查看明细</span>
-        <span class="legend-item"><span class="legend-box intensity-0"></span>无</span>
-        <span class="legend-item"><span class="legend-box intensity-1"></span>1-2</span>
-        <span class="legend-item"><span class="legend-box intensity-2"></span>3-5</span>
-        <span class="legend-item"><span class="legend-box intensity-3"></span>5+</span>
-      </div>
-
-      <!-- Selected day detail -->
-      <div v-if="selectedDate" class="day-detail">
-        <div class="day-detail-header">
-          <span class="day-detail-title">{{ selectedDateLabel }}</span>
-          <button class="day-detail-close" @click="selectedDate = null" title="收起">×</button>
-        </div>
-        <div class="day-detail-metrics">
-          <div class="mini-metric">
-            <span class="mini-value">{{ selectedStat?.pomodoros ?? 0 }}</span>
-            <span class="mini-label">番茄</span>
+        <div class="heatmap">
+          <div class="heatmap-weekdays">
+            <span v-for="d in weekDays" :key="d" class="weekday">{{ d }}</span>
           </div>
-          <div class="mini-metric">
-            <span class="mini-value">{{ formatDuration(selectedStat?.focusMinutes ?? 0) }}</span>
-            <span class="mini-label">专注</span>
-          </div>
-          <div class="mini-metric">
-            <span class="mini-value">{{ selectedStat?.tasksCompleted ?? 0 }}</span>
-            <span class="mini-label">完成任务</span>
-          </div>
-        </div>
-
-        <div class="day-detail-group">
-          <div class="day-detail-group-title">完成的任务</div>
-          <div v-if="selectedCompletedTitles.length === 0" class="day-empty">
-            {{ (selectedStat?.tasksCompleted ?? 0) > 0 ? `完成 ${selectedStat?.tasksCompleted} 个任务（无标题记录）` : '当日没有完成记录' }}
-          </div>
-          <div v-else class="day-task-list">
-            <div v-for="(title, i) in selectedCompletedTitles" :key="i" class="day-task-row done">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
-              <span class="day-task-title">{{ title }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="day-detail-group">
-          <div class="day-detail-group-title">每日定时任务</div>
-          <div v-if="selectedScheduledTasks.length === 0" class="day-empty">暂无每日任务</div>
-          <div v-else class="day-task-list">
+          <div class="heatmap-grid" :class="{ detailed: heatExpanded }">
             <div
-              v-for="t in selectedScheduledTasks"
-              :key="t.id"
-              class="day-task-row"
-              :class="{ done: t.done, planned: !t.done && isSelectedFuture }"
+              v-for="(day, i) in calendarDays"
+              :key="i"
+              :class="['heat-cell', `intensity-${day.intensity}`, { empty: !day.day, selected: selectedDate === day.date }]"
+              @click="selectDay(day)"
+              @mouseenter="hoveredIndex = day.day ? i : null"
+              @mouseleave="hoveredIndex = null"
             >
-              <span class="day-task-time">{{ t.time || '全天' }}</span>
-              <span class="day-task-title">{{ t.title }}</span>
-              <span class="day-task-state">{{ t.done ? '完成' : (isSelectedFuture ? '计划' : '未完成') }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Daily recurring tasks -->
-    <div v-if="monthDailyTasks.length > 0" class="section">
-      <div class="section-header">
-        <span class="section-title">每日定时任务</span>
-        <span class="section-hint">{{ monthYear }}</span>
-      </div>
-      <div class="daily-task-list">
-        <div v-for="t in monthDailyTasks" :key="t.id" class="daily-task-row">
-          <span class="daily-task-time">{{ t.time || '全天' }}</span>
-          <span class="daily-task-title">{{ t.title }}</span>
-          <span class="daily-task-count">本月 {{ t.done }} 天</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Charts Row -->
-    <div class="charts-row">
-      <!-- Week Trend -->
-      <div class="section chart-section">
-        <div class="section-title">本周趋势</div>
-        <div class="trend-chart">
-          <div class="trend-bars">
-            <div
-              v-for="d in weekTrend"
-              :key="d.day"
-              class="trend-bar-wrapper"
-            >
-              <div
-                class="trend-bar"
-                :style="{ height: `${(d.pomodoros / maxPomodoros) * 100}%` }"
-              >
-                <span v-if="d.pomodoros > 0" class="bar-value">{{ d.pomodoros }}</span>
+              <span v-if="day.day" class="day-number">{{ day.day }}</span>
+              <span v-if="heatExpanded && day.day && (day.pomodoros > 0 || day.tasks > 0)" class="cell-count">
+                <span v-if="day.pomodoros > 0" class="cell-metric">
+                  <span class="pixel-dot" aria-hidden="true"></span>{{ day.pomodoros }}
+                </span>
+                <span v-if="day.tasks > 0" class="cell-metric cell-task-count">
+                  <span class="pixel-check" aria-hidden="true"></span>{{ day.tasks }}
+                </span>
+              </span>
+              <span
+                v-else-if="!heatExpanded && day.day && (day.pomodoros > 0 || day.tasks > 0)"
+                class="cell-indicator"
+                :class="{ 'has-tasks': day.tasks > 0 }"
+                aria-hidden="true"
+              ></span>
+              <div v-if="!heatExpanded && hoveredIndex === i && (day.pomodoros > 0 || day.tasks > 0)" class="cell-tooltip">
+                {{ day.pomodoros }}次专注<template v-if="day.tasks > 0"> · {{ day.tasks }}项任务</template>
               </div>
-              <span class="bar-label">{{ d.day }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="heatmap-legend">
+          <span class="legend-hint">点击日期查看明细</span>
+          <span class="legend-item"><span class="legend-box intensity-0"></span>无</span>
+          <span class="legend-item"><span class="legend-box intensity-1"></span>1-2</span>
+          <span class="legend-item"><span class="legend-box intensity-2"></span>3-4</span>
+          <span class="legend-item"><span class="legend-box intensity-3"></span>5+</span>
+        </div>
+
+        <!-- Selected day detail -->
+        <div v-if="selectedDate" class="day-detail">
+          <div class="day-detail-header">
+            <span class="day-detail-title">{{ selectedDateLabel }}</span>
+            <button class="day-detail-close" @click="selectedDate = null" title="收起">×</button>
+          </div>
+          <div class="day-detail-metrics">
+            <div class="mini-metric">
+              <span class="mini-value">{{ selectedStat?.pomodoros ?? 0 }}</span>
+              <span class="mini-label">番茄</span>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-value">{{ formatDuration(selectedStat?.focusMinutes ?? 0) }}</span>
+              <span class="mini-label">专注</span>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-value">{{ selectedStat?.tasksCompleted ?? 0 }}</span>
+              <span class="mini-label">完成任务</span>
+            </div>
+          </div>
+
+          <div class="day-detail-group">
+            <div class="day-detail-group-title">完成的任务</div>
+            <div v-if="selectedCompletedTitles.length === 0" class="day-empty">
+              {{ (selectedStat?.tasksCompleted ?? 0) > 0 ? `完成 ${selectedStat?.tasksCompleted} 个任务（无标题记录）` : '当日没有完成记录' }}
+            </div>
+            <div v-else class="day-task-list">
+              <div v-for="(title, i) in selectedCompletedTitles" :key="i" class="day-task-row done">
+                <span class="pixel-check" aria-hidden="true"></span>
+                <span class="day-task-title">{{ title }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="day-detail-group">
+            <div class="day-detail-group-title">每日定时任务</div>
+            <div v-if="selectedScheduledTasks.length === 0" class="day-empty">暂无每日任务</div>
+            <div v-else class="day-task-list">
+              <div
+                v-for="t in selectedScheduledTasks"
+                :key="t.id"
+                class="day-task-row"
+                :class="{ done: t.done, planned: !t.done && isSelectedFuture }"
+              >
+                <span class="day-task-time">{{ t.time || '全天' }}</span>
+                <span class="day-task-title">{{ t.title }}</span>
+                <span class="day-task-state">{{ t.done ? '完成' : (isSelectedFuture ? '计划' : '未完成') }}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Task Distribution -->
-      <div class="section chart-section">
-        <div class="section-title">任务分布</div>
-        <div class="distribution">
-          <div v-for="item in taskDistribution" :key="item.label" class="dist-item">
-            <div class="dist-label">
-              <span>{{ item.label }}</span>
-              <span class="dist-percent">{{ item.percent }}%</span>
+      <!-- Daily recurring tasks -->
+      <div v-if="monthDailyTasks.length > 0" class="section">
+        <div class="section-header">
+          <span class="section-title">每日定时任务</span>
+          <span class="section-hint">{{ monthYear }}</span>
+        </div>
+        <div class="daily-task-list">
+          <div v-for="t in monthDailyTasks" :key="t.id" class="daily-task-row">
+            <span class="daily-task-time">{{ t.time || '全天' }}</span>
+            <span class="daily-task-title">{{ t.title }}</span>
+            <span class="daily-task-count">本月 {{ t.done }} 天</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="section chart-section">
+          <div class="section-title">本周趋势</div>
+          <div class="trend-chart">
+            <div class="trend-bars">
+              <div
+                v-for="d in weekTrend"
+                :key="d.day"
+                class="trend-bar-wrapper"
+              >
+                <div class="trend-bar-track">
+                  <span v-if="d.pomodoros > 0" class="bar-value">{{ d.pomodoros }}</span>
+                  <div
+                    class="trend-bar"
+                    :class="{ empty: d.pomodoros === 0 }"
+                    :style="{ height: steppedBarHeight(d.pomodoros) }"
+                  ></div>
+                </div>
+                <span class="bar-label">{{ d.day }}</span>
+              </div>
             </div>
-            <div class="dist-bar-bg">
-              <div class="dist-bar" :style="{ width: `${item.percent}%` }"></div>
+          </div>
+        </div>
+
+        <div class="section chart-section">
+          <div class="section-title">任务分布</div>
+          <div class="distribution">
+            <div v-for="item in taskDistribution" :key="item.label" class="dist-item">
+              <div class="dist-label">
+                <span>{{ item.label }}</span>
+                <span class="dist-percent">{{ item.percent }}%</span>
+              </div>
+              <div class="dist-bar-bg">
+                <div class="dist-bar" :style="{ width: `${item.percent}%` }"></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Achievements -->
-    <div class="section">
-      <div class="section-title">成就里程碑</div>
-
-      <div class="achievement-group">
-        <div class="achievement-row">
-          <div
-            v-for="a in starAchievements"
+      <!-- Pixel Companion Achievements -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">专注纪念</span>
+          <span class="section-hint">{{ unlockedCount }} / {{ allAchievements.length }}</span>
+        </div>
+        <div class="badge-strip">
+          <button
+            v-for="a in allAchievements"
             :key="a.id"
-            :class="['achievement-badge', { unlocked: a.unlockedAt }]"
+            class="badge-btn"
+            :class="{ unlocked: a.unlockedAt !== null, active: selectedBadge?.id === a.id }"
+            @click="toggleBadge(a)"
           >
-            <div class="badge-icon">{{ a.icon }}</div>
-            <div class="badge-name">{{ a.name }}</div>
-            <div class="badge-progress">
-              <template v-if="a.unlockedAt">已达成</template>
-              <template v-else>{{ a.progress }}/{{ a.target }}</template>
-            </div>
-          </div>
+            <img
+              v-if="selectedBadges[a.id]"
+              :src="selectedBadges[a.id]"
+              alt=""
+              width="18"
+              height="18"
+              class="pixel-badge"
+            />
+            <span class="badge-name">{{ a.name }}</span>
+          </button>
+        </div>
+        <div v-if="selectedBadge" class="badge-detail">
+          <strong>{{ selectedBadge.name }}</strong>
+          <span>{{ selectedBadge.description }} · {{ selectedBadge.unlockedAt ? '已达成' : `${selectedBadge.progress}/${selectedBadge.target}` }}</span>
         </div>
       </div>
-
-      <div class="achievement-group">
-        <div class="achievement-row">
-          <div
-            v-for="a in streakAchievements"
-            :key="a.id"
-            :class="['achievement-badge', { unlocked: a.unlockedAt }]"
-          >
-            <div class="badge-icon">{{ a.icon }}</div>
-            <div class="badge-name">{{ a.name }}</div>
-            <div class="badge-progress">
-              <template v-if="a.unlockedAt">已达成</template>
-              <template v-else>{{ a.progress }}/{{ a.target }}</template>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="achievement-group special">
-        <div class="achievement-row">
-          <div
-            v-for="a in specialAchievements"
-            :key="a.id"
-            :class="['achievement-badge', { unlocked: a.unlockedAt }]"
-          >
-            <div class="badge-icon">{{ a.icon }}</div>
-            <div class="badge-name">{{ a.name }}</div>
-            <div class="badge-progress">
-              <template v-if="a.unlockedAt">已达成</template>
-              <template v-else>未解锁</template>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -458,65 +498,48 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 0 12px 12px;
+  gap: 10px;
+  padding: 0 12px 14px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .page-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-}
-
-.back-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
-  border-radius: 8px;
-  color: var(--v2-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.back-btn:hover {
-  background: var(--ui-hover);
-  color: var(--v2-ink);
-}
-
-.back-btn svg {
-  width: 18px;
-  height: 18px;
+  gap: 10px;
+  padding: 8px 0 2px;
 }
 
 .page-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--v2-ink);
   flex: 1;
+  min-width: 0;
 }
 
+.section-tabs,
 .time-range-tabs {
-  display: flex;
+  display: inline-flex;
   background: var(--ui-well);
+  border: 1px solid var(--v2-line);
   border-radius: 8px;
   padding: 2px;
+  gap: 2px;
 }
 
 .tab {
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--v2-muted);
   background: transparent;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  white-space: nowrap;
+  transition: color 140ms ease, background 140ms ease;
 }
 
 .tab:hover {
@@ -524,56 +547,69 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .tab.active {
-  background: var(--focus-color);
-  color: var(--v2-ink);
+  background: var(--v2-accent);
+  color: var(--v2-on-accent);
 }
 
-.stats-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+.range-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.stat-card {
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);
-  border-radius: 12px;
-  padding: 14px 8px;
-  text-align: center;
-  min-width: 0;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--v2-ink);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-label {
+.range-caption {
   font-size: 11px;
   color: var(--v2-muted);
 }
 
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat-card {
+  background: var(--v2-elevated);
+  border: 1px solid var(--v2-line);
+  border-radius: 10px;
+  padding: 10px 6px;
+  text-align: center;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-value {
+  color: var(--v2-ink);
+  font-weight: 600;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--v2-muted);
+  white-space: nowrap;
+}
+
 .section {
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
-  border-radius: 12px;
-  padding: 14px;
+  background: var(--v2-elevated);
+  border: 1px solid var(--v2-line);
+  border-radius: 10px;
+  padding: 12px;
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .section-title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--v2-ink);
 }
 
@@ -589,12 +625,12 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
   align-items: center;
   justify-content: center;
   background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
+  border: 1px solid var(--v2-line);
   border-radius: 6px;
   color: var(--v2-muted);
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 140ms ease, background 140ms ease;
 }
 
 .nav-btn:hover {
@@ -609,7 +645,7 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 .heatmap-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 3px;
   margin-bottom: 4px;
 }
 
@@ -627,22 +663,24 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 
 .heat-cell {
   aspect-ratio: 1;
-  border-radius: 4px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  position: relative;
-  transition: all 0.15s;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 140ms ease, border-color 140ms ease;
 }
 
 .heat-cell.empty {
   background: transparent;
+  cursor: default;
 }
 
 .heat-cell:not(.empty):hover {
-  transform: scale(1.15);
-  z-index: 1;
+  border-color: var(--v2-accent);
+  z-index: 2;
 }
 
 .heat-cell.intensity-0 {
@@ -650,24 +688,45 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .heat-cell.intensity-1 {
-  background: color-mix(in srgb, var(--focus-color) 25%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 20%, var(--ui-well));
 }
 
 .heat-cell.intensity-2 {
-  background: color-mix(in srgb, var(--focus-color) 55%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 44%, var(--ui-well));
 }
 
 .heat-cell.intensity-3 {
-  background: var(--focus-color);
+  background: var(--v2-accent);
 }
 
 .day-number {
-  font-size: 9px;
-  color: var(--v2-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-secondary);
 }
 
 .heat-cell.intensity-3 .day-number {
   color: var(--v2-on-accent);
+  font-weight: 600;
+}
+
+.cell-indicator {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.72;
+}
+
+.heat-cell.intensity-3 .cell-indicator {
+  color: var(--v2-on-accent);
+}
+
+.cell-indicator.has-tasks {
+  background: var(--v2-break);
 }
 
 .cell-tooltip {
@@ -675,69 +734,59 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
   bottom: calc(100% + 4px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(28, 28, 34, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
-  border-radius: 4px;
-  padding: 3px 6px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 6px;
+  padding: 3px 7px;
   font-size: 10px;
   color: var(--v2-ink);
   white-space: nowrap;
   z-index: 10;
   pointer-events: none;
+  box-shadow: 0 4px 12px var(--v2-shadow);
 }
 
 .heat-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .expand-btn {
-  padding: 4px 9px;
+  padding: 3px 8px;
   border-radius: 6px;
   background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
+  border: 1px solid var(--v2-line);
   color: var(--v2-secondary);
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
   white-space: nowrap;
 }
 
 .expand-btn:hover {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
+  border-color: var(--v2-accent);
   color: var(--v2-ink);
 }
 
 .expand-btn.active {
-  background: color-mix(in srgb, var(--focus-color) 12%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 28%, transparent);
-  color: color-mix(in srgb, var(--focus-color) 80%, #fff);
+  background: var(--v2-accent-soft);
+  border-color: color-mix(in srgb, var(--v2-accent) 42%, transparent);
+  color: var(--v2-accent);
 }
 
 .section-hint {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--v2-muted);
 }
 
-.heat-cell {
-  cursor: pointer;
-}
-
-.heat-cell.empty {
-  cursor: default;
-}
-
 .heat-cell.selected {
-  outline: 1.5px solid color-mix(in srgb, var(--focus-color) 75%, transparent);
-  outline-offset: 1px;
+  border-color: var(--v2-ink);
 }
 
 .heatmap-grid.detailed .heat-cell {
-  aspect-ratio: 0.82;
+  aspect-ratio: 0.86;
 }
 
 .heatmap-grid.detailed .heat-cell .day-number {
@@ -748,28 +797,52 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 
 .heatmap-grid.detailed .heat-cell .cell-count {
   left: 5px;
-  right: auto;
+  right: 4px;
   bottom: 4px;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
+  gap: 2px;
 }
 
 .cell-count {
   position: absolute;
-  right: 3px;
-  bottom: 2px;
   display: flex;
-  align-items: center;
-  gap: 2px;
   font-size: 8px;
   line-height: 1;
   color: var(--v2-secondary);
   pointer-events: none;
 }
 
+.cell-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pixel-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  flex-shrink: 0;
+}
+
+.heat-cell.intensity-3 .pixel-dot {
+  background: var(--v2-on-accent);
+}
+
+.pixel-check {
+  width: 6px;
+  height: 4px;
+  border-left: 1.5px solid var(--v2-break);
+  border-bottom: 1.5px solid var(--v2-break);
+  transform: rotate(-45deg) translateY(-1px);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .heat-cell.intensity-3 .cell-count {
-  color: var(--v2-ink);
+  color: var(--v2-on-accent);
 }
 
 .cell-task-count {
@@ -784,12 +857,12 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 
 /* Selected day detail */
 .day-detail {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--v2-line);;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--v2-line);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .day-detail-header {
@@ -817,7 +890,6 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
 }
 
 .day-detail-close:hover {
@@ -828,22 +900,23 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 .day-detail-metrics {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .mini-metric {
   display: flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 7px 9px;
+  gap: 4px;
+  padding: 6px 8px;
   border-radius: 8px;
   background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
+  border: 1px solid var(--v2-line);
 }
 
 .mini-value {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: var(--v2-ink);
 }
 
@@ -853,16 +926,16 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .day-detail-group-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--v2-muted);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .day-empty {
   font-size: 11px;
   color: var(--v2-muted);
-  padding: 2px 0 4px;
+  padding: 2px 0;
 }
 
 .day-task-list {
@@ -884,11 +957,6 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 
 .day-task-row.done {
   color: var(--v2-muted);
-}
-
-.day-task-row.done svg {
-  color: var(--focus-color);
-  flex-shrink: 0;
 }
 
 .day-task-time {
@@ -914,11 +982,7 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .day-task-row.done .day-task-state {
-  color: color-mix(in srgb, var(--focus-color) 80%, #fff);
-}
-
-.day-task-row.planned .day-task-state {
-  color: var(--v2-muted);
+  color: var(--v2-accent);
 }
 
 /* Daily recurring tasks list */
@@ -932,7 +996,7 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 9px;
+  padding: 6px 8px;
   border-radius: 8px;
   background: var(--ui-well);
 }
@@ -940,8 +1004,8 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 .daily-task-time {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--focus-color) 70%, #fff);
-  background: color-mix(in srgb, var(--focus-color) 8%, transparent);
+  color: var(--v2-accent);
+  background: var(--v2-accent-soft);
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;
@@ -950,7 +1014,7 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 .daily-task-title {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--v2-ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -966,8 +1030,8 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 .heatmap-legend {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 8px;
   justify-content: flex-end;
 }
 
@@ -980,8 +1044,8 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .legend-box {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 2px;
 }
 
@@ -990,25 +1054,31 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .legend-box.intensity-1 {
-  background: color-mix(in srgb, var(--focus-color) 25%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 20%, var(--ui-well));
 }
 
 .legend-box.intensity-2 {
-  background: color-mix(in srgb, var(--focus-color) 55%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 44%, var(--ui-well));
 }
 
 .legend-box.intensity-3 {
-  background: var(--focus-color);
+  background: var(--v2-accent);
 }
 
 .charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .chart-section {
-  min-height: 140px;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-section .section-title {
+  margin-bottom: 8px;
 }
 
 .trend-chart {
@@ -1018,52 +1088,61 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 }
 
 .trend-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 90px;
-  gap: 6px;
-  padding-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: end;
+  height: 96px;
+  gap: 4px;
 }
 
 .trend-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.trend-bar-track {
+  width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100%;
+  justify-content: flex-end;
+  gap: 2px;
 }
 
 .trend-bar {
-  width: 100%;
-  max-width: 24px;
-  background: var(--focus-color);
-  border-radius: 4px 4px 2px 2px;
-  margin-top: auto;
-  position: relative;
-  min-height: 4px;
-  transition: height 0.3s ease;
+  width: 10px;
+  background: var(--v2-accent);
+  border-radius: 1px;
+  transition: height 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.trend-bar.empty {
+  background: var(--v2-line);
 }
 
 .bar-value {
-  position: absolute;
-  top: -18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 9px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   color: var(--v2-secondary);
 }
 
 .bar-label {
   font-size: 10px;
   color: var(--v2-muted);
-  margin-top: 6px;
 }
 
 .distribution {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
+  justify-content: center;
+  flex: 1;
 }
 
 .dist-item {
@@ -1081,85 +1160,99 @@ const maxPomodoros = computed(() => Math.max(...weekTrend.value.map(d => d.pomod
 
 .dist-percent {
   color: var(--v2-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .dist-bar-bg {
-  height: 6px;
+  height: 5px;
   background: var(--ui-well);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .dist-bar {
   height: 100%;
-  background: var(--focus-color);
-  border-radius: 3px;
-  transition: width 0.3s ease;
+  background: var(--v2-accent);
+  border-radius: 2px;
+  transition: width 200ms ease;
 }
 
-.achievement-group {
-  margin-bottom: 12px;
+/* Companion Pixel Badges */
+.badge-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
-.achievement-group:last-child {
-  margin-bottom: 0;
-}
-
-.achievement-group.special .achievement-row {
-  justify-content: flex-start;
-  gap: 16px;
-}
-
-.achievement-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.achievement-badge {
-  flex: 1;
+.badge-btn {
+  appearance: none;
+  border: 1px solid var(--v2-line);
   background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
-  border-radius: 10px;
-  padding: 10px 8px;
-  text-align: center;
-  transition: all 0.2s;
+  border-radius: 8px;
+  padding: 7px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
-.achievement-badge.unlocked {
-  background: color-mix(in srgb, var(--focus-color) 12%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 30%, transparent);
+.badge-btn.unlocked {
+  opacity: 1;
 }
 
-.badge-icon {
-  font-size: 16px;
-  margin-bottom: 4px;
-  filter: grayscale(1) opacity(0.4);
+.badge-btn.active {
+  border-color: var(--v2-accent);
+  background: var(--v2-accent-soft);
 }
 
-.achievement-badge.unlocked .badge-icon {
-  filter: none;
-  color: var(--focus-color);
+.pixel-badge {
+  display: block;
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .badge-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--v2-muted);
-  margin-bottom: 2px;
-}
-
-.achievement-badge.unlocked .badge-name {
-  color: var(--v2-ink);
-}
-
-.badge-progress {
   font-size: 10px;
-  color: var(--v2-muted);
+  color: var(--v2-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.achievement-badge.unlocked .badge-progress {
-  color: var(--focus-color);
+.badge-detail {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--ui-well);
+  border: 1px solid var(--v2-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--v2-secondary);
+}
+
+.badge-detail strong {
+  color: var(--v2-ink);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+@media (max-width: 349px) {
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .badge-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Custom scrollbar */

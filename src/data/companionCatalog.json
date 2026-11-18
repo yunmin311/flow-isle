@@ -1,0 +1,284 @@
+{
+  "animals": [
+    {
+      "id": "cat-orange",
+      "name": "橘猫晒太阳",
+      "family": "cat",
+      "placement": {
+        "x": 14.32,
+        "y": 18.174,
+        "width": 44.9,
+        "height": 44.9
+      }
+    },
+    {
+      "id": "cat-calico",
+      "name": "三花的小花房",
+      "family": "cat",
+      "placement": {
+        "x": 15.0,
+        "y": 18.721,
+        "width": 44.558,
+        "height": 44.558
+      }
+    },
+    {
+      "id": "cat-tuxedo",
+      "name": "奶牛猫书店",
+      "family": "cat",
+      "placement": {
+        "x": 15.189,
+        "y": 19.006,
+        "width": 42.994,
+        "height": 42.994
+      }
+    },
+    {
+      "id": "cat-silver",
+      "name": "银虎斑雨天",
+      "family": "cat",
+      "placement": {
+        "x": 9.791,
+        "y": 18.056,
+        "width": 45.998,
+        "height": 45.998
+      }
+    },
+    {
+      "id": "cat-ragdoll",
+      "name": "布偶云朵卧室",
+      "family": "cat",
+      "placement": {
+        "x": 12.852,
+        "y": 19.176,
+        "width": 44.9,
+        "height": 44.9
+      }
+    },
+    {
+      "id": "cat-siamese",
+      "name": "暹罗的茶歇",
+      "family": "cat",
+      "placement": {
+        "x": 14.184,
+        "y": 19.354,
+        "width": 42.646,
+        "height": 42.646
+      }
+    },
+    {
+      "id": "cat-black",
+      "name": "黑猫月光阁楼",
+      "family": "cat",
+      "placement": {
+        "x": 12.902,
+        "y": 18.627,
+        "width": 47.837,
+        "height": 47.837
+      }
+    },
+    {
+      "id": "cat-white",
+      "name": "白猫的樱花信",
+      "family": "cat",
+      "placement": {
+        "x": 12.342,
+        "y": 16.749,
+        "width": 47.967,
+        "height": 47.967
+      }
+    },
+    {
+      "id": "dog-shiba",
+      "name": "柴犬秋日散步",
+      "family": "dog",
+      "placement": {
+        "x": 12.625,
+        "y": 18.018,
+        "width": 45.366,
+        "height": 48.47
+      }
+    },
+    {
+      "id": "dog-corgi",
+      "name": "柯基草坪邮差",
+      "family": "dog",
+      "placement": {
+        "x": 15.0,
+        "y": 18.436,
+        "width": 45.165,
+        "height": 48.255
+      }
+    },
+    {
+      "id": "dog-golden",
+      "name": "金毛湖边假日",
+      "family": "dog",
+      "placement": {
+        "x": 15.0,
+        "y": 16.916,
+        "width": 42.992,
+        "height": 45.934
+      }
+    },
+    {
+      "id": "dog-collie",
+      "name": "边牧牧场日记",
+      "family": "dog",
+      "placement": {
+        "x": 15.658,
+        "y": 18.28,
+        "width": 40.92,
+        "height": 43.72
+      }
+    },
+    {
+      "id": "dog-husky",
+      "name": "哈士奇雪地",
+      "family": "dog",
+      "placement": {
+        "x": 14.377,
+        "y": 19.751,
+        "width": 43.211,
+        "height": 46.168
+      }
+    },
+    {
+      "id": "dog-bichon",
+      "name": "比熊面包房",
+      "family": "dog",
+      "placement": {
+        "x": 12.566,
+        "y": 15.634,
+        "width": 46.868,
+        "height": 50.075
+      }
+    },
+    {
+      "id": "dog-dachshund",
+      "name": "腊肠午后庭院",
+      "family": "dog",
+      "placement": {
+        "x": 14.306,
+        "y": 34.463,
+        "width": 43.999,
+        "height": 27.537
+      }
+    },
+    {
+      "id": "dog-dalmatian",
+      "name": "斑点狗海边",
+      "family": "dog",
+      "placement": {
+        "x": 15.0,
+        "y": 17.446,
+        "width": 46.23,
+        "height": 49.394
+      }
+    },
+    {
+      "id": "fox-red",
+      "name": "赤狐枫林来信",
+      "family": "fox",
+      "placement": {
+        "x": 16.662,
+        "y": 19.772,
+        "width": 39.524,
+        "height": 42.228
+      }
+    },
+    {
+      "id": "fox-arctic",
+      "name": "雪狐极光小屋",
+      "family": "fox",
+      "placement": {
+        "x": 8.847,
+        "y": 11.81,
+        "width": 47.81,
+        "height": 53.539
+      }
+    },
+    {
+      "id": "fox-fennec",
+      "name": "耳廓狐沙丘夜",
+      "family": "fox",
+      "placement": {
+        "x": 16.177,
+        "y": 19.297,
+        "width": 42.633,
+        "height": 45.55
+      }
+    },
+    {
+      "id": "fox-silver",
+      "name": "银狐的月亮湖",
+      "family": "fox",
+      "placement": {
+        "x": 16.86,
+        "y": 19.706,
+        "width": 39.585,
+        "height": 42.294
+      }
+    },
+    {
+      "id": "fox-cross",
+      "name": "十字狐苔藓森林",
+      "family": "fox",
+      "placement": {
+        "x": 15.435,
+        "y": 18.365,
+        "width": 42.209,
+        "height": 45.097
+      }
+    },
+    {
+      "id": "fox-sand",
+      "name": "沙色狐风车花田",
+      "family": "fox",
+      "placement": {
+        "x": 16.437,
+        "y": 17.756,
+        "width": 42.526,
+        "height": 45.436
+      }
+    }
+  ],
+  "actions": [
+    {
+      "key": "cat-orange-rest",
+      "title": "把下巴放下来",
+      "animal": "cat-orange",
+      "size": [
+        28,
+        24
+      ]
+    },
+    {
+      "key": "dog-golden-bow",
+      "title": "邀你一起玩",
+      "animal": "dog-golden",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "key": "fox-red-step",
+      "title": "轻步向前",
+      "animal": "fox-red",
+      "size": [
+        32,
+        24
+      ]
+    },
+    {
+      "key": "fox-red-curl",
+      "title": "身侧卷尾",
+      "animal": "fox-red",
+      "size": [
+        32,
+        24
+      ]
+    }
+  ]
+}

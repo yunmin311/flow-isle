@@ -15,6 +15,7 @@ import { useMemos } from '../composables/useMemos'
 import { useDailyStats } from '../composables/useDailyStats'
 import { useAchievements } from '../composables/useAchievements'
 import { useRadio } from '../composables/useRadio'
+import { useCompanion } from '../composables/useCompanion'
 import TodoPage from './TodoPage.vue'
 import TaskArea from './TaskArea.vue'
 import TaskDetailPage from './TaskDetailPage.vue'
@@ -25,17 +26,6 @@ import RadioPage from './RadioPage.vue'
 import NotificationsPage from './NotificationsPage.vue'
 import PanelTitleBar from './PanelTitleBar.vue'
 
-interface PanelTransitionMetrics {
-  island_x: number
-  island_y: number
-  island_width: number
-  island_height: number
-  panel_x: number
-  panel_y: number
-  panel_width: number
-  panel_height: number
-}
-
 const { startBridge } = useTimerBridge()
 const { settings } = useSettings()
 // 面板启动即开始记录番茄通知，避免通知页未打开时漏记
@@ -44,6 +34,7 @@ void startScreenshotCollection()
 // 每日任务 repeatTime 到点提醒
 useTaskReminders()
 const { tasks } = useTasks()
+const { statsSection } = useCompanion()
 
 function prewarmPanelData() {
   useTaskGroups()
@@ -51,12 +42,13 @@ function prewarmPanelData() {
   useDailyStats()
   useAchievements()
   useRadio()
+  useCompanion()
 }
 
 prewarmPanelData()
 
 
-const PANEL_CLOSE_DURATION = 130
+const PANEL_CLOSE_DURATION = 150
 const CLOSE_FALLBACK_BUFFER = 140
 const IS_MACOS = navigator.userAgent.toLowerCase().includes('mac')
 
@@ -65,6 +57,55 @@ const currentView = ref<'tasks' | 'todo' | 'taskDetail' | 'settings' | 'memos' |
 const notificationFocusRequest = ref<{ recordId?: string; openSource?: boolean; destination?: 'timer' }>()
 const panelContent = ref<HTMLElement | null>(null)
 let notificationRouteFocus: string | undefined
+const viewScrollMemory = new Map<string, number>()
+let activeViewAnim: Animation | null = null
+
+const viewOrder: Record<string, number> = {
+  tasks: 0,
+  todo: 1,
+  taskDetail: 1,
+  memos: 2,
+  stats: 3,
+  radio: 4,
+  notifications: 5,
+  settings: 6,
+}
+
+function navigateTo(nextView: typeof currentView.value) {
+  const prevView = currentView.value
+  if (prevView === nextView) return
+  const prevChild = panelContent.value?.firstElementChild as HTMLElement | null
+  if (prevChild) viewScrollMemory.set(prevView, prevChild.scrollTop)
+
+  const dir = (viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1
+  currentView.value = nextView
+
+  void nextTick(() => {
+    const nextChild = panelContent.value?.firstElementChild as HTMLElement | null
+    if (!nextChild) return
+    const savedScroll = viewScrollMemory.get(nextView) ?? 0
+    nextChild.scrollTop = savedScroll
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    activeViewAnim?.cancel()
+    if (typeof nextChild.animate === 'function') {
+      activeViewAnim = nextChild.animate(
+        [
+          { opacity: 0, transform: `translate3d(${dir * 12}px, 0, 0)` },
+          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+        ],
+        {
+          duration: 180,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        },
+      )
+    }
+  })
+}
+
+function openCompanionPanel() {
+  statsSection.value = 'companions'
+  navigateTo('stats')
+}
 
 function focusNotificationDestination() {
   if (!notificationRouteFocus) return
@@ -78,7 +119,7 @@ function focusNotificationDestination() {
 function openNotificationDestination(view: 'tasks' | 'taskDetail' | 'todo', taskId?: string) {
   if (taskId) taskIdForDetail.value = taskId
   notificationRouteFocus = view === 'tasks' ? '.focus-hero' : view === 'taskDetail' ? '.detail-page' : '.panel-body'
-  currentView.value = view
+  navigateTo(view)
   void nextTick(focusNotificationDestination)
 }
 
@@ -163,44 +204,6 @@ let unlistenOpenNotifications: (() => void) | null = null
 let unlistenOpenTask: (() => void) | null = null
 let closeFallbackTimer: number | null = null
 
-function clamp(v: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, v))
-}
-
-function applyTransitionVars(metrics: PanelTransitionMetrics) {
-  const root = panelRootRef.value
-  if (!root) return
-
-  const panelW = Math.max(1, metrics.panel_width)
-  const panelH = Math.max(1, metrics.panel_height)
-  const scaleX = clamp(metrics.island_width / panelW, 0.1, 1)
-  const scaleY = clamp(metrics.island_height / panelH, 0.08, 0.18)
-
-  const islandCenterX = metrics.island_x + metrics.island_width / 2
-  const islandCenterY = metrics.island_y + metrics.island_height / 2
-  const panelCenterX = metrics.panel_x + panelW / 2
-  const panelCenterY = metrics.panel_y + panelH / 2
-
-  const translateX = islandCenterX - panelCenterX
-  const translateY = islandCenterY - panelCenterY
-  const closeArc = clamp(Math.abs(translateY) * 0.14, 10, 26) * (translateY < 0 ? -1 : 1)
-  const fromRadius = `${Math.max(12, Math.round(metrics.island_height / 2))}px`
-  const topLift = `${Math.round(clamp(metrics.island_height * 0.24, 8, 14))}px`
-
-  root.style.setProperty('--panel-from-x', `${translateX.toFixed(2)}px`)
-  root.style.setProperty('--panel-from-y', `${translateY.toFixed(2)}px`)
-  root.style.setProperty('--panel-from-sx', scaleX.toFixed(4))
-  root.style.setProperty('--panel-from-sy', scaleY.toFixed(4))
-  root.style.setProperty('--panel-from-radius', fromRadius)
-  root.style.setProperty('--panel-close-arc', `${closeArc.toFixed(2)}px`)
-  root.style.setProperty('--panel-top-lift', topLift)
-}
-
-async function prepareTransitionVars() {
-  const metrics = await invoke<PanelTransitionMetrics | null>('get_panel_transition_metrics')
-  if (metrics) applyTransitionVars(metrics)
-}
-
 function clearCloseFallback() {
   if (closeFallbackTimer) {
     window.clearTimeout(closeFallbackTimer)
@@ -238,7 +241,6 @@ function runOpenAnimation() {
 
 async function runCloseAnimation() {
   if (panelAnimState.value === 'closing') return
-  await prepareTransitionVars()
   scheduleCloseFallback()
   panelAnimState.value = 'closing'
 }
@@ -247,9 +249,8 @@ async function onWindowTransition(payload: string) {
   if (payload === 'open') {
     isClosing.value = false
     panelAnimState.value = 'hidden'
-    await prepareTransitionVars()
     void invoke('emit_island_panel_motion', { phase: 'open' })
-    // 窗口此刻在屏幕外，先移回目标位置，再开始弹起动画。
+    // 窗口此刻在屏幕外，先移回目标位置，再开始无缩放平滑展开动画。
     try {
       await invoke('position_panel_under_island')
     } catch {
@@ -307,9 +308,14 @@ function onPanelKeydown(event: KeyboardEvent) {
 
 onMounted(async () => {
   startBridge()
+  window.addEventListener('keydown', onPanelKeydown)
+  if (!('__TAURI_INTERNALS__' in window)) {
+    panelAnimState.value = 'steady'
+    return
+  }
   unlistenOpenNotifications = await listen<{ recordId?: string; openSource?: boolean; destination?: 'timer' }>('open-notifications', ({ payload }) => {
     notificationFocusRequest.value = { recordId: payload?.recordId, openSource: payload?.openSource, destination: payload?.destination }
-    currentView.value = 'notifications'
+    navigateTo('notifications')
   })
   unlistenOpenTask = await listen<{ taskId?: string }>('open-task', ({ payload }) => {
     const taskId = (payload?.taskId ?? '').trim()
@@ -319,8 +325,7 @@ onMounted(async () => {
       openNotificationDestination('todo')
     }
   })
-  await invoke('set_click_through', { ignore: false })
-  window.addEventListener('keydown', onPanelKeydown)
+  await invoke('set_click_through', { ignore: false }).catch(() => {})
 
   const win = getCurrentWebviewWindow()
   try {
@@ -390,21 +395,22 @@ async function closeWindow() {
         :search-query="currentView === 'memos' ? memoSearchQuery : todoSearchQuery"
         :search-placeholder="currentView === 'memos' ? '搜索备忘录...' : (todoActiveTabLabel ? `搜索「${todoActiveTabLabel}」...` : '搜索当前分类...')"
         @update:search-query="currentView === 'memos' ? (memoSearchQuery = $event) : (todoSearchQuery = $event)"
+        @open-companion="openCompanionPanel"
         @close="closeWindow"
       />
       <div ref="panelContent" class="panel-body" tabindex="-1">
         <KeepAlive :include="cachedPanelViews">
-          <TaskArea v-if="currentView === 'tasks'" category="today" @close="closeWindow" />
-          <TodoPage v-else-if="currentView === 'todo'" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; currentView = 'taskDetail' }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
-          <TaskDetailPage v-else-if="currentView === 'taskDetail'" :task-id="taskIdForDetail" @back="currentView = 'todo'" />
-          <SettingsPage v-else-if="currentView === 'settings'" @back="currentView = 'tasks'" />
-          <MemoPage v-else-if="currentView === 'memos'" :search-query="memoSearchQuery" @back="currentView = 'tasks'" />
-          <StatsPage v-else-if="currentView === 'stats'" @back="currentView = 'tasks'" />
-          <RadioPage v-else-if="currentView === 'radio'" @back="currentView = 'tasks'" />
+          <TaskArea v-if="currentView === 'tasks'" category="today" @close="closeWindow" @open-companion="openCompanionPanel" />
+          <TodoPage v-else-if="currentView === 'todo'" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; navigateTo('taskDetail') }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
+          <TaskDetailPage v-else-if="currentView === 'taskDetail'" :task-id="taskIdForDetail" @back="navigateTo('todo')" />
+          <SettingsPage v-else-if="currentView === 'settings'" @back="navigateTo('tasks')" />
+          <MemoPage v-else-if="currentView === 'memos'" :search-query="memoSearchQuery" @back="navigateTo('tasks')" />
+          <StatsPage v-else-if="currentView === 'stats'" @back="navigateTo('tasks')" />
+          <RadioPage v-else-if="currentView === 'radio'" @back="navigateTo('tasks')" />
           <NotificationsPage
             v-else-if="currentView === 'notifications'"
             :focus-request="panelAnimState === 'steady' ? notificationFocusRequest : undefined"
-            @back="currentView = 'tasks'"
+            @back="navigateTo('tasks')"
             @open-task="taskId => openNotificationDestination('taskDetail', taskId)"
             @open-home="openNotificationDestination('tasks')"
             @open-todo="openNotificationDestination('todo')"
@@ -417,7 +423,7 @@ async function closeWindow() {
           :key="item.key"
           class="nav-btn"
           :class="{ active: currentView === item.key }"
-          @click="currentView = item.key"
+          @click="navigateTo(item.key)"
         >
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -448,18 +454,9 @@ async function closeWindow() {
   overflow: visible;
   color: var(--panel-text);
   font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  transform-origin: 50% 0;
   will-change: transform, opacity;
   backface-visibility: hidden;
   isolation: isolate;
-
-  --panel-from-x: 0px;
-  --panel-from-y: -280px;
-  --panel-from-sx: 0.82;
-  --panel-from-sy: 0.14;
-  --panel-from-radius: 22px;
-  --panel-close-arc: -20px;
-  --panel-top-lift: 10px;
 }
 
 .panel-card {
@@ -532,10 +529,10 @@ async function closeWindow() {
 }
 
 .glass-bright .panel-card {
-  border-color: color-mix(in srgb, #fff 78%, transparent);
+  border-color: var(--panel-shell-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    inset 0 1px 0 var(--v2-specular),
+    inset 0 -1px 0 var(--v2-shadow);
 }
 
 .glass-bright .panel-vignette {
@@ -545,7 +542,7 @@ async function closeWindow() {
 /* 主题磨砂：以宽幅漫反射和可见颗粒形成雾面。 */
 .glass-frost {
   --panel-mode-sheen:
-    radial-gradient(120% 82% at 46% -6%, rgba(255, 255, 255, 0.26), transparent 70%),
+    radial-gradient(120% 82% at 46% -6%, rgba(255, 255, 255, 0.22), transparent 70%),
     radial-gradient(85% 64% at 93% 35%, var(--v2-glow), transparent 72%);
   --panel-sheen-opacity: 1;
   --panel-grain: 0.32;
@@ -553,10 +550,10 @@ async function closeWindow() {
 }
 
 .glass-frost .panel-card {
-  border-color: color-mix(in srgb, #fff 42%, transparent);
+  border-color: var(--panel-shell-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+    inset 0 1px 0 var(--v2-specular),
+    inset 0 -1px 0 var(--v2-shadow);
 }
 
 .glass-frost .panel-vignette {
@@ -567,7 +564,7 @@ async function closeWindow() {
 .glass-acrylic {
   --panel-mode-sheen:
     linear-gradient(180deg,
-      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.14) 0%,
       transparent 40%,
       color-mix(in srgb, var(--focus-color) 11%, transparent) 100%);
   --panel-sheen-opacity: 1;
@@ -576,10 +573,10 @@ async function closeWindow() {
 }
 
 .glass-acrylic .panel-card {
-  border-color: color-mix(in srgb, #fff 22%, transparent);
+  border-color: var(--panel-shell-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.10);
+    inset 0 1px 0 var(--v2-specular),
+    inset 0 -1px 0 var(--v2-shadow);
 }
 
 .glass-acrylic .panel-vignette {
@@ -597,86 +594,52 @@ async function closeWindow() {
   overflow: clip;
 }
 
-
-
 .motion-opening {
-  animation: panel-open 280ms cubic-bezier(0.165, 0.84, 0.44, 1) both;
+  animation: panel-open 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .motion-hidden,
 .motion-opening-ready {
-  opacity: 0.92;
-  border-radius: var(--panel-from-radius);
-  transform: translate3d(var(--panel-from-x), calc(var(--panel-from-y) - var(--panel-top-lift)), 0)
-    scale(var(--panel-from-sx), var(--panel-from-sy));
+  opacity: 0;
+  transform: translate3d(0, -10px, 0);
   pointer-events: none;
 }
 
 .motion-hidden {
-  opacity: 0;
   visibility: hidden;
 }
 
 .motion-closing {
-  animation: panel-close 90ms ease-out both;
+  animation: panel-close 150ms cubic-bezier(0.4, 0, 1, 1) both;
   pointer-events: none;
 }
 
-.motion-hidden .panel-inner,
-.motion-opening-ready .panel-inner {
+.motion-hidden .panel-inner > *,
+.motion-opening-ready .panel-inner > * {
   opacity: 0;
 }
 
-.motion-opening .panel-inner {
-  animation: panel-inner-open 170ms cubic-bezier(0.2, 0.8, 0.22, 1) 48ms both;
+.motion-opening .panel-inner > :first-child {
+  animation: panel-child-in 170ms cubic-bezier(0.22, 1, 0.36, 1) 20ms both;
+}
+
+.motion-opening .panel-body {
+  animation: panel-child-in 190ms cubic-bezier(0.22, 1, 0.36, 1) 45ms both;
+}
+
+.motion-opening .panel-nav {
+  animation: panel-child-in 170ms cubic-bezier(0.22, 1, 0.36, 1) 70ms both;
 }
 
 .motion-closing .panel-inner {
   opacity: 0;
-  transition: opacity 60ms ease;
+  transition: opacity 90ms ease-in;
 }
 
 @keyframes panel-open {
   0% {
-    opacity: 0.92;
-    border-radius: var(--panel-from-radius);
-    transform: translate3d(var(--panel-from-x), calc(var(--panel-from-y) - var(--panel-top-lift)), 0)
-      scale(var(--panel-from-sx), var(--panel-from-sy));
-  }
-
-  68% {
-    opacity: 1;
-    border-radius: 17px;
-    transform: translate3d(
-        calc(var(--panel-from-x) * 0.05),
-        calc(var(--panel-from-y) * 0.05 + var(--panel-close-arc) * -0.24),
-        0
-      )
-      scale(1.038, 1.052);
-  }
-
-  100% {
-    opacity: 1;
-    border-radius: 22px;
-    transform: translate3d(0, 0, 0) scale(1, 1);
-  }
-}
-
-@keyframes panel-close {
-  /* 底板跟随内容同步消失：只做透明度，不残留壳体 */
-  0% {
-    opacity: 1;
-  }
-
-  100% {
     opacity: 0;
-  }
-}
-
-@keyframes panel-inner-open {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0);
+    transform: translate3d(0, -10px, 0);
   }
 
   100% {
@@ -685,19 +648,27 @@ async function closeWindow() {
   }
 }
 
-.panel-body > * {
-  animation: view-in 300ms var(--panel-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
-}
-
-@keyframes view-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
+@keyframes panel-close {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 
-  to {
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes panel-child-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 5px, 0);
+  }
+
+  100% {
     opacity: 1;
-    transform: none;
+    transform: translate3d(0, 0, 0);
   }
 }
 

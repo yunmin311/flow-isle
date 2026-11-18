@@ -2,15 +2,17 @@
 import { computed } from 'vue'
 import { useTimer } from '../composables/useTimer'
 import { useTasks } from '../composables/useTasks'
+import { useCompanion, resolveIslandCompanionSprite } from '../composables/useCompanion'
 import { PIXEL_3X5, layoutPixelText } from '../utils/pixelFont'
 
-const { displayTime, phase, activeTaskId, activeTaskTitle, activeSubtaskTitle, running } = useTimer()
+const { displayTime, phase, activeTaskId, activeTaskTitle, activeSubtaskTitle, running, remaining } = useTimer()
 const { tasks } = useTasks()
+const { selectedCompanion } = useCompanion()
 
 defineProps<{ radioPlaying?: boolean }>()
 
 const activeTask = computed(() =>
-  tasks.value.find(t => t.id === activeTaskId.value)
+  tasks.value.find(t => t.id === activeTaskId.value),
 )
 const resolvedTitle = computed(() => {
   if (activeSubtaskTitle.value) return activeSubtaskTitle.value
@@ -18,32 +20,50 @@ const resolvedTitle = computed(() => {
 })
 
 const phaseColor = computed(() =>
-  phase.value === 'focus' ? 'var(--focus-color)' : 'var(--break-color)'
+  phase.value === 'focus' ? 'var(--focus-color)' : 'var(--break-color)',
 )
 
-// 固定 3px：与 idle 时钟保持一致，整体再小一号
+const companionSprite = computed(() =>
+  resolveIslandCompanionSprite(
+    selectedCompanion.value,
+    phase.value === 'break' ? 'break' : 'focus',
+  ),
+)
+
+// 固定 3px：与 idle 时钟保持一致
 const pixelUnit = 3
 const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, pixelUnit, 1))
 </script>
 
 <template>
-  <div class="capsule-focus flex items-center justify-between w-full h-full px-4 gap-3">
-    <!-- Phase indicator dot -->
-    <div
-      class="shrink-0 w-2 h-2 rounded-full"
-      :class="running ? 'animate-pulse' : ''"
-      :style="{ backgroundColor: phaseColor, width: `calc(8px * var(--island-scale, 1))`, height: `calc(8px * var(--island-scale, 1))` }"
-    />
+  <div class="capsule-focus">
+    <div class="focus-companion">
+      <img
+        class="companion-pixel"
+        :src="companionSprite.url"
+        :alt="selectedCompanion.name"
+        width="18"
+        height="18"
+        :style="{
+          width: `calc(18px * var(--island-scale, 1))`,
+          height: `calc(18px * var(--island-scale, 1))`,
+        }"
+      />
+      <span
+        class="phase-pip"
+        :class="{ 'is-running': running }"
+        :style="{ backgroundColor: phaseColor }"
+        aria-hidden="true"
+      />
+    </div>
 
-    <!-- Task name -->
     <div class="flex-1 min-w-0">
       <span
         class="font-medium truncate block text-[var(--capsule-text)]"
-        :style="{ fontSize: `calc(12px * var(--island-scale, 1))` }"
+        :style="{ fontSize: `calc(12.5px * var(--island-scale, 1))` }"
       >{{ resolvedTitle ?? (phase === 'break' ? '休息一下' : '专注中') }}</span>
     </div>
 
-    <!-- Countdown -->
     <div
       class="shrink-0 flex items-center"
       :style="{ gap: `calc(8px * var(--island-scale, 1))` }"
@@ -66,8 +86,12 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
           :height="pixelUnit"
         />
       </svg>
-      <span class="text-[var(--capsule-muted)]" :style="{ fontSize: `calc(10px * var(--island-scale, 1))` }">
-        {{ running ? '' : '⏸' }}
+      <span
+        v-if="!running && remaining > 0"
+        class="text-[var(--capsule-muted)]"
+        :style="{ fontSize: `calc(10px * var(--island-scale, 1))` }"
+      >
+        ⏸
       </span>
       <div v-if="radioPlaying" class="wave-bars">
         <span class="wave-bar" />
@@ -79,6 +103,46 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 </template>
 
 <style scoped>
+.capsule-focus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 0 calc(14px * var(--island-scale, 1));
+  gap: calc(10px * var(--island-scale, 1));
+}
+
+.focus-companion {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.companion-pixel {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.phase-pip {
+  position: absolute;
+  right: -2px;
+  bottom: -1px;
+  width: 5px;
+  height: 5px;
+}
+
+.phase-pip.is-running {
+  animation: pip-pulse 1.8s steps(2, end) infinite;
+}
+
+@keyframes pip-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .capsule-pixel-time {
   flex-shrink: 0;
   display: block;
@@ -92,17 +156,17 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 .wave-bars {
   display: flex;
   align-items: flex-end;
-  gap: calc(4px * var(--island-scale, 1));
+  gap: calc(3px * var(--island-scale, 1));
   height: calc(12px * var(--island-scale, 1));
 }
 
 .wave-bar {
-  width: calc(4px * var(--island-scale, 1));
+  width: calc(3px * var(--island-scale, 1));
   height: calc(12px * var(--island-scale, 1));
   background: var(--focus-color);
   border-radius: 0;
-  opacity: 0.8;
-  animation: wave-bounce 0.8s steps(2, end) infinite;
+  opacity: 0.82;
+  animation: wave-bounce 1s steps(2, end) infinite;
 }
 
 .wave-bar:nth-child(1) {
@@ -111,17 +175,24 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 }
 
 .wave-bar:nth-child(2) {
-  animation-delay: 0.15s;
+  animation-delay: -0.33s;
   clip-path: inset(0);
 }
 
 .wave-bar:nth-child(3) {
-  animation-delay: 0.3s;
+  animation-delay: -0.66s;
   clip-path: inset(55% 0 0);
 }
 
 @keyframes wave-bounce {
-  0%, 100% { clip-path: inset(70% 0 0); }
+  0%, 100% { clip-path: inset(66% 0 0); }
   50% { clip-path: inset(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phase-pip.is-running,
+  .wave-bar {
+    animation: none;
+  }
 }
 </style>

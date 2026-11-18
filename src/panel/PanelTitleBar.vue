@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useCompanion } from '../composables/useCompanion'
+
+const { selectedCompanion } = useCompanion()
 
 const props = defineProps<{
   title?: string
@@ -11,6 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  openCompanion: []
   'update:searchQuery': [value: string]
 }>()
 
@@ -61,6 +65,15 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
     <div v-else class="titlebar-spacer"></div>
 
     <div class="titlebar-actions">
+      <button
+        type="button"
+        class="companion-button"
+        :aria-label="`查看${selectedCompanion.name}陪伴相册`"
+        :title="selectedCompanion.name"
+        @click="emit('openCompanion')"
+      >
+        <img :src="selectedCompanion.sitUrl" alt="" width="18" height="18" />
+      </button>
       <button class="btn-close" @click="$emit('close')" title="关闭">✕</button>
     </div>
   </div>
@@ -107,10 +120,10 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
 }
 
 .titlebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #f8f6f0;
-  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--v2-ink);
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
@@ -186,6 +199,7 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
 
 .titlebar-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
@@ -193,31 +207,43 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
 .titlebar-actions button {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  border: none;
+  border-radius: 50%;
+  border: 0;
   background: transparent;
   color: var(--v2-muted);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  padding: 0;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.titlebar-actions .companion-button {
+  border-radius: 8px;
+}
+
+.titlebar-actions .companion-button img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.titlebar-actions .companion-button:hover {
+  background: var(--ui-hover);
 }
 
 .titlebar-actions .btn-close {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ff5f57;
-  border: 1px solid rgba(0, 0, 0, 0.10);
-  color: transparent;
-  font-size: 9px;
+  background: var(--ui-well);
+  color: var(--v2-muted);
+  font-size: 12px;
   line-height: 1;
 }
 
 .titlebar-actions .btn-close:hover {
-  background: #ff6f62;
-  color: rgba(70, 0, 0, 0.65);
+  background: var(--ui-hover);
+  color: var(--v2-ink);
 }
 </style>

@@ -1,6 +1,6 @@
 /**
  * useTimerBridge — panel 窗口专用
- * 计时器逻辑在此运行，关键状态变化时广播状态到灵动岛窗口
+ * 计时器逻辑在此运行，关键状态变化时广播状态到灵动岛窗口，并在专注完成时累计统计与伙伴陪伴时长。
  */
 import { emit, listen } from '@tauri-apps/api/event'
 import { watch } from 'vue'
@@ -9,6 +9,7 @@ import { useTasks } from './useTasks'
 import { useDailyStats } from './useDailyStats'
 import { useAchievements } from './useAchievements'
 import { useSettings } from './useSettings'
+import { useCompanion } from './useCompanion'
 
 export interface TimerStatePayload {
   phase: TimerPhase
@@ -26,11 +27,13 @@ let bridgeStarted = false
 
 export function useTimerBridge() {
   const timer = useTimer()
-  const { tasks, incrementPomodoro, touchTask } = useTasks()
+  const { tasks, incrementPomodoro, incrementSubtaskPomodoro, touchTask } = useTasks()
   const { recordPomodoro } = useDailyStats()
   const { recordPomodoro: recordAchievementPomodoro, recordEarlyBird, recordNightOwl } = useAchievements()
   const { settings } = useSettings()
+  const { selectedId: selectedCompanionId, recordCompanionMinutes, installCompanionSyncResponder } = useCompanion()
   let lastPayloadKey = ''
+  let sessionCompanionId: string | null = null
 
   function buildPayload() {
     return {
@@ -64,13 +67,32 @@ export function useTimerBridge() {
   function startBridge() {
     if (bridgeStarted) return
     bridgeStarted = true
+    installCompanionSyncResponder()
+
+    // 专注开始时锁定该轮归属的伙伴，中途换伴不改记本轮进度
+    watch(
+      () => [timer.running.value, timer.phase.value, timer.activeTaskId.value] as const,
+      ([isRunning, currentPhase, taskId]) => {
+        if (isRunning && currentPhase === 'focus' && taskId) {
+          sessionCompanionId ??= selectedCompanionId.value
+        } else if (!taskId) {
+          sessionCompanionId = null
+        }
+      },
+      { immediate: true },
+    )
 
     timer.onPhaseDoneCallback((phase, taskId) => {
       if (phase === 'focus' && taskId) {
         incrementPomodoro(taskId)
+        if (timer.activeSubtaskId.value) {
+          incrementSubtaskPomodoro(taskId, timer.activeSubtaskId.value)
+        }
         const focusMinutes = settings.value.focusDuration
         recordPomodoro(focusMinutes)
         recordAchievementPomodoro()
+        recordCompanionMinutes(sessionCompanionId ?? selectedCompanionId.value, focusMinutes)
+        sessionCompanionId = null
 
         const startHour = timer.focusStartedAt.value === null
           ? null
@@ -90,7 +112,6 @@ export function useTimerBridge() {
       () => timer.pendingNotification.value,
       (notif) => {
         emitNotification(notif)
-        // Also emit timer state so island gets the stopped state
         emitTimerState(true)
       },
     )
@@ -106,7 +127,7 @@ export function useTimerBridge() {
       }
     }).catch(() => {})
 
-    // 即时同步关键状态（开始/暂停/跳过/任务切换/阶段切换）
+    // 即时同步关键状态（开始/暂停/跳过/任务切换/子任务切换/阶段切换）
     watch(
       () => [
         timer.phase.value,
@@ -114,6 +135,8 @@ export function useTimerBridge() {
         timer.totalDuration.value,
         timer.activeTaskId.value,
         timer.activeTaskTitle.value,
+        timer.activeSubtaskId.value,
+        timer.activeSubtaskTitle.value,
       ],
       () => emitTimerState(),
       { immediate: true },
@@ -135,7 +158,6 @@ export function useTimerBridge() {
     // 灵动岛窗口重启/晚启动时，允许主动请求一次当前快照。
     listen('timer-state-request', () => {
       emitTimerState(true)
-      // Also resend notification state if pending
       if (timer.pendingNotification.value) {
         emitNotification(timer.pendingNotification.value)
       }

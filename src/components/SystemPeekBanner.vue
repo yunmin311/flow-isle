@@ -185,32 +185,41 @@ const initial = computed(() => (appName.value ? Array.from(appName.value)[0] : '
 }
 
 .peek-enter-active {
-  animation: peek-in 240ms ease-out both;
+  animation: peek-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .peek-leave-active {
-  animation: peek-out 180ms ease-in both;
+  animation: peek-out 140ms ease-in both;
 }
 
 @keyframes peek-in {
   from {
     opacity: 0;
-    transform: scale(0.88);
+    transform: translate3d(0, -6px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes peek-out {
   from {
     opacity: 1;
-    transform: scale(1);
+    transform: translate3d(0, 0, 0);
   }
   to {
     opacity: 0;
-    transform: scale(0.92);
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .peek-enter-active,
+  .peek-leave-active,
+  .peek-banner {
+    animation: none;
+    transition: none;
   }
 }
 </style>
