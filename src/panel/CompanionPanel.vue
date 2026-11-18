@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import CompanionScene from '../components/CompanionScene.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 import {
   ALBUM_MINUTES,
   approvedCompanionActions,
@@ -115,8 +116,9 @@ watch(activeId, () => {
   showScene.value = true
 })
 
-async function collect() {
+async function collect(event?: MouseEvent) {
   collectCompanionPicture(activeId.value)
+  triggerPixelBurstFromEvent(event, 'gold', 10)
   announcement.value = '纪念画已收进相册'
   await nextTick()
   collectedStatus.value?.focus({ preventScroll: true })
@@ -186,7 +188,7 @@ async function collect() {
             }}
           </span>
         </div>
-        <button v-if="ready && !record.collectedAt" class="collect-button" @click="collect">收进相册</button>
+        <button v-if="ready && !record.collectedAt" class="collect-button" @click="collect($event)">收进相册</button>
         <span
           v-else-if="record.collectedAt"
           ref="collectedStatus"

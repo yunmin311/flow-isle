@@ -7,6 +7,7 @@ import { useCompanion } from '../composables/useCompanion'
 import BackButton from './BackButton.vue'
 import CompanionPanel from './CompanionPanel.vue'
 import StatNumber from '../components/StatNumber.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 type TimeRange = 'today' | 'week' | 'month' | 'all'
 
@@ -176,8 +177,11 @@ function selectDay(day: { date: string; day: number }) {
   selectedDate.value = selectedDate.value === day.date ? null : day.date
 }
 
-function toggleBadge(item: Achievement) {
+function toggleBadge(item: Achievement, event?: MouseEvent) {
   selectedBadge.value = selectedBadge.value?.id === item.id ? null : item
+  if (item.unlockedAt !== null && selectedBadge.value?.id === item.id) {
+    triggerPixelBurstFromEvent(event, 'gold', 7)
+  }
 }
 
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
@@ -349,7 +353,8 @@ function steppedBarHeight(pomodoros: number): string {
         </div>
 
         <!-- Selected day detail -->
-        <div v-if="selectedDate" class="day-detail">
+        <Transition name="drawer-unfold">
+          <div v-if="selectedDate" class="day-detail">
           <div class="day-detail-header">
             <span class="day-detail-title">{{ selectedDateLabel }}</span>
             <button class="day-detail-close" @click="selectedDate = null" title="收起">×</button>
@@ -398,7 +403,8 @@ function steppedBarHeight(pomodoros: number): string {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </Transition>
       </div>
 
       <!-- Daily recurring tasks -->
@@ -469,7 +475,7 @@ function steppedBarHeight(pomodoros: number): string {
             :key="a.id"
             class="badge-btn"
             :class="{ unlocked: a.unlockedAt !== null, active: selectedBadge?.id === a.id }"
-            @click="toggleBadge(a)"
+            @click="toggleBadge(a, $event)"
           >
             <img
               v-if="selectedBadges[a.id]"
@@ -482,10 +488,12 @@ function steppedBarHeight(pomodoros: number): string {
             <span class="badge-name">{{ a.name }}</span>
           </button>
         </div>
-        <div v-if="selectedBadge" class="badge-detail">
-          <strong>{{ selectedBadge.name }}</strong>
-          <span>{{ selectedBadge.description }} · {{ selectedBadge.unlockedAt ? '已达成' : `${selectedBadge.progress}/${selectedBadge.target}` }}</span>
-        </div>
+        <Transition name="drawer-unfold">
+          <div v-if="selectedBadge" class="badge-detail">
+            <strong>{{ selectedBadge.name }}</strong>
+            <span>{{ selectedBadge.description }} · {{ selectedBadge.unlockedAt ? '已达成' : `${selectedBadge.progress}/${selectedBadge.target}` }}</span>
+          </div>
+        </Transition>
       </div>
     </template>
   </div>
@@ -1134,7 +1142,7 @@ function steppedBarHeight(pomodoros: number): string {
   width: 10px;
   background: var(--v2-accent);
   border-radius: 1px;
-  transition: height 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .trend-bar.empty {
@@ -1190,7 +1198,7 @@ function steppedBarHeight(pomodoros: number): string {
   height: 100%;
   background: var(--v2-accent);
   border-radius: 2px;
-  transition: width 200ms ease;
+  transition: width 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Companion Pixel Badges */
@@ -1259,6 +1267,20 @@ function steppedBarHeight(pomodoros: number): string {
   color: var(--v2-ink);
   font-weight: 600;
   flex-shrink: 0;
+}
+
+.drawer-unfold-enter-active {
+  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.drawer-unfold-leave-active {
+  transition: opacity 180ms cubic-bezier(0.4, 0, 0.6, 1), transform 180ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.drawer-unfold-enter-from,
+.drawer-unfold-leave-to {
+  opacity: 0;
+  transform: translate3d(0, -4px, 0);
 }
 
 @media (max-width: 349px) {

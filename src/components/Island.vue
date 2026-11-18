@@ -511,8 +511,10 @@ function onNotifDismiss() {
 }
 
 let panelMotionTimer: number | null = null;
+let ringHandoffTimer: number | null = null;
 let countdownTimer: number | null = null;
 let countdownEndAt = 0;
+const ringPourFromStrip = ref(false);
 
 const BASE_WIDTH = 320;
 const BASE_HEIGHT = 35;
@@ -533,16 +535,20 @@ const progressScale = computed(() => {
     return v;
 });
 
+const ringBoxWidth = computed(() => Math.max(2, capsuleWidth.value - 2));
+const ringBoxHeight = computed(() => Math.max(2, capsuleHeight.value - 2));
+
 const ringPath = computed(() => {
-    const w = capsuleWidth.value;
-    const h = capsuleHeight.value;
+    const w = ringBoxWidth.value;
+    const h = ringBoxHeight.value;
     const scale = settings.value.islandScale ?? 1;
-    const inset = 1.5 * scale;
+    const inset = Math.max(1.25, 1.5 * scale);
     const left = inset;
     const top = inset;
     const right = w - inset;
     const bottom = h - inset;
-    const r = Math.max(0, Math.min((right - left) / 2, (bottom - top) / 2, capsuleRadius.value - inset));
+    const innerRadius = Math.max(0, capsuleRadius.value - 1);
+    const r = Math.max(0, Math.min((right - left) / 2, (bottom - top) / 2, innerRadius - inset));
     const cx = w / 2;
     return `M ${cx} ${top} H ${right - r} A ${r} ${r} 0 0 1 ${right} ${top + r} V ${bottom - r} A ${r} ${r} 0 0 1 ${right - r} ${bottom} H ${left + r} A ${r} ${r} 0 0 1 ${left} ${bottom - r} V ${top + r} A ${r} ${r} 0 0 1 ${left + r} ${top} Z`;
 });
@@ -555,6 +561,25 @@ const ringColor = computed(() => {
     return "transparent";
 });
 
+watch(
+    () => showStrip.value,
+    (nowStrip, wasStrip) => {
+        if (ringHandoffTimer !== null) {
+            window.clearTimeout(ringHandoffTimer);
+            ringHandoffTimer = null;
+        }
+        if (wasStrip === true && !nowStrip && (state.value === "focus" || state.value === "break" || timer.running.value)) {
+            ringPourFromStrip.value = true;
+            ringHandoffTimer = window.setTimeout(() => {
+                ringPourFromStrip.value = false;
+                ringHandoffTimer = null;
+            }, 520);
+        } else if (nowStrip) {
+            ringPourFromStrip.value = false;
+        }
+    },
+);
+
 function runPanelMotion(phase: "open" | "close") {
     if (panelMotionTimer) {
         window.clearTimeout(panelMotionTimer);
@@ -563,7 +588,7 @@ function runPanelMotion(phase: "open" | "close") {
     panelMotionTimer = window.setTimeout(() => {
         panelMotionState.value = "idle";
         panelMotionTimer = null;
-    }, phase === "open" ? 280 : 165);
+    }, phase === "open" ? 390 : 250);
 }
 
 function stopLocalCountdown() {
@@ -739,6 +764,9 @@ onUnmounted(() => {
     if (panelMotionTimer) {
         window.clearTimeout(panelMotionTimer);
     }
+    if (ringHandoffTimer !== null) {
+        window.clearTimeout(ringHandoffTimer);
+    }
 });
 </script>
 
@@ -774,24 +802,36 @@ onUnmounted(() => {
                         borderRadius: (showStrip ? '0 0 10px 10px' : capsuleRadius + 'px'),
                     }"
                 >
-                    <Transition name="xfade">
+                    <Transition name="strip-morph">
                         <DockStrip
                             v-if="showStrip"
+                            class="strip-layer"
                             :progress="stripProgress"
                             :color="stripColor"
                             :scale="settings.islandScale ?? 1"
                         />
-                    <div v-else class="absolute inset-0">
-                        <CapsuleIdle v-if="state === 'idle' || state === 'alert'" :radio-playing="radioPlaying" />
-                        <CapsuleFocus v-else-if="state === 'focus' || state === 'break'" :radio-playing="radioPlaying" />
-                        <svg class="progress-ring" :viewBox="`0 0 ${capsuleWidth} ${capsuleHeight}`" aria-hidden="true">
-                            <path
-                                class="ring-progress"
-                                :d="ringPath"
-                                pathLength="1"
-                            />
-                        </svg>
-                    </div>
+                    </Transition>
+                    <Transition name="capsule-body-morph">
+                        <div v-if="!showStrip" class="capsule-body absolute inset-0">
+                            <Transition name="island-phase">
+                                <CapsuleIdle v-if="state === 'idle' || state === 'alert'" key="idle" :radio-playing="radioPlaying" />
+                                <CapsuleFocus v-else-if="state === 'focus' || state === 'break'" key="focus" :radio-playing="radioPlaying" />
+                            </Transition>
+                            <svg class="progress-ring" :viewBox="`0 0 ${ringBoxWidth} ${ringBoxHeight}`" :style="{ width: `${ringBoxWidth}px`, height: `${ringBoxHeight}px` }" preserveAspectRatio="none" aria-hidden="true">
+                                <path
+                                    v-if="state === 'focus' || state === 'break'"
+                                    class="ring-track"
+                                    :d="ringPath"
+                                    pathLength="1"
+                                />
+                                <path
+                                    class="ring-progress"
+                                    :class="{ 'ring-pouring': ringPourFromStrip }"
+                                    :d="ringPath"
+                                    pathLength="1"
+                                />
+                            </svg>
+                        </div>
                     </Transition>
                 </div>
             </div>
@@ -818,14 +858,69 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.xfade-enter-active,
-.xfade-leave-active {
-    transition: opacity 0.16s ease;
+.strip-layer {
+    position: absolute;
+    inset: 0;
+    transform-origin: center top;
 }
 
-.xfade-enter-from,
-.xfade-leave-to {
+.strip-morph-enter-active {
+    transition: opacity 280ms ease 90ms, transform 340ms cubic-bezier(0.22, 1, 0.36, 1) 70ms;
+}
+
+.strip-morph-leave-active {
+    transition: opacity 220ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.strip-morph-enter-from {
     opacity: 0;
+    transform: translate3d(0, 3px, 0) scaleX(1.35) scaleY(0.7);
+}
+
+.strip-morph-leave-to {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scaleX(1.65) scaleY(0.45);
+}
+
+.capsule-body {
+    overflow: hidden;
+    border-radius: inherit;
+    transform-origin: center top;
+}
+
+.capsule-body-morph-enter-active {
+    transition: opacity 320ms ease 85ms, transform 400ms cubic-bezier(0.22, 1.06, 0.36, 1) 50ms;
+}
+
+.capsule-body-morph-leave-active {
+    transition: opacity 200ms ease, transform 240ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.capsule-body-morph-enter-from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.9);
+}
+
+.capsule-body-morph-leave-to {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.92);
+}
+
+.island-phase-enter-active,
+.island-phase-leave-active {
+    position: absolute;
+    inset: 0;
+    transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.island-phase-enter-from {
+    opacity: 0;
+    transform: translate3d(0, 5px, 0) scale(0.97);
+}
+
+.island-phase-leave-to {
+    opacity: 0;
+    transform: translate3d(0, -5px, 0) scale(0.97);
 }
 
 .capsule-shell :deep(.dock-strip) {
@@ -863,23 +958,62 @@ onUnmounted(() => {
     background: var(--island-shell-bg, var(--v2-shell));
     border: 1px solid var(--v2-line);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
         inset 0 -1px 0 var(--v2-shadow);
     backdrop-filter: blur(16px) saturate(1.2);
     -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    overflow: clip;
     transition:
-        width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-        height 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-        border-radius 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+        width 0.42s cubic-bezier(0.22, 1.06, 0.36, 1),
+        height 0.42s cubic-bezier(0.22, 1.06, 0.36, 1),
+        border-radius 0.42s cubic-bezier(0.22, 1.06, 0.36, 1),
+        background 0.42s ease,
+        border-color 0.36s ease;
     contain: layout style;
 }
 
+.capsule-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        106deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.24) 48%,
+        transparent 66%
+    );
+    opacity: 0;
+    transform: translate3d(-45%, 0, 0);
+    pointer-events: none;
+}
+
+.capsule-shell.ring-focus:not(.strip-mode)::after,
+.capsule-shell.ring-break:not(.strip-mode)::after {
+    animation: capsule-liquid-glint 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes capsule-liquid-glint {
+    0% {
+        opacity: 0;
+        transform: translate3d(-45%, 0, 0);
+    }
+    40% {
+        opacity: 0.72;
+    }
+    100% {
+        opacity: 0;
+        transform: translate3d(45%, 0, 0);
+    }
+}
+
 .capsule-shell.strip-mode {
-    /* 收回刘海：快速收拢，干净克制 */
+    /* 收回刘海：保留液体表面张力回拉节奏 */
     transition:
-        width 0.14s cubic-bezier(0.4, 0, 0.2, 1),
-        height 0.14s cubic-bezier(0.4, 0, 0.2, 1),
-        border-radius 0.14s cubic-bezier(0.4, 0, 0.2, 1);
+        width 0.32s cubic-bezier(0.32, 0.04, 0.24, 1),
+        height 0.32s cubic-bezier(0.32, 0.04, 0.24, 1),
+        border-radius 0.32s cubic-bezier(0.32, 0.04, 0.24, 1),
+        background 0.36s ease;
     background: var(--island-shell-bg, var(--v2-shell));
 }
 
@@ -912,12 +1046,12 @@ onUnmounted(() => {
 
 .panel-launching {
     will-change: transform;
-    animation: island-release 280ms cubic-bezier(0.2, 0.88, 0.26, 1) both;
+    animation: island-release 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .panel-receiving {
     will-change: transform;
-    animation: island-receive 165ms cubic-bezier(0.34, 0, 0.72, 0.2) both;
+    animation: island-receive 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes island-release {
@@ -925,12 +1059,12 @@ onUnmounted(() => {
         transform: translate3d(0, 0, 0) scale(1, 1);
     }
 
-    34% {
-        transform: translate3d(0, 2px, 0) scale(0.955, 0.9);
+    36% {
+        transform: translate3d(0, 2px, 0) scale(0.972, 0.94);
     }
 
-    72% {
-        transform: translate3d(0, -1px, 0) scale(1.022, 1.03);
+    74% {
+        transform: translate3d(0, -0.5px, 0) scale(1.008, 1.012);
     }
 
     100% {
@@ -944,11 +1078,11 @@ onUnmounted(() => {
     }
 
     42% {
-        transform: translate3d(0, -1px, 0) scale(0.94, 0.86);
+        transform: translate3d(0, -1px, 0) scale(0.968, 0.93);
     }
 
-    78% {
-        transform: translate3d(0, 1px, 0) scale(1.015, 1.02);
+    80% {
+        transform: translate3d(0, 0.5px, 0) scale(1.006, 1.008);
     }
 
     100% {
@@ -970,9 +1104,9 @@ onUnmounted(() => {
 
 .progress-ring {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
     pointer-events: none;
 }
 
@@ -984,7 +1118,8 @@ onUnmounted(() => {
 }
 
 .ring-track {
-    stroke: var(--v2-line);
+    stroke: color-mix(in srgb, var(--v2-line) 55%, transparent);
+    transition: stroke 420ms ease, opacity 320ms ease;
 }
 
 .ring-progress {
@@ -994,7 +1129,23 @@ onUnmounted(() => {
     stroke-linecap: round;
     opacity: var(--ring-opacity);
     transition:
-        stroke-dashoffset 0.4s linear,
-        opacity 0.3s ease;
+        stroke 0.42s ease,
+        stroke-dashoffset 0.54s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.34s ease;
+}
+
+.ring-progress.ring-pouring {
+    animation: ring-pour-from-strip 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ring-pour-from-strip {
+    0% {
+        stroke-dashoffset: 1;
+        opacity: 0.25;
+    }
+    100% {
+        stroke-dashoffset: calc(1 - var(--ring-progress));
+        opacity: var(--ring-opacity);
+    }
 }
 </style>

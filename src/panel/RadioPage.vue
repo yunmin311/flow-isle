@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, nextTick } from 'vue'
 import { useRadio, CATEGORY_LABELS, type StationCategory, type RadioStation } from '../composables/useRadio'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const {
   stations, currentStation, playing, loading, error, volume,
@@ -166,7 +167,7 @@ async function scrollToPlaying() {
               class="play-btn"
               :class="{ 'is-playing': playing }"
               :disabled="!currentStation"
-              @click="toggle"
+              @click="!playing && triggerPixelBurstFromEvent($event, 'accent', 7); toggle()"
             >
               <svg v-if="loading" viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="7" cy="12" r="1.8" opacity="0.3" />

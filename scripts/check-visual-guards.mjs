@@ -83,8 +83,8 @@ for (const name of ['CapsuleIdle.vue', 'CapsuleFocus.vue']) {
 
 const island = readFileSync(join(root, 'src/components/Island.vue'), 'utf8')
 const islandTemplate = island.split('<style')[0]
-if (/capsule-glass-fx|ring-track/.test(islandTemplate)) {
-  errors.push('Island.vue: island must stay one visual layer (remove glass-fx and ring-track)')
+if (/capsule-glass-fx/.test(islandTemplate)) {
+  errors.push('Island.vue: island must stay one visual layer (remove capsule-glass-fx)')
 }
 if (!/const BASE_HEIGHT = 35/.test(island)) {
   errors.push('Island.vue: island height must stay 35 (one size down from 38)')

@@ -7,6 +7,7 @@ import { useSettings } from '../composables/useSettings'
 import { useCompanion, resolveIslandCompanionSprite, ALBUM_MINUTES } from '../composables/useCompanion'
 import { getCategoryColor } from '../composables/useMemos'
 import PixelTime from '../components/PixelTime.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const emit = defineEmits<{
   close: []
@@ -99,16 +100,21 @@ const companionSummary = computed(() => {
   return { animal, rec, stage, sprite, progressText }
 })
 
-function handleHeroAction() {
+function handleHeroAction(event?: MouseEvent) {
   if (pendingNotification.value) {
+    triggerPixelBurstFromEvent(event, pendingNotification.value === 'focus-done' ? 'break' : 'accent', 8)
     confirmNotification()
     return
   }
   if (activeTaskId.value) {
     if (running.value) pause()
-    else resume()
+    else {
+      triggerPixelBurstFromEvent(event, phase.value === 'break' ? 'break' : 'accent', 6)
+      resume()
+    }
     return
   }
+  triggerPixelBurstFromEvent(event, 'accent', 8)
   startQuick()
 }
 
@@ -215,11 +221,15 @@ async function handleInput(event: KeyboardEvent) {
 }
 
 // --- Timer Controls ---
-function handleStartTask(task: Task) {
+function handleStartTask(task: Task, event?: MouseEvent) {
   if (activeTaskId.value === task.id) {
     if (running.value) pause()
-    else resume()
+    else {
+      triggerPixelBurstFromEvent(event, phase.value === 'break' ? 'break' : 'accent', 6)
+      resume()
+    }
   } else {
+    triggerPixelBurstFromEvent(event, 'accent', 7)
     start(task.id, task.title)
   }
 }
@@ -228,7 +238,7 @@ function isDoneToday(task: Task): boolean {
   return isTaskDoneOnDate(task, todayString.value)
 }
 
-function handleDoneTask(taskId: string) {
+function handleDoneTask(taskId: string, event?: MouseEvent) {
   const task = tasks.value.find(item => item.id === taskId)
   const doneToday = task ? isDoneToday(task) : false
   if (activeTaskId.value === taskId) {
@@ -237,6 +247,7 @@ function handleDoneTask(taskId: string) {
     abandon()
   }
   toggleComplete(taskId)
+  if (!doneToday) triggerPixelBurstFromEvent(event, 'accent', 9)
 }
 </script>
 
@@ -266,16 +277,16 @@ function handleDoneTask(taskId: string) {
 
       <div class="hero-actions">
         <template v-if="pendingNotification === 'focus-done'">
-          <button class="primary-action" @click="confirmNotification()">开始休息</button>
+          <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'break', 8); confirmNotification()">开始休息</button>
           <button class="quiet-action" @click="extendNotification()">+5m</button>
           <button class="quiet-action" @click="dismissNotification()">结束</button>
         </template>
         <template v-else-if="pendingNotification === 'break-done'">
-          <button class="primary-action" @click="confirmNotification()">继续专注</button>
+          <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'accent', 8); confirmNotification()">继续专注</button>
           <button class="quiet-action" @click="dismissNotification()">结束</button>
         </template>
         <template v-else>
-          <button class="primary-action" @click="handleHeroAction">
+          <button class="primary-action" @click="handleHeroAction($event)">
             {{ activeTaskId ? (running ? '暂停' : '继续') : '开始专注' }}
           </button>
           <button v-if="activeTaskId && phase === 'break'" class="quiet-action" @click="skipBreak()">跳过</button>
@@ -336,7 +347,7 @@ function handleDoneTask(taskId: string) {
             <button
               v-else
               class="check-circle"
-              @click="handleDoneTask(task.id)"
+              @click="handleDoneTask(task.id, $event)"
               title="完成"
               aria-label="完成"
             ></button>
@@ -357,17 +368,17 @@ function handleDoneTask(taskId: string) {
 
             <template v-if="activeTaskId === task.id">
               <span class="task-timer">{{ displayTime }}</span>
-              <button class="queue-btn icon-only" @click="running ? pause() : resume()" :title="running ? '暂停' : '继续'" :aria-label="running ? '暂停' : '继续'">
+              <button class="queue-btn icon-only" @click="handleStartTask(task, $event)" :title="running ? '暂停' : '继续'" :aria-label="running ? '暂停' : '继续'">
                 {{ running ? '❚❚' : '▶' }}
               </button>
-              <button class="queue-btn icon-only done" @click="handleDoneTask(task.id)" title="完成" aria-label="完成">✓</button>
+              <button class="queue-btn icon-only done" @click="handleDoneTask(task.id, $event)" title="完成" aria-label="完成">✓</button>
               <button class="queue-btn icon-only subtle" @click="abandon()" title="停止" aria-label="停止">■</button>
             </template>
             <template v-else>
               <span v-if="task.pomodoroCount > 0" class="pomo-count">
                 <span class="pomo-dot" aria-hidden="true"></span>{{ task.pomodoroCount }}
               </span>
-              <button class="start-btn" @click="handleStartTask(task)" title="开始">▶</button>
+              <button class="start-btn" @click="handleStartTask(task, $event)" title="开始">▶</button>
             </template>
           </div>
         </div>
@@ -444,6 +455,7 @@ function handleDoneTask(taskId: string) {
     inset 0 1px 0 var(--v2-specular),
     0 8px 20px var(--v2-shadow);
   color: var(--v2-ink);
+  transition: background 420ms ease, border-color 360ms ease, box-shadow 360ms ease;
 }
 
 .focus-hero.is-break .pixel-status,
@@ -530,10 +542,15 @@ function handleDoneTask(taskId: string) {
   height: 4px;
   border-radius: 1px;
   background: var(--v2-line);
+  transition: background 360ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pixel-progress i.filled {
   background: var(--v2-accent);
+}
+
+.focus-hero.is-running .pixel-progress i.filled {
+  box-shadow: 0 0 4px color-mix(in srgb, var(--v2-accent) 35%, transparent);
 }
 
 .hero-meta {
@@ -561,7 +578,7 @@ function handleDoneTask(taskId: string) {
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, filter 140ms ease;
+  transition: background 240ms ease, color 220ms ease, filter 220ms ease, border-color 240ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .hero-actions .primary-action {
@@ -570,7 +587,8 @@ function handleDoneTask(taskId: string) {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: var(--v2-accent);
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 14%, var(--v2-accent)), var(--v2-accent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
   color: var(--v2-on-accent);
   font-weight: 600;
 }

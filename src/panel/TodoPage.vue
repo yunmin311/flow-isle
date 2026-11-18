@@ -7,6 +7,7 @@ import { getCategoryColor } from '../composables/useMemos'
 import TaskGroupDialog from './TaskGroupDialog.vue'
 import CalendarDatePicker from './CalendarDatePicker.vue'
 import RepeatPicker from './RepeatPicker.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const props = defineProps<{ initialTab?: string; searchQuery?: string }>()
 const emit = defineEmits<{
@@ -338,15 +339,19 @@ function handleStartSubtask(task: Task, subtaskId: string) {
   }
 }
 
-function handleToggleComplete(taskId: string) {
+function handleToggleComplete(taskId: string, event?: MouseEvent) {
+  const targetTask = tasks.value.find(t => t.id === taskId)
+  const wasDone = targetTask ? isTaskDoneOnDate(targetTask, todayString.value) : false
   if (activeTaskId.value === taskId) {
     abandon()
   }
   toggleComplete(taskId)
+  if (!wasDone) triggerPixelBurstFromEvent(event, 'accent', 8)
 }
 
-function handleDoneTimer() {
+function handleDoneTimer(event?: MouseEvent) {
   if (!activeTaskId.value) return
+  triggerPixelBurstFromEvent(event, 'accent', 9)
   incrementPomodoro(activeTaskId.value)
   abandon()
 }
@@ -854,7 +859,7 @@ onBeforeUnmount(() => {
             <button
               class="task-checkbox"
               :class="{ checked: isDoneToday(task) }"
-              @click="handleToggleComplete(task.id)"
+              @click="handleToggleComplete(task.id, $event)"
             >
               <svg v-if="isDoneToday(task)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
             </button>
@@ -870,7 +875,7 @@ onBeforeUnmount(() => {
                   <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
                   <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
                 </button>
-                <button class="timer-btn done-btn" @click.stop="handleDoneTimer" title="完成">
+                <button class="timer-btn done-btn" @click.stop="handleDoneTimer($event)" title="完成">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
                 </button>
                 <button class="timer-btn stop-btn" @click.stop="abandon()" title="停止">

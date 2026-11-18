@@ -5,6 +5,7 @@ import type { Memo, MemoCategory } from '../composables/useMemos'
 import MemoCategoryDropdown from './MemoCategoryDropdown.vue'
 import BackButton from './BackButton.vue'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const props = defineProps<{
   memo: Memo
@@ -181,8 +182,9 @@ function onCategoryChange() {
 }
 
 // Pin toggle
-function togglePin() {
+function togglePin(event?: MouseEvent) {
   localIsPinned.value = !localIsPinned.value
+  if (localIsPinned.value) triggerPixelBurstFromEvent(event, 'gold', 8)
   scheduleSave()
 }
 
@@ -684,7 +686,7 @@ function formatUpdateTime(timestamp: number): string {
         <button
           class="top-bar-btn pin-btn"
           :class="{ 'is-pinned': localIsPinned }"
-          @click="togglePin"
+          @click="togglePin($event)"
           :title="localIsPinned ? '取消收藏置顶' : '收藏并置顶'"
           :aria-label="localIsPinned ? '取消收藏置顶' : '收藏并置顶'"
         >
@@ -955,9 +957,9 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .delete-btn:hover {
-  background: rgba(248, 113, 113, 0.15);
-  border-color: rgba(248, 113, 113, 0.3);
-  color: #f87171;
+  background: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 32%, transparent);
+  color: var(--v2-danger, var(--alert-color));
 }
 
 /* Title Area */
@@ -1128,6 +1130,15 @@ function formatUpdateTime(timestamp: number): string {
   color: var(--v2-ink);
   outline: none;
   caret-color: var(--v2-ink);
+  overflow-wrap: anywhere;
+}
+
+.editor-content :deep(:where(span, p, div, li, b, strong, em, i, u, font)) {
+  background-color: transparent !important;
+}
+
+.editor-content :deep(*) {
+  max-width: 100%;
 }
 
 .editor-content :deep(p) {
@@ -1338,14 +1349,14 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .confirm-btn {
-  background: rgba(248, 113, 113, 0.15);
-  border-color: rgba(248, 113, 113, 0.3);
-  color: #f87171;
+  background: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 15%, transparent);
+  border-color: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 34%, transparent);
+  color: var(--v2-danger, var(--alert-color));
 }
 
 .confirm-btn:hover {
-  background: rgba(248, 113, 113, 0.25);
-  border-color: rgba(248, 113, 113, 0.5);
+  background: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 24%, transparent);
+  border-color: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 48%, transparent);
 }
 
 /* Context Menu */
@@ -1361,7 +1372,7 @@ function formatUpdateTime(timestamp: number): string {
   box-shadow: 0 12px 28px var(--v2-shadow);
   font-size: 13px;
   user-select: none;
-  animation: contextMenuIn 0.12s ease-out;
+  animation: contextMenuIn 240ms var(--liquid-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 @keyframes contextMenuIn {

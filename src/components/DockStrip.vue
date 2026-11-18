@@ -29,17 +29,20 @@ const barHeight = computed(() => `${Math.max(2, 3 * props.scale)}px`)
 }
 
 .track {
-  width: 60%;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--strip-color) 25%, transparent);
+  width: 64%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--strip-color) 20%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   overflow: hidden;
   display: flex;
   align-items: stretch;
 }
 
 .fill {
-  border-radius: 0;
-  transition: width 0.4s linear, background 0.3s ease;
+  position: relative;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--strip-color) 76%, #fff), var(--strip-color));
+  transition: width 0.56s cubic-bezier(0.22, 1, 0.36, 1), background 0.42s ease;
   min-width: 0;
 }
 </style>

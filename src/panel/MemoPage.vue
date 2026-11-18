@@ -6,6 +6,7 @@ import MemoCategoryDialog from './MemoCategoryDialog.vue'
 import MemoCategoryDropdown from './MemoCategoryDropdown.vue'
 import MemoCategoryTag from './MemoCategoryTag.vue'
 import BackButton from './BackButton.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const props = defineProps<{ searchQuery?: string }>()
 const emit = defineEmits<{
@@ -136,7 +137,9 @@ function handleBackToList(isEmpty: boolean) {
 // Toggle pin status
 function handleTogglePin(memo: Memo, event: Event) {
   event.stopPropagation()
+  const willPin = !memo.isPinned
   togglePin(memo.id)
+  if (willPin) triggerPixelBurstFromEvent(event, 'gold', 8)
 }
 
 // Delete memo - show confirmation dialog

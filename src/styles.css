@@ -8,9 +8,9 @@
 }
 
 :root {
-  --panel-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --spring-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --liquid-ease: cubic-bezier(0.22, 1.18, 0.36, 1);
+  --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-ease: cubic-bezier(0.22, 1.08, 0.36, 1);
+  --liquid-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --island-radius: 22px;
 }
 
@@ -2119,8 +2119,8 @@ textarea:focus-visible,
   .reader-footer button
 ) {
   transition-property: transform, background, border-color, color, box-shadow;
-  transition-duration: 180ms;
-  transition-timing-function: var(--spring-ease);
+  transition-duration: 240ms;
+  transition-timing-function: var(--liquid-ease);
 }
 
 #app .panel-root :is(

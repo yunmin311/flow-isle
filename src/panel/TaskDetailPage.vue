@@ -7,6 +7,7 @@ import { getCategoryColor } from '../composables/useMemos'
 import CalendarDatePicker from './CalendarDatePicker.vue'
 import RepeatPicker from './RepeatPicker.vue'
 import BackButton from './BackButton.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const props = defineProps<{ taskId: string }>()
 const emit = defineEmits<{ back: [] }>()
@@ -43,6 +44,7 @@ const showGroupDropdown = ref(false)
 const showRepeatMenu = ref(false)
 const showDeleteConfirm = ref(false)
 const newSubtaskTitle = ref('')
+const subtaskInputRef = ref<HTMLInputElement | null>(null)
 
 const todayStr = todayString
 
@@ -122,13 +124,35 @@ function handleAddSubtask() {
   newSubtaskTitle.value = ''
 }
 
-function handleStartSubtask(subtaskId: string, subtaskTitle: string) {
+function handleFocusOrAddSubtask() {
+  if (newSubtaskTitle.value.trim()) {
+    handleAddSubtask()
+  } else {
+    subtaskInputRef.value?.focus()
+  }
+}
+
+function handleToggleComplete(event?: MouseEvent) {
+  if (!task.value) return
+  const wasDone = isTaskDoneOnDate(task.value, todayStr.value)
+  toggleComplete(task.value.id)
+  if (!wasDone) triggerPixelBurstFromEvent(event, 'accent', 9)
+}
+
+function handleToggleSubtask(subtaskId: string, completed: boolean, event?: MouseEvent) {
+  if (!task.value) return
+  toggleSubtask(task.value.id, subtaskId)
+  if (!completed) triggerPixelBurstFromEvent(event, 'break', 6)
+}
+
+function handleStartSubtask(subtaskId: string, subtaskTitle: string, event?: MouseEvent) {
   if (!task.value) return
   setSubtaskContext(subtaskId, subtaskTitle)
   start(task.value.id, `${task.value.title} — ${subtaskTitle}`)
+  triggerPixelBurstFromEvent(event, 'accent', 7)
 }
 
-function handleStartTask() {
+function handleStartTask(event?: MouseEvent) {
   if (!task.value) return
   setSubtaskContext(null, null)
   if (activeTaskId.value === task.value.id) {
@@ -136,6 +160,7 @@ function handleStartTask() {
     else resume()
   } else {
     start(task.value.id, task.value.title)
+    triggerPixelBurstFromEvent(event, 'accent', 7)
   }
 }
 
@@ -221,7 +246,7 @@ onBeforeUnmount(() => {
           class="task-checkbox"
           :class="{ checked: isTaskDoneOnDate(task!, todayStr), disabled: isRepeatEnded(task!) }"
           :disabled="isRepeatEnded(task!)"
-          @click="toggleComplete(task!.id)"
+          @click="handleToggleComplete($event)"
         >
           <svg v-if="isTaskDoneOnDate(task!, todayStr)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
         </button>
@@ -258,11 +283,13 @@ onBeforeUnmount(() => {
             <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
           </button>
         </div>
-        <button v-else class="play-btn" @click.stop="handleStartTask" title="开始专注">
+        <button v-else class="play-btn" @click.stop="handleStartTask($event)" title="开始专注">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
         </button>
       </div>
 
+      <!-- Scrollable content: properties, subtasks & notes -->
+      <div class="detail-scroll-area">
       <!-- Properties -->
       <div class="prop-section">
         <!-- Due date -->
@@ -343,13 +370,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Scrollable content: subtasks & notes -->
-      <div class="detail-scroll-area">
         <!-- Subtasks -->
         <div class="subtask-section">
           <div class="section-label-row">
             <span class="section-label">子任务</span>
-            <button class="add-subtask-btn" @click.stop>
+            <button class="add-subtask-btn" @click.stop="handleFocusOrAddSubtask">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               添加
             </button>
@@ -366,7 +391,7 @@ onBeforeUnmount(() => {
               <button
                 class="subtask-checkbox"
                 :class="{ checked: sub.completed }"
-                @click.stop="toggleSubtask(task!.id, sub.id)"
+                @click.stop="handleToggleSubtask(sub.id, sub.completed, $event)"
               >
                 <svg v-if="sub.completed" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
               </button>
@@ -375,7 +400,7 @@ onBeforeUnmount(() => {
               <button
                 class="subtask-play-btn"
                 :class="{ active: activeSubtaskId === sub.id }"
-                @click.stop="handleStartSubtask(sub.id, sub.title)"
+                @click.stop="handleStartSubtask(sub.id, sub.title, $event)"
                 title="开始子任务"
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
@@ -389,6 +414,7 @@ onBeforeUnmount(() => {
           <!-- Add subtask -->
           <div class="subtask-add" @click.stop>
             <input
+              ref="subtaskInputRef"
               v-model="newSubtaskTitle"
               class="subtask-add-input"
               placeholder="添加子任务..."
@@ -453,8 +479,13 @@ onBeforeUnmount(() => {
 
 .detail-scroll-area {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 14px;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
   min-height: 0;
 }
 
@@ -724,11 +755,12 @@ onBeforeUnmount(() => {
 
 /* Properties section */
 .prop-section {
-  margin: 0 10px 8px;
-  padding: 6px 10px 10px;
+  width: 100%;
+  margin: 0;
+  padding: 4px 12px 6px;
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .prop-row {
@@ -843,11 +875,12 @@ onBeforeUnmount(() => {
 
 /* Notes section */
 .note-section {
-  margin: 0 10px 8px;
+  width: 100%;
+  margin: 0;
   padding: 10px 12px;
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .section-label {
@@ -892,11 +925,12 @@ onBeforeUnmount(() => {
 
 /* Subtask section */
 .subtask-section {
-  margin: 0 10px 10px;
+  width: 100%;
+  margin: 0;
   padding: 10px 12px;
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .pomodoro-count,
@@ -1066,8 +1100,8 @@ onBeforeUnmount(() => {
 }
 
 .subtask-delete-btn:hover {
-  background: rgba(248, 113, 113, 0.12);
-  color: #f87171;
+  background: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 12%, transparent);
+  color: var(--v2-danger, var(--alert-color));
 }
 
 .subtask-add {
@@ -1122,13 +1156,13 @@ onBeforeUnmount(() => {
 
 /* Delete header button */
 .delete-header-btn {
-  color: rgba(248, 113, 113, 0.5);
+  color: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 70%, transparent);
 }
 
 .delete-header-btn:hover {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  background: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 12%, transparent);
+  border-color: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 28%, transparent);
+  color: var(--v2-danger, var(--alert-color));
 }
 
 /* Delete confirmation bar */

@@ -59,7 +59,7 @@ function prewarmPanelData() {
 prewarmPanelData()
 
 
-const PANEL_CLOSE_DURATION = 165
+const PANEL_CLOSE_DURATION = 235
 const CLOSE_FALLBACK_BUFFER = 140
 const IS_MACOS = navigator.userAgent.toLowerCase().includes('mac')
 
@@ -107,19 +107,17 @@ function navigateTo(nextView: typeof currentView.value) {
     const savedScroll = viewScrollMemory.get(nextView) ?? 0
     nextChild.scrollTop = savedScroll
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    pulsePanelGlass(210)
+    pulsePanelGlass(300)
     activeViewAnim?.cancel()
     if (typeof nextChild.animate === 'function') {
-      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 24 : -20) : dir * 18
-      const overshootX = isDetailDrill ? (nextView === 'taskDetail' ? -2 : 2) : dir * -2.5
+      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 22 : -18) : dir * 16
       activeViewAnim = nextChild.animate(
         [
-          { opacity: 0, transform: `translate3d(${startX}px, 5px, 0) scale(0.976)` },
-          { opacity: 1, transform: `translate3d(${overshootX}px, -1px, 0) scale(1.005)`, offset: 0.64 },
+          { opacity: 0, transform: `translate3d(${startX}px, 3px, 0) scale(0.988)` },
           { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1)' },
         ],
         {
-          duration: 245,
+          duration: 320,
           easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
         },
       )
@@ -311,7 +309,7 @@ async function onWindowTransition(payload: string) {
     } catch {
       // 命令不可用时忽略
     }
-    pulsePanelGlass(320)
+    pulsePanelGlass(460)
     runOpenAnimation()
     return
   }
@@ -582,7 +580,7 @@ async function closeWindow() {
 
 .motion-opening .panel-sheen::before,
 .panel-settling .panel-sheen::before {
-  animation: liquid-sheen-sweep 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: liquid-sheen-sweep 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes liquid-sheen-sweep {
@@ -693,7 +691,7 @@ async function closeWindow() {
 }
 
 .motion-opening {
-  animation: panel-open 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: panel-open 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .motion-hidden,
@@ -708,7 +706,7 @@ async function closeWindow() {
 }
 
 .motion-closing {
-  animation: panel-close 165ms cubic-bezier(0.4, 0, 0.72, 0.25) both;
+  animation: panel-close 235ms cubic-bezier(0.32, 0.04, 0.24, 1) both;
   pointer-events: none;
 }
 
@@ -718,20 +716,20 @@ async function closeWindow() {
 }
 
 .motion-opening .panel-inner > :first-child {
-  animation: panel-child-in 210ms cubic-bezier(0.34, 1.4, 0.64, 1) 25ms both;
+  animation: panel-child-in 280ms cubic-bezier(0.22, 1, 0.36, 1) 35ms both;
 }
 
 .motion-opening .panel-body {
-  animation: panel-child-in 240ms cubic-bezier(0.34, 1.32, 0.64, 1) 45ms both;
+  animation: panel-child-in 320ms cubic-bezier(0.22, 1, 0.36, 1) 65ms both;
 }
 
 .motion-opening .panel-nav {
-  animation: panel-child-in 210ms cubic-bezier(0.34, 1.4, 0.64, 1) 70ms both;
+  animation: panel-child-in 280ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
 }
 
 .motion-closing .panel-inner {
   opacity: 0;
-  transition: opacity 95ms ease-in;
+  transition: opacity 150ms ease;
 }
 
 @keyframes panel-open {
@@ -741,16 +739,10 @@ async function closeWindow() {
     transform: translate3d(var(--panel-from-x), var(--panel-from-y), 0) scale(var(--panel-from-sx), var(--panel-from-sy));
   }
 
-  56% {
+  66% {
     opacity: 1;
-    border-radius: 19px;
-    transform: translate3d(0, 3px, 0) scale(1.018, 1.024);
-  }
-
-  80% {
-    opacity: 1;
-    border-radius: 22px;
-    transform: translate3d(0, -1px, 0) scale(0.996, 0.997);
+    border-radius: 21px;
+    transform: translate3d(0, 1.5px, 0) scale(1.007, 1.009);
   }
 
   100% {
@@ -770,7 +762,7 @@ async function closeWindow() {
   100% {
     opacity: 0;
     border-radius: 26px;
-    transform: translate3d(calc(var(--panel-from-x) * 0.28), -18px, 0) scale(0.92, 0.88);
+    transform: translate3d(calc(var(--panel-from-x) * 0.24), -16px, 0) scale(0.93, 0.89);
   }
 }
 
@@ -830,7 +822,7 @@ async function closeWindow() {
   font-weight: 500;
   cursor: pointer;
   border-radius: 8px;
-  transition: color 0.18s ease, background 0.18s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: color 0.24s ease, background 0.24s ease, transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   font-family: inherit;
   letter-spacing: 0.02em;
 }
@@ -859,7 +851,7 @@ async function closeWindow() {
   border-radius: 1px;
   background: var(--v2-accent);
   transform: translateX(-50%);
-  animation: nav-pip-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: nav-pip-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes nav-pip-in {

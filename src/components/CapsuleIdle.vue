@@ -335,11 +335,11 @@ onUnmounted(() => {
 }
 
 .carousel-enter-active {
-    transition: opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .carousel-leave-active {
-    transition: opacity 150ms ease-in, transform 150ms ease-in;
+    transition: opacity 220ms cubic-bezier(0.4, 0, 0.6, 1), transform 220ms cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 .carousel-enter-from {

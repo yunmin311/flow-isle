@@ -132,6 +132,7 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
   bottom: -1px;
   width: 5px;
   height: 5px;
+  transition: background-color 420ms ease;
 }
 
 .phase-pip.is-running {
@@ -151,6 +152,7 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 
 .capsule-pixel-time rect {
   fill: var(--pixel-color);
+  transition: fill 420ms ease;
 }
 
 .wave-bars {
