@@ -2,10 +2,12 @@
 import { computed } from 'vue'
 import type { NotificationType } from '../composables/useTimer'
 import { useCompanion, resolveIslandCompanionSprite } from '../composables/useCompanion'
+import type { FocusMissedSummary } from '../composables/useNotifications'
 
 const props = defineProps<{
   type: NotificationType
   scale: number
+  missedSummary?: FocusMissedSummary | null
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +19,29 @@ const emit = defineEmits<{
 
 const { selectedCompanion } = useCompanion()
 const isFocusDone = computed(() => props.type === 'focus-done')
+const hasMissed = computed(() => isFocusDone.value && Boolean(props.missedSummary && props.missedSummary.total > 0))
+const bannerTitle = computed(() => {
+  if (!isFocusDone.value) return '休息结束'
+  if (hasMissed.value && props.missedSummary) return `完成专注 · 错过 ${props.missedSummary.total} 条`
+  return '完成了一个番茄'
+})
+
+function compactMissedLine(summary: FocusMissedSummary): string {
+  const parts: string[] = []
+  if (summary.emailCount > 0) parts.push(`${summary.emailCount}邮件`)
+  if (summary.socialCount > 0) {
+    const label = summary.socialApps.length === 1 ? summary.socialApps[0] : '社交'
+    parts.push(`${summary.socialCount}${label}`)
+  }
+  if (summary.systemCount > 0) parts.push(`${summary.systemCount}系统`)
+  return parts.join(' · ')
+}
+
+const bannerSub = computed(() => {
+  if (!isFocusDone.value) return '准备开启下一个番茄钟吗'
+  if (hasMissed.value && props.missedSummary) return compactMissedLine(props.missedSummary)
+  return `${selectedCompanion.value.name} · 休息一下吧`
+})
 const companionSprite = computed(() =>
   resolveIslandCompanionSprite(selectedCompanion.value, isFocusDone.value ? 'done' : 'idle'),
 )
@@ -66,8 +91,8 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
         @keydown.enter.prevent="emit('open')"
         @keydown.space.prevent="emit('open')"
       >
-        <div class="notif-title">{{ isFocusDone ? '完成了一个番茄' : '休息结束' }}</div>
-        <div class="notif-sub">{{ isFocusDone ? `${selectedCompanion.name} · 休息一下吧` : '准备开启下一个番茄钟吗' }}</div>
+        <div class="notif-title">{{ bannerTitle }}</div>
+        <div class="notif-sub">{{ bannerSub }}</div>
       </div>
       <div class="notif-actions">
         <button class="notif-btn primary" @click.stop="emit('confirm')">

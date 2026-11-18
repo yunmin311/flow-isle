@@ -300,11 +300,12 @@ function save() {
 }
 
 watch(settings, () => {
-  if (!suppressEmit) {
-    save()
-    emit('settings-changed', settings.value)
+  if (suppressEmit) {
+    suppressEmit = false
+    return
   }
-  suppressEmit = false
+  save()
+  emit('settings-changed', settings.value)
 }, { deep: true })
 
 watch(() => settings.value.autoLaunch, (val) => {
@@ -325,13 +326,17 @@ const activeTheme = computed(() =>
 )
 
 function applyExternalSettings(newSettings: Settings) {
-  suppressEmit = true
-  settings.value = {
+  const merged: Settings = {
     ...DEFAULT_SETTINGS,
     ...newSettings,
     emailAccounts: migrateEmailAccounts(newSettings),
     colorMode: normalizeColorMode(newSettings.colorMode),
   }
+  if (loaded.value && JSON.stringify(settings.value) === JSON.stringify(merged)) {
+    return
+  }
+  suppressEmit = true
+  settings.value = merged
   loaded.value = true
 }
 

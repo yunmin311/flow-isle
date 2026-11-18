@@ -2,13 +2,21 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  data: { key: string; kind?: 'system' | 'email' | 'email-history' | 'task'; app: string; title: string; body: string } | null
+  data: {
+    key: string
+    kind?: 'system' | 'email' | 'email-history' | 'task' | 'focus-missed'
+    app: string
+    title: string
+    body: string
+    badgeCount?: number
+  } | null
   scale: number
 }>()
 
 const emit = defineEmits<{ open: []; hold: []; resume: [] }>()
 
 const openHint = computed(() => {
+  if (props.data?.kind === 'focus-missed') return '查看专注期间错过的通知'
   if (props.data?.kind === 'email-history') return '查看补收邮件'
   if (props.data?.kind === 'email') return '打开邮箱'
   if (props.data?.kind === 'task') return '打开任务'
@@ -25,7 +33,12 @@ const sub = computed(() => {
   if (b) return b
   return appName.value && appName.value !== title.value ? appName.value : '来自系统通知中心'
 })
-const initial = computed(() => (appName.value ? Array.from(appName.value)[0] : ''))
+const initial = computed(() => {
+  if (props.data?.kind === 'focus-missed' && typeof props.data.badgeCount === 'number') {
+    return props.data.badgeCount > 99 ? '99+' : String(props.data.badgeCount)
+  }
+  return appName.value ? Array.from(appName.value)[0] : ''
+})
 </script>
 
 <template>
@@ -106,8 +119,9 @@ const initial = computed(() => (appName.value ? Array.from(appName.value)[0] : '
 }
 
 .peek-icon {
-  width: calc(26px * var(--peek-scale, 1));
+  min-width: calc(26px * var(--peek-scale, 1));
   height: calc(26px * var(--peek-scale, 1));
+  padding: 0 calc(4px * var(--peek-scale, 1));
   border-radius: 5px;
   background: var(--v2-accent);
   color: var(--v2-on-accent);
@@ -123,8 +137,9 @@ const initial = computed(() => (appName.value ? Array.from(appName.value)[0] : '
 }
 
 .peek-initial {
-  font-size: calc(12px * var(--peek-scale, 1));
+  font-size: calc(11px * var(--peek-scale, 1));
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 

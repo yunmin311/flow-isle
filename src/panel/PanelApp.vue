@@ -54,7 +54,7 @@ const IS_MACOS = navigator.userAgent.toLowerCase().includes('mac')
 
 
 const currentView = ref<'tasks' | 'todo' | 'taskDetail' | 'settings' | 'memos' | 'stats' | 'radio' | 'notifications'>('tasks')
-const notificationFocusRequest = ref<{ recordId?: string; openSource?: boolean; destination?: 'timer' }>()
+const notificationFocusRequest = ref<{ recordId?: string; openSource?: boolean; destination?: 'timer'; focusMissed?: boolean }>()
 const panelContent = ref<HTMLElement | null>(null)
 let notificationRouteFocus: string | undefined
 const viewScrollMemory = new Map<string, number>()
@@ -313,8 +313,13 @@ onMounted(async () => {
     panelAnimState.value = 'steady'
     return
   }
-  unlistenOpenNotifications = await listen<{ recordId?: string; openSource?: boolean; destination?: 'timer' }>('open-notifications', ({ payload }) => {
-    notificationFocusRequest.value = { recordId: payload?.recordId, openSource: payload?.openSource, destination: payload?.destination }
+  unlistenOpenNotifications = await listen<{ recordId?: string; openSource?: boolean; destination?: 'timer'; focusMissed?: boolean }>('open-notifications', ({ payload }) => {
+    notificationFocusRequest.value = {
+      recordId: payload?.recordId,
+      openSource: payload?.openSource,
+      destination: payload?.destination,
+      focusMissed: payload?.focusMissed,
+    }
     navigateTo('notifications')
   })
   unlistenOpenTask = await listen<{ taskId?: string }>('open-task', ({ payload }) => {

@@ -57,6 +57,42 @@ export function emailNotificationRecordId(p: EmailNotificationPayload) {
   return `email-${p.mailbox_key}-${p.uid}`
 }
 
+export interface FocusMissedSummary {
+  id: string
+  total: number
+  emailCount: number
+  systemCount: number
+  socialCount: number
+  socialApps: string[]
+  systemApps: string[]
+  latestRecordId?: string
+  latestLabel?: string
+  endedAt: number
+  phaseCompleted: boolean
+}
+
+export function formatFocusMissedBreakdown(
+  summary: Pick<FocusMissedSummary, 'emailCount' | 'systemCount' | 'socialCount' | 'socialApps'>,
+): string {
+  const parts: string[] = []
+  if (summary.emailCount > 0) parts.push(`${summary.emailCount} 封邮件`)
+  if (summary.socialCount > 0) {
+    const label = summary.socialApps.length === 1 ? ` ${summary.socialApps[0]}` : '社交提醒'
+    parts.push(`${summary.socialCount} 条${label}`)
+  }
+  if (summary.systemCount > 0) parts.push(`${summary.systemCount} 条系统通知`)
+  return parts.join(' · ')
+}
+
+export function formatFocusMissedTitle(
+  summary: Pick<FocusMissedSummary, 'total' | 'emailCount' | 'systemCount' | 'socialCount'>,
+): string {
+  if (summary.emailCount > 0 && summary.systemCount === 0 && summary.socialCount === 0) {
+    return `专注期间错过 ${summary.emailCount} 封邮件`
+  }
+  return `专注期间错过 ${summary.total} 条通知`
+}
+
 export function useExternalNotificationSilence() {
   const { settings } = useSettings()
   const timer = useTimer()
@@ -240,8 +276,105 @@ function addEmailRecord(p: EmailNotificationPayload) {
   })
 }
 
+const missedEmailIds = new Set<string>()
+const missedSystemIds = new Set<string>()
+const missedSocialKeys = new Set<string>()
+const missedSystemApps = new Set<string>()
+const missedSocialApps = new Set<string>()
+let missedLatestRecordId: string | undefined
+let missedLatestLabel: string | undefined
+
+const lastFocusMissed = ref<FocusMissedSummary | null>(null)
+const focusMissedRecordIds = ref<string[]>([])
+
+function isFocusSilenced(): boolean {
+  const { settings } = useSettings()
+  const timer = useTimer()
+  return Boolean(
+    settings.value.systemNotificationSilentInFocus
+    && timer.phase?.value === 'focus'
+    && timer.running?.value,
+  )
+}
+
+function recordMissedSystem(p: SystemNotificationPayload) {
+  if (!isFocusSilenced()) return
+  const app = (p.app || '').trim()
+  if (isTransientSocialNotification(p.app, p.aumid)) {
+    const socialKey = `soc-${p.id}-${p.created_ms}-${app.toLowerCase()}-${(p.aumid || '').trim().toLowerCase()}`
+    if (missedSocialKeys.has(socialKey)) return
+    missedSocialKeys.add(socialKey)
+    if (app) missedSocialApps.add(app)
+    return
+  }
+  const id = systemNotificationRecordId(p)
+  if (missedSystemIds.has(id)) return
+  missedSystemIds.add(id)
+  if (app) missedSystemApps.add(app)
+  missedLatestRecordId = id
+  const title = (p.title || '').trim() || app || '系统通知'
+  missedLatestLabel = app && app !== title ? `${app} · ${title}` : title
+}
+
+function recordMissedEmail(p: EmailNotificationPayload) {
+  if (p.historical || !isFocusSilenced()) return
+  const id = emailNotificationRecordId(p)
+  if (missedEmailIds.has(id)) return
+  missedEmailIds.add(id)
+  missedLatestRecordId = id
+  const subject = (p.subject || '').trim() || '(无主题)'
+  const from = (p.from || '').trim() || '未知发件人'
+  missedLatestLabel = `${from} · ${subject}`
+}
+
+export function resetActiveFocusMissedSession() {
+  missedEmailIds.clear()
+  missedSystemIds.clear()
+  missedSocialKeys.clear()
+  missedSystemApps.clear()
+  missedSocialApps.clear()
+  missedLatestRecordId = undefined
+  missedLatestLabel = undefined
+}
+
+export function flushFocusMissedSummary(phaseCompleted: boolean): FocusMissedSummary | null {
+  const emailCount = missedEmailIds.size
+  const systemCount = missedSystemIds.size
+  const socialCount = missedSocialKeys.size
+  const total = emailCount + systemCount + socialCount
+  if (total === 0) {
+    resetActiveFocusMissedSession()
+    lastFocusMissed.value = null
+    focusMissedRecordIds.value = []
+    return null
+  }
+  const summary: FocusMissedSummary = {
+    id: `fm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    total,
+    emailCount,
+    systemCount,
+    socialCount,
+    socialApps: [...missedSocialApps],
+    systemApps: [...missedSystemApps],
+    latestRecordId: missedLatestRecordId,
+    latestLabel: missedLatestLabel,
+    endedAt: Date.now(),
+    phaseCompleted,
+  }
+  focusMissedRecordIds.value = [...missedEmailIds, ...missedSystemIds]
+  resetActiveFocusMissedSession()
+  lastFocusMissed.value = summary
+  return summary
+}
+
+export function clearFocusMissedSummary() {
+  lastFocusMissed.value = null
+  focusMissedRecordIds.value = []
+}
+
 function markAllRead() {
   records.value = records.value.map(r => (r.read ? r : { ...r, read: true }))
+  clearFocusMissedSummary()
   save()
 }
 
@@ -249,6 +382,7 @@ function clearAll() {
   if (historyTimer !== undefined) clearTimeout(historyTimer)
   historyTimer = undefined
   historyBatch.clear()
+  clearFocusMissedSummary()
   records.value = []
   save()
 }
@@ -277,13 +411,24 @@ export function useNotifications() {
       if (!payload) return
       rememberSystemNotificationSource(payload.app, payload.aumid)
       if (shouldMirrorSystemNotification(payload.app, payload.aumid)) {
+        recordMissedSystem(payload)
         addSystemRecord(payload)
       }
     })
     // 邮箱 IMAP 新邮件
     void listen<EmailNotificationPayload>('email-notification', ({ payload }) => {
-      if (payload) addEmailRecord(payload)
+      if (!payload) return
+      recordMissedEmail(payload)
+      addEmailRecord(payload)
     }).then(() => invoke('email_listener_ready')).catch(() => { listening = false })
   }
-  return { records: visibleRecords, unreadCount, markAllRead, clearAll }
+  return {
+    records: visibleRecords,
+    unreadCount,
+    markAllRead,
+    clearAll,
+    lastFocusMissed,
+    focusMissedRecordIds,
+    clearFocusMissedSummary,
+  }
 }

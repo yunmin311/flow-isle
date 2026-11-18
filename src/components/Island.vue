@@ -16,8 +16,15 @@ import CapsuleFocus from "./CapsuleFocus.vue";
 import NotificationBanner from "./NotificationBanner.vue";
 import SystemPeekBanner from "./SystemPeekBanner.vue";
 import {
-    emailNotificationRecordId, systemNotificationRecordId, useExternalNotificationSilence,
-    type SystemNotificationPayload, type EmailNotificationPayload, type EmailHistorySummary,
+    emailNotificationRecordId,
+    formatFocusMissedBreakdown,
+    formatFocusMissedTitle,
+    systemNotificationRecordId,
+    useExternalNotificationSilence,
+    type EmailHistorySummary,
+    type EmailNotificationPayload,
+    type FocusMissedSummary,
+    type SystemNotificationPayload,
 } from "../composables/useNotifications";
 import type { TimerStatePayload } from "../composables/useTimerBridge";
 
@@ -39,21 +46,26 @@ let unlistenSystemNotification: (() => void) | null = null;
 let unlistenTaskReminder: (() => void) | null = null;
 let unlistenEmail: (() => void) | null = null;
 let unlistenEmailHistory: (() => void) | null = null;
+let unlistenFocusMissed: (() => void) | null = null;
 let activityTimer: ReturnType<typeof setInterval> | null = null;
 let panelStateTimer: ReturnType<typeof setInterval> | null = null;
 
 const radioPlaying = ref(false);
 const notificationType = ref<NotificationType>(null);
+const pendingFocusMissed = ref<FocusMissedSummary | null>(null);
+const focusMissedPeekAllowed = ref(false);
 
 // 系统通知镜像的岛内 peek：无按钮、自动消失，点击直接打开对应来源
 interface SystemPeekItem {
     key: string;
     external: boolean;
-    kind: 'system' | 'email' | 'email-history' | 'task';
+    kind: 'system' | 'email' | 'email-history' | 'task' | 'focus-missed';
     app: string;
     aumid?: string;
     provider?: string;
     taskId?: string;
+    recordId?: string;
+    badgeCount?: number;
     title: string;
     body: string;
     receivedAt: number;
@@ -123,18 +135,28 @@ watch([notificationType, systemPeek, panelOpen], () => {
     // 点击穿透统一由 useDockMode 的横幅悬停检测管理。
 });
 
-// 番茄横幅优先级更高：它出现时收起系统 peek，结束后再补上排队的系统通知
-watch(notificationType, (type) => {
+// 番茄横幅优先级更高：它出现时收起系统 peek，结束后再补上错过的专注汇总或排队通知
+watch(notificationType, (type, prevType) => {
     if (type) {
         closeSystemPeek();
     } else {
-        nextTick(showNextSystemPeek);
+        if (prevType === 'focus-done') {
+            focusMissedPeekAllowed.value = true;
+        }
+        nextTick(() => {
+            promoteFocusMissedPeek();
+            showNextSystemPeek();
+        });
     }
 });
 
-// 面板打开时收起 peek，避免横幅压在面板上
+// 面板打开时收起 peek，避免横幅压在面板上；收起后如仍有专注错过汇总未展示则立即提醒
 watch(panelOpen, (open) => {
-    if (open) closeSystemPeek(true);
+    if (open) {
+        closeSystemPeek(true);
+    } else {
+        nextTick(promoteFocusMissedPeek);
+    }
 });
 
 // 悬停展开后的胶囊：点击打开专注清单
@@ -197,11 +219,11 @@ function showNextSystemPeek() {
     if (systemPeek.value || notificationType.value) return;
     while (systemPeekQueue.length > 0) {
         const next = systemPeekQueue.shift()!;
-        if (Date.now() - next.receivedAt > SYSTEM_PEEK_MAX_AGE_MS) continue;
+        if (next.kind !== 'focus-missed' && Date.now() - next.receivedAt > SYSTEM_PEEK_MAX_AGE_MS) continue;
         if (next.external && externalNotificationsSilent.value) continue;
         systemPeek.value = next;
         if (next.kind === 'system') void invoke("notification_delivery_metrics", { stage: "peek", delayMs: Math.max(0, Date.now() - next.receivedAt) }).catch(() => {});
-        scheduleSystemPeekEnd(SYSTEM_PEEK_MS);
+        scheduleSystemPeekEnd(next.kind === 'focus-missed' ? 8000 : SYSTEM_PEEK_MS);
         return;
     }
 }
@@ -239,11 +261,18 @@ function pushPeekItem(item: SystemPeekItem) {
 }
 
 watch(externalNotificationsSilent, (silent) => {
-    if (!silent) return;
-    for (let index = systemPeekQueue.length - 1; index >= 0; index--) {
-        if (systemPeekQueue[index].external) systemPeekQueue.splice(index, 1);
+    if (!silent) {
+        nextTick(promoteFocusMissedPeek);
+        return;
     }
-    if (systemPeek.value?.external) {
+    pendingFocusMissed.value = null;
+    focusMissedPeekAllowed.value = false;
+    for (let index = systemPeekQueue.length - 1; index >= 0; index--) {
+        if (systemPeekQueue[index].external || systemPeekQueue[index].kind === 'focus-missed') {
+            systemPeekQueue.splice(index, 1);
+        }
+    }
+    if (systemPeek.value?.external || systemPeek.value?.kind === 'focus-missed') {
         closeSystemPeek();
         showNextSystemPeek();
     }
@@ -304,6 +333,60 @@ function enqueueEmailPeek(payload: EmailNotificationPayload) {
     });
 }
 
+function handleFocusMissedReady(payload: FocusMissedSummary | null) {
+    if (!payload || payload.total <= 0) {
+        pendingFocusMissed.value = null;
+        focusMissedPeekAllowed.value = false;
+        for (let i = systemPeekQueue.length - 1; i >= 0; i--) {
+            if (systemPeekQueue[i].kind === 'focus-missed') systemPeekQueue.splice(i, 1);
+        }
+        if (systemPeek.value?.kind === 'focus-missed') {
+            closeSystemPeek();
+            showNextSystemPeek();
+        }
+        return;
+    }
+    pendingFocusMissed.value = payload;
+    // 自然完成时会先展示 focus-done 横幅，等用户选择休息/退出后再弹出独立错过汇总通知
+    focusMissedPeekAllowed.value = !payload.phaseCompleted;
+    if (focusMissedPeekAllowed.value) {
+        nextTick(promoteFocusMissedPeek);
+    }
+}
+
+function promoteFocusMissedPeek() {
+    const summary = pendingFocusMissed.value;
+    if (!summary || summary.total <= 0 || !focusMissedPeekAllowed.value) return;
+    if (panelOpen.value || notificationType.value || externalNotificationsSilent.value) return;
+    pendingFocusMissed.value = null;
+    focusMissedPeekAllowed.value = false;
+    const breakdown = formatFocusMissedBreakdown(summary);
+    const title = formatFocusMissedTitle(summary);
+    const body = summary.latestLabel
+        ? `${breakdown} · ${summary.latestLabel}`
+        : `${breakdown} · 点击查看通知中心`;
+    if (systemPeek.value && systemPeekTimer !== null) {
+        closeSystemPeek();
+    }
+    for (let i = systemPeekQueue.length - 1; i >= 0; i--) {
+        if (systemPeekQueue[i].kind === 'focus-missed' || systemPeekQueue[i].external) {
+            systemPeekQueue.splice(i, 1);
+        }
+    }
+    systemPeekQueue.unshift({
+        key: summary.id,
+        external: false,
+        kind: 'focus-missed',
+        app: '专注错过',
+        recordId: summary.latestRecordId,
+        badgeCount: summary.total,
+        title,
+        body,
+        receivedAt: Date.now(),
+    });
+    showNextSystemPeek();
+}
+
 function enqueueEmailHistoryPeek(payload: EmailHistorySummary) {
     if (externalNotificationsSilent.value || !payload.count) return;
     pushPeekItem({
@@ -330,6 +413,19 @@ async function onSystemPeekOpen() {
     if (!item) return;
     const recordId = item.key;
     closeSystemPeek(true);
+
+    if (item.kind === "focus-missed") {
+        try {
+            await emitTo("panel", "open-notifications", {
+                recordId: item.recordId,
+                openSource: false,
+                focusMissed: true,
+            });
+        } finally {
+            await invoke("show_panel", { focus: true });
+        }
+        return;
+    }
 
     if (item.kind === "email-history") {
         try {
@@ -402,6 +498,8 @@ function onNotifConfirm() {
 }
 
 function onNotifExtend() {
+    pendingFocusMissed.value = null;
+    focusMissedPeekAllowed.value = false;
     notificationType.value = null;
     emit("notification-action", "extend");
 }
@@ -612,6 +710,9 @@ onMounted(async () => {
     unlistenEmailHistory = await listen<EmailHistorySummary>("email-history-ready", ({ payload }) => {
         if (payload) enqueueEmailHistoryPeek(payload);
     });
+    unlistenFocusMissed = await listen<FocusMissedSummary | null>("focus-missed-ready", ({ payload }) => {
+        handleFocusMissedReady(payload ?? null);
+    });
     await invoke("email_listener_ready");
 });
 
@@ -632,6 +733,7 @@ onUnmounted(() => {
     unlistenTaskReminder?.();
     unlistenEmail?.();
     unlistenEmailHistory?.();
+    unlistenFocusMissed?.();
     stopLocalCountdown();
     if (panelMotionTimer) {
         window.clearTimeout(panelMotionTimer);
@@ -696,6 +798,7 @@ onUnmounted(() => {
                 <NotificationBanner
                     :type="notificationType"
                     :scale="settings.islandScale ?? 1"
+                    :missed-summary="pendingFocusMissed"
                     @open="onNotifOpen"
                     @confirm="onNotifConfirm"
                     @extend="onNotifExtend"

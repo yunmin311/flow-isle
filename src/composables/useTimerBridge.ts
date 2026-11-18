@@ -2,7 +2,7 @@
  * useTimerBridge — panel 窗口专用
  * 计时器逻辑在此运行，关键状态变化时广播状态到灵动岛窗口，并在专注完成时累计统计与伙伴陪伴时长。
  */
-import { emit, listen } from '@tauri-apps/api/event'
+import { emit, emitTo, listen } from '@tauri-apps/api/event'
 import { watch } from 'vue'
 import { useTimer, type TimerPhase, type NotificationType } from './useTimer'
 import { useTasks } from './useTasks'
@@ -10,6 +10,10 @@ import { useDailyStats } from './useDailyStats'
 import { useAchievements } from './useAchievements'
 import { useSettings } from './useSettings'
 import { useCompanion } from './useCompanion'
+import {
+  flushFocusMissedSummary,
+  resetActiveFocusMissedSession,
+} from './useNotifications'
 
 export interface TimerStatePayload {
   phase: TimerPhase
@@ -69,13 +73,29 @@ export function useTimerBridge() {
     bridgeStarted = true
     installCompanionSyncResponder()
 
-    // 专注开始时锁定该轮归属的伙伴，中途换伴不改记本轮进度
+    let focusSessionActive = false
+
+    // 专注开始时锁定该轮归属的伙伴，中途换伴不改记本轮进度；同时跟踪本轮静默期间错过的通知
     watch(
-      () => [timer.running.value, timer.phase.value, timer.activeTaskId.value] as const,
-      ([isRunning, currentPhase, taskId]) => {
-        if (isRunning && currentPhase === 'focus' && taskId) {
-          sessionCompanionId ??= selectedCompanionId.value
-        } else if (!taskId) {
+      () => [timer.running.value, timer.phase.value, timer.activeTaskId.value, timer.pendingNotification.value] as const,
+      ([isRunning, currentPhase, taskId, pendingNotif]) => {
+        if (isRunning && currentPhase === 'focus') {
+          if (!focusSessionActive) {
+            focusSessionActive = true
+            resetActiveFocusMissedSession()
+          }
+          if (taskId) {
+            sessionCompanionId ??= selectedCompanionId.value
+          }
+        } else if (
+          focusSessionActive
+          && (currentPhase !== 'focus' || (!isRunning && !taskId && !pendingNotif))
+        ) {
+          focusSessionActive = false
+          const summary = flushFocusMissedSummary(false)
+          void emitTo('main', 'focus-missed-ready', summary).catch(() => {})
+        }
+        if (!taskId) {
           sessionCompanionId = null
         }
       },
@@ -83,6 +103,11 @@ export function useTimerBridge() {
     )
 
     timer.onPhaseDoneCallback((phase, taskId) => {
+      if (phase === 'focus') {
+        focusSessionActive = false
+        const summary = flushFocusMissedSummary(true)
+        void emitTo('main', 'focus-missed-ready', summary).catch(() => {})
+      }
       if (phase === 'focus' && taskId) {
         incrementPomodoro(taskId)
         if (timer.activeSubtaskId.value) {

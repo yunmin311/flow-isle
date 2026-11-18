@@ -6,6 +6,8 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import {
   useNotifications,
   formatNotifTime,
+  formatFocusMissedBreakdown,
+  formatFocusMissedTitle,
   pruneExpiredRecords,
   type NotificationRecord,
 } from '../composables/useNotifications'
@@ -19,10 +21,32 @@ import { emailInboxUrl } from '../utils/emailLinks'
 import EmailReader from './EmailReader.vue'
 import ScreenshotShelf from './ScreenshotShelf.vue'
 
-const props = defineProps<{ focusRequest?: { recordId?: string; openSource?: boolean; destination?: 'timer' } }>()
+const props = defineProps<{ focusRequest?: { recordId?: string; openSource?: boolean; destination?: 'timer'; focusMissed?: boolean } }>()
 const emit = defineEmits<{ back: []; openTask: [taskId: string]; openHome: []; openTodo: [] }>()
 
-const { records, unreadCount, markAllRead, clearAll } = useNotifications()
+const {
+  records,
+  unreadCount,
+  markAllRead,
+  clearAll,
+  lastFocusMissed,
+  focusMissedRecordIds,
+  clearFocusMissedSummary,
+} = useNotifications()
+const missedIdSet = computed(() => new Set(focusMissedRecordIds.value))
+const focusMissedTitle = computed(() => (lastFocusMissed.value ? formatFocusMissedTitle(lastFocusMissed.value) : ''))
+const focusMissedBreakdown = computed(() => (lastFocusMissed.value ? formatFocusMissedBreakdown(lastFocusMissed.value) : ''))
+const focusMissedCardRef = ref<HTMLElement | null>(null)
+const missedSocialError = ref<string | null>(null)
+
+async function openMissedSocialApp(app: string) {
+  missedSocialError.value = null
+  try {
+    await invoke('activate_notification_source', { app, aumid: '' })
+  } catch (reason) {
+    missedSocialError.value = typeof reason === 'string' ? reason : `无法打开 ${app}，请从系统托盘打开`
+  }
+}
 const { settings } = useSettings()
 const { tasks } = useTasks()
 
@@ -165,6 +189,9 @@ watch([() => props.focusRequest, records], ([request]) => {
     handledFocusRequest = request
     if (request.openSource) void openRecordSource(record)
     else focusRecord(record)
+  } else if (request.focusMissed && lastFocusMissed.value) {
+    handledFocusRequest = request
+    void nextTick(() => focusMissedCardRef.value?.focus())
   } else {
     void nextTick(() => pageHeading.value?.focus())
   }
@@ -331,6 +358,37 @@ onDeactivated(() => { selectedEmail.value = null })
       </div>
     </div>
     <div class="notif-scroll">
+      <section
+        v-if="lastFocusMissed && lastFocusMissed.total > 0"
+        ref="focusMissedCardRef"
+        class="focus-missed-card"
+        tabindex="-1"
+        aria-label="本轮专注错过通知"
+      >
+        <div class="focus-missed-head">
+          <div class="focus-missed-heading">
+            <span class="focus-missed-badge">{{ lastFocusMissed.total }}</span>
+            <span class="focus-missed-title">{{ focusMissedTitle }}</span>
+          </div>
+          <button type="button" class="text-btn focus-missed-close" @click="clearFocusMissedSummary(); missedSocialError = null">
+            知道了
+          </button>
+        </div>
+        <div class="focus-missed-breakdown">{{ focusMissedBreakdown }}</div>
+        <div v-if="lastFocusMissed.latestLabel" class="focus-missed-preview">{{ lastFocusMissed.latestLabel }}</div>
+        <div v-if="lastFocusMissed.socialApps.length" class="focus-missed-actions">
+          <button
+            v-for="app in lastFocusMissed.socialApps"
+            :key="app"
+            type="button"
+            class="copy-btn"
+            @click="openMissedSocialApp(app)"
+          >
+            打开 {{ app }}
+          </button>
+        </div>
+        <div v-if="missedSocialError" class="notif-action-status error" role="status">{{ missedSocialError }}</div>
+      </section>
       <ScreenshotShelf />
       <section v-for="group in notifGroups" :key="group.key" class="notif-group">
         <div class="group-head">
@@ -358,6 +416,7 @@ onDeactivated(() => { selectedEmail.value = null })
             <div class="notif-dot" />
             <div class="notif-body">
               <div class="notif-line">
+                <span v-if="missedIdSet.has(r.id)" class="notif-missed-tag">专注时错过</span>
                 <span
                   v-if="r.kind === 'system' && (r.app || isRecordBlocked(r))"
                   class="notif-app"
@@ -414,7 +473,7 @@ onDeactivated(() => { selectedEmail.value = null })
           {{ isGroupExpanded(group.key) ? '收起' : `展开剩余 ${group.items.length - GROUP_VISIBLE_LIMIT} 条` }}
         </button>
       </section>
-      <div v-if="!records.length" class="empty">还没有通知，完成番茄或收到系统通知后会记录在这里</div>
+      <div v-if="!records.length && !lastFocusMissed" class="empty">还没有通知，完成番茄或收到系统通知后会记录在这里</div>
     </div>
     </div>
   </div>
@@ -424,6 +483,103 @@ onDeactivated(() => { selectedEmail.value = null })
 @reference "../styles.css";
 
 .notif-account { font-size: 11px; font-weight: 400; color: var(--v2-secondary); margin-top: 3px; overflow-wrap: anywhere; line-height: 1.5; }
+
+.focus-missed-card {
+  padding: 9px 10px 9px 12px;
+  border-radius: 10px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: inset 3px 0 0 var(--v2-accent);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  outline: none;
+}
+
+.focus-missed-card:focus-visible {
+  border-color: var(--v2-accent);
+}
+
+.focus-missed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.focus-missed-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.focus-missed-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--v2-accent);
+  color: var(--v2-on-accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.focus-missed-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v2-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-missed-close {
+  flex-shrink: 0;
+}
+
+.focus-missed-breakdown {
+  font-size: 11px;
+  color: var(--v2-secondary);
+  line-height: 1.4;
+}
+
+.focus-missed-preview {
+  font-size: 11px;
+  color: var(--v2-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-missed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.focus-missed-actions .copy-btn {
+  color: var(--v2-ink);
+  border: 1px solid var(--v2-line);
+}
+
+.notif-missed-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--v2-accent);
+  background: var(--v2-accent-soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
 
 .records-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
