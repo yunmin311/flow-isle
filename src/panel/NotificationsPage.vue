@@ -17,7 +17,7 @@ import {
   systemNotificationSourceKey,
 } from '../composables/useSettings'
 import { useTasks } from '../composables/useTasks'
-import { emailInboxUrl } from '../utils/emailLinks'
+import { emailInboxUrl, formatEmailSourceTag } from '../utils/emailLinks'
 import EmailReader from './EmailReader.vue'
 import ScreenshotShelf from './ScreenshotShelf.vue'
 
@@ -320,32 +320,34 @@ onDeactivated(() => { selectedEmail.value = null })
 
 <template>
   <div class="notif-page">
-    <!-- 音量：紧凑工具条，不单独占一块卡片 -->
-    <div v-if="volumeReady" class="volume-strip">
-      <span class="volume-label">音量</span>
-      <button class="mute-btn" :class="{ active: sysMuted }" @click="toggleMute" :title="sysMuted ? '取消静音' : '静音'">
-        <svg v-if="sysMuted || sysVolume === 0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M11 5L6 9H2v6h4l5 4V5z" />
-          <line x1="23" y1="9" x2="17" y2="15" />
-          <line x1="17" y1="9" x2="23" y2="15" />
-        </svg>
-        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M11 5L6 9H2v6h4l5 4V5z" />
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-        </svg>
-      </button>
-      <input
-        type="range"
-        class="volume-slider"
-        min="0"
-        max="100"
-        :value="sysVolume"
-        @input="onVolumeInput"
-      />
-      <span class="volume-value">{{ sysMuted ? '静音' : sysVolume }}</span>
-    </div>
-    <div v-else class="volume-hint">{{ volumeError ?? '读取系统音量中…' }}</div>
+    <!-- 音量：紧凑工具条，进入邮件正文阅读时自动隐藏以让出阅读空间 -->
+    <template v-if="!selectedEmail">
+      <div v-if="volumeReady" class="volume-strip">
+        <span class="volume-label">音量</span>
+        <button class="mute-btn" :class="{ active: sysMuted }" @click="toggleMute" :title="sysMuted ? '取消静音' : '静音'">
+          <svg v-if="sysMuted || sysVolume === 0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <line x1="23" y1="9" x2="17" y2="15" />
+            <line x1="17" y1="9" x2="23" y2="15" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+          </svg>
+        </button>
+        <input
+          type="range"
+          class="volume-slider"
+          min="0"
+          max="100"
+          :value="sysVolume"
+          @input="onVolumeInput"
+        />
+        <span class="volume-value">{{ sysMuted ? '静音' : sysVolume }}</span>
+      </div>
+      <div v-else class="volume-hint">{{ volumeError ?? '读取系统音量中…' }}</div>
+    </template>
 
     <EmailReader v-if="selectedEmail" :record="selectedEmail" @back="closeEmail" />
     <div v-show="!selectedEmail" class="records-view">
@@ -423,6 +425,9 @@ onDeactivated(() => { selectedEmail.value = null })
                 >
                   <span v-if="r.app">{{ r.app }}</span>
                   <span v-if="r.kind === 'system' && isRecordBlocked(r)" class="notif-blocked">已屏蔽</span>
+                </span>
+                <span v-else-if="r.kind === 'email'" class="notif-app">
+                  {{ formatEmailSourceTag(r.emailAccountAddress, r.emailProvider) }}
                 </span>
                 <span class="notif-title">{{ r.title }}</span>
                 <span class="notif-time">{{ formatNotifTime(r.time) }}</span>

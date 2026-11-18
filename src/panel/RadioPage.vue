@@ -719,11 +719,11 @@ async function scrollToPlaying() {
 }
 
 .live-bars span {
-  width: 2px;
+  width: 3px;
   height: 100%;
   border-radius: 1px;
-  background: color-mix(in srgb, var(--focus-color) 70%, transparent);
-  animation: live-bar 1s ease-in-out infinite;
+  background: color-mix(in srgb, var(--v2-accent) 78%, transparent);
+  animation: live-bar 0.9s steps(4, end) infinite;
   transform-origin: bottom;
 }
 
@@ -783,9 +783,12 @@ async function scrollToPlaying() {
 }
 
 .play-btn:hover {
-  border-color: var(--v2-muted);
+  border-color: var(--v2-accent);
   color: var(--v2-ink);
-  transform: scale(1.05);
+}
+
+.play-btn:active:not(:disabled) {
+  transform: scale(0.93);
 }
 
 .play-btn:hover::before {
@@ -798,7 +801,7 @@ async function scrollToPlaying() {
     var(--focus-color) 100%
   );
   border-color: var(--focus-color);
-  color: var(--v2-ink);
+  color: var(--v2-on-accent);
   box-shadow: 0 0 20px color-mix(in srgb, var(--focus-color) 40%, transparent),
               0 0 40px color-mix(in srgb, var(--focus-color) 20%, transparent);
   animation: pulse-glow 2s ease-in-out infinite;

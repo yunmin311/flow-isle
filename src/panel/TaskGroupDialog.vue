@@ -192,12 +192,14 @@ function onBackdropClick(event: MouseEvent) {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  border-radius: 22px;
+  overflow: clip;
+  background: color-mix(in srgb, #000 24%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fade-in 0.2s ease-out;
+  animation: fade-in 0.16s ease-out;
 }
 
 @keyframes fade-in {
@@ -215,17 +217,17 @@ function onBackdropClick(event: MouseEvent) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: slide-up 0.25s cubic-bezier(0.2, 0.8, 0.22, 1);
+  animation: slide-up 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes slide-up {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.96);
+    transform: translate3d(0, 10px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -357,13 +359,13 @@ function onBackdropClick(event: MouseEvent) {
 }
 
 .edit-btn:hover {
-  color: #60a5fa;
+  color: var(--v2-accent);
 }
 
 .delete-btn:hover {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
-  border-color: rgba(248, 113, 113, 0.2);
+  color: var(--alert-color);
+  background: color-mix(in srgb, var(--alert-color) 10%, transparent);
+  border-color: color-mix(in srgb, var(--alert-color) 24%, transparent);
 }
 
 .edit-input {
@@ -446,13 +448,12 @@ function onBackdropClick(event: MouseEvent) {
 }
 
 .color-option-btn:hover {
-  transform: scale(1.1);
-  border-color: var(--v2-muted);
+  border-color: var(--v2-secondary);
 }
 
 .color-option-btn.active {
   border-color: var(--v2-ink);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--v2-ink) 22%, transparent);
 }
 
 .color-option-dot {

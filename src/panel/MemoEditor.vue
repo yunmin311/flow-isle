@@ -38,17 +38,17 @@ const hasSelection = ref(false)
 const activeFormats = ref<{ bold: boolean; italic: boolean }>({ bold: false, italic: false })
 
 // Track current font color
-const currentColor = ref('#ffffff')
+const currentColor = ref('inherit')
 
 // Available colors
 const colors = [
-  { value: '#ffffff', label: '白色' },
-  { value: '#f87171', label: '红色' },
-  { value: '#fbbf24', label: '黄色' },
-  { value: '#4ade80', label: '绿色' },
-  { value: '#60a5fa', label: '蓝色' },
-  { value: '#a78bfa', label: '紫色' },
-  { value: '#f472b6', label: '粉色' },
+  { value: 'default', label: '默认字色' },
+  { value: '#dc2626', label: '红色' },
+  { value: '#d97706', label: '琥珀' },
+  { value: '#16a34a', label: '绿色' },
+  { value: '#2563eb', label: '蓝色' },
+  { value: '#7c3aed', label: '紫色' },
+  { value: '#db2777', label: '粉色' },
 ]
 
 // Store last selection to restore after toolbar button clicks
@@ -224,7 +224,7 @@ function rgbToHex(rgb: string): string {
     return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('')
   }
 
-  return '#ffffff'
+  return 'inherit'
 }
 
 // Save current selection for restoring after toolbar clicks
@@ -280,7 +280,13 @@ function toggleItalic() {
 }
 
 function setTextColor(color: string) {
-  execCommand('foreColor', color)
+  if (color === 'default') {
+    const resolved = getComputedStyle(document.documentElement).getPropertyValue('--v2-ink').trim() || 'inherit'
+    if (resolved !== 'inherit') execCommand('foreColor', resolved)
+    currentColor.value = 'inherit'
+  } else {
+    execCommand('foreColor', color)
+  }
   showColorPicker.value = false
 }
 
@@ -679,10 +685,20 @@ function formatUpdateTime(timestamp: number): string {
           class="top-bar-btn pin-btn"
           :class="{ 'is-pinned': localIsPinned }"
           @click="togglePin"
-          :title="localIsPinned ? '取消置顶' : '置顶'"
+          :title="localIsPinned ? '取消收藏置顶' : '收藏并置顶'"
+          :aria-label="localIsPinned ? '取消收藏置顶' : '收藏并置顶'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v8M5 10h14M9 21h6M12 10v11"/>
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            :fill="localIsPinned ? 'currentColor' : 'none'"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
           </svg>
         </button>
 
@@ -759,8 +775,8 @@ function formatUpdateTime(timestamp: number): string {
             v-for="color in colors"
             :key="color.value"
             class="color-option"
-            :class="{ active: currentColor === color.value }"
-            :style="{ color: color.value }"
+            :class="{ active: color.value === 'default' ? currentColor === 'inherit' : currentColor === color.value }"
+            :style="{ color: color.value === 'default' ? 'var(--v2-ink)' : color.value }"
             :title="color.label"
             @click.stop="setTextColor(color.value)"
           >
@@ -820,7 +836,7 @@ function formatUpdateTime(timestamp: number): string {
     <!-- Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="delete-dialog-overlay" @click="cancelDelete">
       <div class="delete-dialog" @click.stop>
-        <div class="delete-dialog-title">🗑️ 删除备忘录</div>
+        <div class="delete-dialog-title">删除备忘录</div>
         <div class="delete-dialog-content">确定要删除这条备忘录吗？此操作无法撤销。</div>
         <div class="delete-dialog-actions">
           <button class="dialog-btn cancel-btn" @click="cancelDelete">取消</button>
@@ -933,9 +949,9 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .pin-btn.is-pinned {
-  background: color-mix(in srgb, var(--focus-color) 20%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 40%, transparent);
-  color: var(--focus-color);
+  background: var(--v2-accent-soft);
+  border-color: color-mix(in srgb, var(--v2-accent) 36%, var(--v2-line));
+  color: var(--v2-accent);
 }
 
 .delete-btn:hover {
@@ -1051,13 +1067,11 @@ function formatUpdateTime(timestamp: number): string {
 .color-option:hover {
   background: var(--ui-hover);
   border-color: var(--v2-muted);
-  transform: scale(1.05);
 }
 
 .color-option.active {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--v2-accent-soft);
   border-color: currentColor;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
 .color-picker.active .color-btn {
@@ -1085,8 +1099,13 @@ function formatUpdateTime(timestamp: number): string {
 /* Editor Content */
 .editor-content-wrapper {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  margin: 8px 12px 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
 }
 
 .editor-content-wrapper::-webkit-scrollbar {
@@ -1180,7 +1199,7 @@ function formatUpdateTime(timestamp: number): string {
   top: 1px;
   width: 4px;
   height: 8px;
-  border: solid #fff;
+  border: solid var(--v2-on-accent);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -1226,9 +1245,10 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .editor-content :deep(pre) {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--ui-well);
+  border: 1px solid var(--v2-line);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px 12px;
   margin: 12px 0;
   overflow-x: auto;
   font-family: 'SF Mono', Monaco, monospace;
@@ -1244,8 +1264,8 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .editor-content :deep(a) {
-  color: #60a5fa;
-  text-decoration: none;
+  color: var(--v2-accent);
+  text-decoration: underline;
 }
 
 .editor-content :deep(a:hover) {
@@ -1256,12 +1276,13 @@ function formatUpdateTime(timestamp: number): string {
 .delete-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  border-radius: 22px;
+  overflow: clip;
+  background: color-mix(in srgb, #000 24%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
 }
 
 .delete-dialog {
@@ -1346,11 +1367,11 @@ function formatUpdateTime(timestamp: number): string {
 @keyframes contextMenuIn {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: translate3d(0, -4px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 

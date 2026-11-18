@@ -5,6 +5,8 @@ mod social_notifications;
 mod social_window;
 #[cfg(target_os = "windows")]
 mod email_imap;
+#[cfg(target_os = "windows")]
+mod windows_wpn;
 
 use tauri::{
     image::Image,
@@ -1582,7 +1584,7 @@ fn get_macos_update_health<R: Runtime>(_app: AppHandle<R>) -> Option<MacosUpdate
 
 #[cfg(target_os = "windows")]
 #[derive(Clone, serde::Serialize)]
-struct SystemNotificationEvent {
+pub(crate) struct SystemNotificationEvent {
     id: u32,
     app: String,
     aumid: String,
@@ -1640,7 +1642,7 @@ fn read_system_notification_event(
     }
 }
 
-fn notification_diagnostic<R: Runtime>(app: &AppHandle<R>, message: &str) {
+pub(crate) fn notification_diagnostic<R: Runtime>(app: &AppHandle<R>, message: &str) {
     use std::io::Write;
     let Ok(dir) = app.path().app_data_dir() else { return };
     let dir = dir.join("focus-island"); let _ = std::fs::create_dir_all(&dir);
@@ -1674,6 +1676,12 @@ fn start_system_notification_mirror<R: Runtime>(app: AppHandle<R>) {
                     None,
                     windows::Win32::System::Com::COINIT_MULTITHREADED,
                 );
+            }
+
+            if let Err(reason) = windows_wpn::try_run_wpn_watcher(&app) {
+                notification_diagnostic(&app, &format!("wpndb_fallback reason={reason}"));
+            } else {
+                return;
             }
 
             let started_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;

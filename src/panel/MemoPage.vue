@@ -224,9 +224,19 @@ function handleCloseCategoryDialog() {
                 class="action-btn pin-btn"
                 :class="{ 'is-pinned': memo.isPinned }"
                 @click="(e) => handleTogglePin(memo, e)"
-                :title="memo.isPinned ? '取消置顶' : '置顶'"
+                :title="memo.isPinned ? '取消收藏置顶' : '收藏并置顶'"
+                :aria-label="memo.isPinned ? '取消收藏置顶' : '收藏并置顶'"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  :fill="memo.isPinned ? 'currentColor' : 'none'"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                 </svg>
               </button>
@@ -243,6 +253,7 @@ function handleCloseCategoryDialog() {
             </div>
           </div>
           <div class="memo-item-meta">
+            <span v-if="memo.isPinned" class="memo-pinned-tag">已置顶</span>
             <MemoCategoryTag :category-id="memo.categoryId" />
             <span class="memo-item-time">{{ formatTime(memo.updatedAt) }}</span>
           </div>
@@ -251,11 +262,11 @@ function handleCloseCategoryDialog() {
 
         <!-- Empty State -->
         <div v-if="displayMemos.length === 0" class="memo-empty-state">
-          <svg v-if="searchQuery" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-if="searchQuery" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--v2-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="7"/>
             <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <div v-else class="empty-icon">📝</div>
+          <div v-else class="empty-icon"></div>
           <div class="empty-text">{{ searchQuery ? '没有匹配的备忘录' : '还没有备忘录' }}</div>
           <button v-if="!searchQuery" class="empty-action-btn" @click="handleNewMemo">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -283,7 +294,7 @@ function handleCloseCategoryDialog() {
     <!-- Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="delete-dialog-overlay" @click="cancelDeleteMemo">
       <div class="delete-dialog" @click.stop>
-        <div class="delete-dialog-title">🗑️ 删除备忘录</div>
+        <div class="delete-dialog-title">删除备忘录</div>
         <div class="delete-dialog-content">确定要删除这条备忘录吗？此操作无法撤销。</div>
         <div class="delete-dialog-actions">
           <button class="dialog-btn cancel-btn" @click="cancelDeleteMemo">取消</button>
@@ -430,31 +441,29 @@ function handleCloseCategoryDialog() {
 }
 
 .memo-item {
-  padding: 11px 12px;
+  padding: 10px 12px;
   margin-bottom: 8px;
   border-radius: 10px;
-  background: var(--ui-well);
+  background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  box-shadow: 0 2px 8px var(--v2-shadow);
+  box-shadow: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
 }
 
 .memo-item:hover {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
-  box-shadow: 0 4px 12px var(--v2-shadow);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--v2-accent) 5%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
 }
 
 .memo-item.is-pinned {
-  background: color-mix(in srgb, var(--focus-color) 8%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--focus-color) 28%, var(--v2-line));
+  background: color-mix(in srgb, var(--v2-accent) 8%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
 }
 
 .memo-item.is-pinned:hover {
-  background: color-mix(in srgb, var(--focus-color) 12%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--focus-color) 40%, var(--v2-line));
+  background: color-mix(in srgb, var(--v2-accent) 12%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 44%, var(--v2-line));
 }
 
 .memo-item-header {
@@ -480,20 +489,21 @@ function handleCloseCategoryDialog() {
   display: flex;
   align-items: center;
   gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  opacity: 0.65;
+  transition: opacity 0.16s ease;
   flex-shrink: 0;
 }
 
 .memo-item:hover .memo-item-actions,
+.memo-item:focus-within .memo-item-actions,
 .memo-item.is-pinned .memo-item-actions {
   opacity: 1;
 }
 
 .action-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--v2-muted);
@@ -501,37 +511,57 @@ function handleCloseCategoryDialog() {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .action-btn:hover {
   background: var(--ui-hover);
-  border-color: var(--v2-muted);
-  color: var(--v2-secondary);
+  border-color: var(--v2-line);
+  color: var(--v2-ink);
 }
 
-/* Pin button: highlighted when pinned */
 .pin-btn.is-pinned {
-  color: var(--focus-color);
+  color: var(--v2-accent);
+  background: var(--v2-accent-soft);
 }
 
 .pin-btn.is-pinned:hover {
-  background: rgba(248, 113, 113, 0.15);
-  border-color: rgba(248, 113, 113, 0.25);
-  color: #f87171;
+  background: color-mix(in srgb, var(--v2-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--v2-accent) 34%, var(--v2-line));
+  color: var(--v2-accent);
+}
+
+.delete-btn {
+  opacity: 0.45;
+}
+
+.memo-item:hover .delete-btn,
+.memo-item:focus-within .delete-btn {
+  opacity: 1;
 }
 
 .delete-btn:hover {
-  background: rgba(248, 113, 113, 0.15);
-  border-color: rgba(248, 113, 113, 0.25);
-  color: #f87171;
+  background: color-mix(in srgb, var(--alert-color) 14%, transparent);
+  border-color: color-mix(in srgb, var(--alert-color) 30%, transparent);
+  color: var(--alert-color);
 }
 
 .memo-item-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 5px;
+}
+
+.memo-pinned-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--v2-accent);
+  background: var(--v2-accent-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.3;
 }
 
 .memo-item-time {
@@ -588,19 +618,19 @@ function handleCloseCategoryDialog() {
 .empty-action-btn:hover {
   background: color-mix(in srgb, var(--focus-color) 25%, transparent);
   border-color: color-mix(in srgb, var(--focus-color) 50%, transparent);
-  transform: scale(1.02);
 }
 
 /* Delete Confirmation Dialog */
 .delete-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  border-radius: 22px;
+  overflow: clip;
+  background: color-mix(in srgb, #000 24%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
 }
 
 .delete-dialog {

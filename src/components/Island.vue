@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
-import { emailInboxUrl } from "../utils/emailLinks";
+import { emailInboxUrl, formatEmailSourceTag } from "../utils/emailLinks";
 import { isTransientSocialNotification } from "../utils/notificationSources";
 import { useIslandState } from "../composables/useIslandState";
 import { useTimer, type NotificationType } from "../composables/useTimer";
@@ -320,12 +320,13 @@ function enqueueEmailPeek(payload: EmailNotificationPayload) {
     if (externalNotificationsSilent.value) return;
     const subject = (payload.subject ?? "").trim() || "(无主题)";
     const from = (payload.from ?? "").trim() || "未知发件人";
+    const mailbox = formatEmailSourceTag(payload.account_address, payload.provider);
     playNotificationSound();
     pushPeekItem({
         key: emailNotificationRecordId(payload),
         external: true,
         kind: 'email',
-        app: "邮件",
+        app: mailbox,
         provider: payload.provider,
         title: subject,
         body: from,
@@ -562,7 +563,7 @@ function runPanelMotion(phase: "open" | "close") {
     panelMotionTimer = window.setTimeout(() => {
         panelMotionState.value = "idle";
         panelMotionTimer = null;
-    }, phase === "open" ? 200 : 140);
+    }, phase === "open" ? 280 : 165);
 }
 
 function stopLocalCountdown() {
@@ -911,39 +912,47 @@ onUnmounted(() => {
 
 .panel-launching {
     will-change: transform;
-    animation: island-release 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: island-release 280ms cubic-bezier(0.2, 0.88, 0.26, 1) both;
 }
 
 .panel-receiving {
     will-change: transform;
-    animation: island-receive 140ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation: island-receive 165ms cubic-bezier(0.34, 0, 0.72, 0.2) both;
 }
 
 @keyframes island-release {
     0% {
-        transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0) scale(1, 1);
     }
 
-    40% {
-        transform: translate3d(0, 2px, 0);
+    34% {
+        transform: translate3d(0, 2px, 0) scale(0.955, 0.9);
+    }
+
+    72% {
+        transform: translate3d(0, -1px, 0) scale(1.022, 1.03);
     }
 
     100% {
-        transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0) scale(1, 1);
     }
 }
 
 @keyframes island-receive {
     0% {
-        transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0) scale(1, 1);
     }
 
-    45% {
-        transform: translate3d(0, -1px, 0);
+    42% {
+        transform: translate3d(0, -1px, 0) scale(0.94, 0.86);
+    }
+
+    78% {
+        transform: translate3d(0, 1px, 0) scale(1.015, 1.02);
     }
 
     100% {
-        transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0) scale(1, 1);
     }
 }
 

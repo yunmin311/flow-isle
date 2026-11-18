@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
   <div class="detail-page" tabindex="-1" aria-label="任务详情" @click="onClickOutside">
     <!-- Task not found -->
     <div v-if="taskNotFound" class="not-found">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v2-muted)" stroke-width="1.5">
         <circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
       </svg>
       <span class="not-found-text">任务不存在</span>
@@ -244,8 +244,9 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Pomodoro count -->
-        <div class="pomodoro-count">
-          🍅{{ task!.pomodoroCount }}
+        <div class="pomodoro-count" title="专注次数">
+          <span class="pomo-dot" aria-hidden="true"></span>
+          <span>{{ task!.pomodoroCount }}</span>
         </div>
 
         <!-- Timer or play button -->
@@ -370,7 +371,7 @@ onBeforeUnmount(() => {
                 <svg v-if="sub.completed" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
               </button>
               <span class="subtask-title" :class="{ 'line-through': sub.completed }">{{ sub.title }}</span>
-              <span v-if="sub.pomodoroCount > 0" class="subtask-pomodoro">🍅{{ sub.pomodoroCount }}</span>
+              <span v-if="sub.pomodoroCount > 0" class="subtask-pomodoro"><span class="pomo-dot" aria-hidden="true"></span><span>{{ sub.pomodoroCount }}</span></span>
               <button
                 class="subtask-play-btn"
                 :class="{ active: activeSubtaskId === sub.id }"
@@ -447,7 +448,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: transparent;
   color: var(--v2-ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: inherit;
 }
 
 .detail-scroll-area {
@@ -717,15 +718,17 @@ onBeforeUnmount(() => {
 }
 
 .play-btn:hover {
-  background: color-mix(in srgb, var(--focus-color) 30%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 50%, transparent);
-  transform: scale(1.08);
+  background: color-mix(in srgb, var(--focus-color) 28%, transparent);
+  border-color: color-mix(in srgb, var(--focus-color) 48%, transparent);
 }
 
 /* Properties section */
 .prop-section {
-  padding: 6px 12px 10px;
-  border-bottom: 1px solid var(--v2-line);;
+  margin: 0 10px 8px;
+  padding: 6px 10px 10px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 10px;
 }
 
 .prop-row {
@@ -833,15 +836,18 @@ onBeforeUnmount(() => {
 }
 
 .repeat-btn.on {
-  background: color-mix(in srgb, var(--focus-color) 10%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 25%, transparent);
-  color: color-mix(in srgb, var(--focus-color) 75%, #fff);
+  background: var(--v2-accent-soft);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, transparent);
+  color: var(--v2-accent);
 }
 
 /* Notes section */
 .note-section {
+  margin: 0 10px 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--v2-line);;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 10px;
 }
 
 .section-label {
@@ -886,8 +892,27 @@ onBeforeUnmount(() => {
 
 /* Subtask section */
 .subtask-section {
+  margin: 0 10px 10px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--v2-line);;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 10px;
+}
+
+.pomodoro-count,
+.subtask-pomodoro {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pomo-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--focus-color);
+  flex-shrink: 0;
 }
 
 .add-subtask-btn {
@@ -1140,13 +1165,14 @@ onBeforeUnmount(() => {
 }
 
 .delete-confirm-btn.danger {
-  background: rgba(220, 38, 38, 0.25);
-  border-color: rgba(220, 38, 38, 0.4);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--alert-color) 14%, transparent);
+  border-color: color-mix(in srgb, var(--alert-color) 36%, transparent);
+  color: var(--alert-color);
 }
 
 .delete-confirm-btn.danger:hover {
-  background: rgba(220, 38, 38, 0.4);
-  color: var(--v2-ink);
+  background: color-mix(in srgb, var(--alert-color) 24%, transparent);
+  border-color: color-mix(in srgb, var(--alert-color) 50%, transparent);
+  color: var(--alert-color);
 }
 </style>

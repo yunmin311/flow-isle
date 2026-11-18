@@ -26,6 +26,17 @@ import RadioPage from './RadioPage.vue'
 import NotificationsPage from './NotificationsPage.vue'
 import PanelTitleBar from './PanelTitleBar.vue'
 
+interface PanelTransitionMetrics {
+  island_x: number
+  island_y: number
+  island_width: number
+  island_height: number
+  panel_x: number
+  panel_y: number
+  panel_width: number
+  panel_height: number
+}
+
 const { startBridge } = useTimerBridge()
 const { settings } = useSettings()
 // 面板启动即开始记录番茄通知，避免通知页未打开时漏记
@@ -48,7 +59,7 @@ function prewarmPanelData() {
 prewarmPanelData()
 
 
-const PANEL_CLOSE_DURATION = 150
+const PANEL_CLOSE_DURATION = 165
 const CLOSE_FALLBACK_BUFFER = 140
 const IS_MACOS = navigator.userAgent.toLowerCase().includes('mac')
 
@@ -71,6 +82,15 @@ const viewOrder: Record<string, number> = {
   settings: 6,
 }
 
+function pulsePanelGlass(ms = 240) {
+  panelSettling.value = true
+  if (settleTimer !== null) window.clearTimeout(settleTimer)
+  settleTimer = window.setTimeout(() => {
+    panelSettling.value = false
+    settleTimer = null
+  }, ms)
+}
+
 function navigateTo(nextView: typeof currentView.value) {
   const prevView = currentView.value
   if (prevView === nextView) return
@@ -78,6 +98,7 @@ function navigateTo(nextView: typeof currentView.value) {
   if (prevChild) viewScrollMemory.set(prevView, prevChild.scrollTop)
 
   const dir = (viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1
+  const isDetailDrill = nextView === 'taskDetail' || prevView === 'taskDetail'
   currentView.value = nextView
 
   void nextTick(() => {
@@ -86,15 +107,19 @@ function navigateTo(nextView: typeof currentView.value) {
     const savedScroll = viewScrollMemory.get(nextView) ?? 0
     nextChild.scrollTop = savedScroll
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    pulsePanelGlass(210)
     activeViewAnim?.cancel()
     if (typeof nextChild.animate === 'function') {
+      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 24 : -20) : dir * 18
+      const overshootX = isDetailDrill ? (nextView === 'taskDetail' ? -2 : 2) : dir * -2.5
       activeViewAnim = nextChild.animate(
         [
-          { opacity: 0, transform: `translate3d(${dir * 12}px, 0, 0)` },
-          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+          { opacity: 0, transform: `translate3d(${startX}px, 5px, 0) scale(0.976)` },
+          { opacity: 1, transform: `translate3d(${overshootX}px, -1px, 0) scale(1.005)`, offset: 0.64 },
+          { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1)' },
         ],
         {
-          duration: 180,
+          duration: 245,
           easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
         },
       )
@@ -230,6 +255,36 @@ async function finishCloseAnimation() {
   await invoke('hide_panel')
 }
 
+function clampVal(v: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, v))
+}
+
+function applyTransitionVars(metrics: PanelTransitionMetrics) {
+  const root = panelRootRef.value
+  if (!root) return
+  const panelW = Math.max(1, metrics.panel_width)
+  const panelH = Math.max(1, metrics.panel_height)
+  const islandCenterX = metrics.island_x + metrics.island_width / 2
+  const panelCenterX = metrics.panel_x + panelW / 2
+  const rawDx = islandCenterX - panelCenterX
+  const fromX = clampVal(rawDx * 0.48, -140, 140)
+  const scaleX = clampVal(Math.max(0.76, metrics.island_width / panelW), 0.76, 0.9)
+  const scaleY = clampVal(Math.max(0.62, (metrics.island_height / panelH) * 5.2), 0.62, 0.78)
+  root.style.setProperty('--panel-from-x', `${fromX.toFixed(2)}px`)
+  root.style.setProperty('--panel-from-y', '-34px')
+  root.style.setProperty('--panel-from-sx', scaleX.toFixed(4))
+  root.style.setProperty('--panel-from-sy', scaleY.toFixed(4))
+}
+
+async function prepareTransitionVars() {
+  try {
+    const metrics = await invoke<PanelTransitionMetrics | null>('get_panel_transition_metrics')
+    if (metrics) applyTransitionVars(metrics)
+  } catch {
+    // ignore outside Tauri runtime
+  }
+}
+
 function runOpenAnimation() {
   if (panelAnimState.value === 'opening' || panelAnimState.value === 'opening-ready') return
   clearCloseFallback()
@@ -249,24 +304,20 @@ async function onWindowTransition(payload: string) {
   if (payload === 'open') {
     isClosing.value = false
     panelAnimState.value = 'hidden'
+    await prepareTransitionVars()
     void invoke('emit_island_panel_motion', { phase: 'open' })
-    // 窗口此刻在屏幕外，先移回目标位置，再开始无缩放平滑展开动画。
     try {
       await invoke('position_panel_under_island')
     } catch {
       // 命令不可用时忽略
     }
-    panelSettling.value = true
-    if (settleTimer !== null) window.clearTimeout(settleTimer)
-    settleTimer = window.setTimeout(() => {
-      panelSettling.value = false
-      settleTimer = null
-    }, 220)
+    pulsePanelGlass(320)
     runOpenAnimation()
     return
   }
 
   if (payload === 'close') {
+    await prepareTransitionVars()
     void invoke('emit_island_panel_motion', { phase: 'close' })
     await runCloseAnimation()
   }
@@ -455,10 +506,16 @@ async function closeWindow() {
   padding: 0;
   background: transparent;
   border: 0;
+  border-radius: 22px;
   box-shadow: none;
-  overflow: visible;
+  overflow: clip;
   color: var(--panel-text);
   font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  transform-origin: 50% 0;
+  --panel-from-x: 0px;
+  --panel-from-y: -34px;
+  --panel-from-sx: 0.80;
+  --panel-from-sy: 0.66;
   will-change: transform, opacity;
   backface-visibility: hidden;
   isolation: isolate;
@@ -491,12 +548,12 @@ async function closeWindow() {
 .panel-tint {
   background: var(--panel-shell-bg);
   opacity: 0;
-  transition: opacity 90ms ease-out;
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .panel-settling .panel-tint {
-  opacity: 0.06;
-  transition: none;
+  opacity: 0.08;
+  transition: opacity 90ms ease-out;
 }
 
 .panel-sheen {
@@ -504,6 +561,42 @@ async function closeWindow() {
     var(--panel-mode-sheen, none),
     var(--panel-sheen-bg);
   opacity: var(--panel-sheen-opacity, 0.9);
+  transition: opacity 220ms ease;
+}
+
+.panel-sheen::before {
+  content: '';
+  position: absolute;
+  inset: -20% -35%;
+  background: linear-gradient(
+    108deg,
+    transparent 32%,
+    color-mix(in srgb, #fff 36%, transparent) 48%,
+    color-mix(in srgb, var(--v2-glow) 34%, transparent) 54%,
+    transparent 68%
+  );
+  opacity: 0;
+  transform: translate3d(-40%, 0, 0);
+  pointer-events: none;
+}
+
+.motion-opening .panel-sheen::before,
+.panel-settling .panel-sheen::before {
+  animation: liquid-sheen-sweep 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes liquid-sheen-sweep {
+  0% {
+    opacity: 0;
+    transform: translate3d(-38%, -6%, 0);
+  }
+  42% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(38%, 6%, 0);
+  }
 }
 
 /* 颗粒层：只在磨砂/亚克力开启，亮面保持干净 */
@@ -600,13 +693,13 @@ async function closeWindow() {
 }
 
 .motion-opening {
-  animation: panel-open 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: panel-open 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .motion-hidden,
 .motion-opening-ready {
   opacity: 0;
-  transform: translate3d(0, -10px, 0);
+  transform: translate3d(var(--panel-from-x), var(--panel-from-y), 0) scale(var(--panel-from-sx), var(--panel-from-sy));
   pointer-events: none;
 }
 
@@ -615,7 +708,7 @@ async function closeWindow() {
 }
 
 .motion-closing {
-  animation: panel-close 150ms cubic-bezier(0.4, 0, 1, 1) both;
+  animation: panel-close 165ms cubic-bezier(0.4, 0, 0.72, 0.25) both;
   pointer-events: none;
 }
 
@@ -625,50 +718,66 @@ async function closeWindow() {
 }
 
 .motion-opening .panel-inner > :first-child {
-  animation: panel-child-in 170ms cubic-bezier(0.22, 1, 0.36, 1) 20ms both;
+  animation: panel-child-in 210ms cubic-bezier(0.34, 1.4, 0.64, 1) 25ms both;
 }
 
 .motion-opening .panel-body {
-  animation: panel-child-in 190ms cubic-bezier(0.22, 1, 0.36, 1) 45ms both;
+  animation: panel-child-in 240ms cubic-bezier(0.34, 1.32, 0.64, 1) 45ms both;
 }
 
 .motion-opening .panel-nav {
-  animation: panel-child-in 170ms cubic-bezier(0.22, 1, 0.36, 1) 70ms both;
+  animation: panel-child-in 210ms cubic-bezier(0.34, 1.4, 0.64, 1) 70ms both;
 }
 
 .motion-closing .panel-inner {
   opacity: 0;
-  transition: opacity 90ms ease-in;
+  transition: opacity 95ms ease-in;
 }
 
 @keyframes panel-open {
   0% {
     opacity: 0;
-    transform: translate3d(0, -10px, 0);
+    border-radius: 28px;
+    transform: translate3d(var(--panel-from-x), var(--panel-from-y), 0) scale(var(--panel-from-sx), var(--panel-from-sy));
+  }
+
+  56% {
+    opacity: 1;
+    border-radius: 19px;
+    transform: translate3d(0, 3px, 0) scale(1.018, 1.024);
+  }
+
+  80% {
+    opacity: 1;
+    border-radius: 22px;
+    transform: translate3d(0, -1px, 0) scale(0.996, 0.997);
   }
 
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    border-radius: 22px;
+    transform: translate3d(0, 0, 0) scale(1, 1);
   }
 }
 
 @keyframes panel-close {
   0% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    border-radius: 22px;
+    transform: translate3d(0, 0, 0) scale(1, 1);
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(0, -8px, 0);
+    border-radius: 26px;
+    transform: translate3d(calc(var(--panel-from-x) * 0.28), -18px, 0) scale(0.92, 0.88);
   }
 }
 
 @keyframes panel-child-in {
   0% {
     opacity: 0;
-    transform: translate3d(0, 5px, 0);
+    transform: translate3d(0, 8px, 0);
   }
 
   100% {
@@ -705,6 +814,7 @@ async function closeWindow() {
 }
 
 .nav-btn {
+  position: relative;
   display: inline-flex;
   flex: 1 1 0;
   min-width: 0;
@@ -719,8 +829,8 @@ async function closeWindow() {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 6px;
-  transition: color 0.18s ease, background 0.18s ease;
+  border-radius: 8px;
+  transition: color 0.18s ease, background 0.18s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-family: inherit;
   letter-spacing: 0.02em;
 }
@@ -730,13 +840,41 @@ async function closeWindow() {
   background: var(--ui-well);
 }
 
+.nav-btn:active {
+  transform: translate3d(0, 1px, 0) scale(0.93);
+}
+
 .nav-btn.active {
-  color: var(--focus-color);
-  background: transparent;
+  color: var(--v2-accent);
+  background: color-mix(in srgb, var(--v2-accent) 10%, transparent);
+}
+
+.nav-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  transform: translateX(-50%);
+  animation: nav-pip-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes nav-pip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scaleX(1);
+  }
 }
 
 .nav-btn.active:hover {
-  background: color-mix(in srgb, var(--focus-color) 8%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 14%, transparent);
 }
 
 .nav-icon {

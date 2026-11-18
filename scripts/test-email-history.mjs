@@ -6,6 +6,8 @@ import assert from 'node:assert/strict'
 const source = readFileSync(new URL('../src/composables/useNotifications.ts', import.meta.url), 'utf8')
 const social = { exports: {} }
 vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/utils/notificationSources.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, social)
+const emailLinks = { exports: {} }
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/utils/emailLinks.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, emailLinks)
 const handlers = new Map(), timers = new Map()
 let ready = false, serial = 0, persisted = []
 const summaries = []
@@ -53,12 +55,16 @@ assert.equal(summaries[1].count, 2); assert.equal(summaries[1].accounts, 2)
 const island = readFileSync(new URL('../src/components/Island.vue', import.meta.url), 'utf8')
 const functionText = name => island.slice(island.indexOf(`function ${name}(`), island.indexOf('\n}', island.indexOf(`function ${name}(`)) + 2)
 const peeks = []; let sounds = 0
-const context = { externalNotificationsSilent: { value: false }, playNotificationSound: () => sounds++, pushPeekItem: item => peeks.push(item), emailNotificationRecordId: () => 'fixture', Date }
+const context = { externalNotificationsSilent: { value: false }, playNotificationSound: () => sounds++, pushPeekItem: item => peeks.push(item), emailNotificationRecordId: () => 'fixture', formatEmailSourceTag: emailLinks.exports.formatEmailSourceTag, Date }
 vm.runInNewContext(ts.transpileModule(functionText('enqueueEmailPeek') + '\n' + functionText('enqueueEmailHistoryPeek'), {}).outputText, context)
 context.enqueueEmailPeek({ historical: true }); assert.equal(peeks.length, 0)
 context.enqueueEmailHistoryPeek(summaries[1]); assert.equal(peeks[0].kind, 'email-history'); assert.equal(peeks[0].key, summaries[1].recordId); assert.equal(sounds, 0)
 context.externalNotificationsSilent.value = true; context.enqueueEmailHistoryPeek(summaries[1]); assert.equal(peeks.length, 1)
-context.externalNotificationsSilent.value = false; context.enqueueEmailPeek({ historical: false }); assert.equal(peeks.length, 2); assert.equal(sounds, 1)
+context.externalNotificationsSilent.value = false
+context.enqueueEmailPeek({ historical: false, account_address: 'alice@163.com', provider: '163' })
+assert.equal(peeks.length, 2); assert.equal(sounds, 1); assert.equal(peeks[1].app, 'alice@163.com')
+context.enqueueEmailPeek({ historical: false, provider: 'qq' })
+assert.equal(peeks.length, 3); assert.equal(peeks[2].app, 'QQ邮箱')
 send(5, 0.05); await flush(); assert.equal(timers.size, 1)
 store.clearAll(); await flush(); await flushSummary(); assert.equal(summaries.length, 2, 'clearing records cancels pending summary'); assert.equal(persisted.length, 0)
 persisted = [

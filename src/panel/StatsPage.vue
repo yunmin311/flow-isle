@@ -325,7 +325,7 @@ function steppedBarHeight(pomodoros: number): string {
                   <span class="pixel-dot" aria-hidden="true"></span>{{ day.pomodoros }}
                 </span>
                 <span v-if="day.tasks > 0" class="cell-metric cell-task-count">
-                  <span class="pixel-check" aria-hidden="true"></span>{{ day.tasks }}
+                  <svg class="cell-check-icon" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2.5 6.5 5 9 9.5 3.5" /></svg>{{ day.tasks }}
                 </span>
               </span>
               <span
@@ -663,14 +663,14 @@ function steppedBarHeight(pomodoros: number): string {
 
 .heat-cell {
   aspect-ratio: 1;
-  border-radius: 5px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background 160ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .heat-cell.empty {
@@ -679,8 +679,13 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .heat-cell:not(.empty):hover {
-  border-color: var(--v2-accent);
+  border-color: color-mix(in srgb, var(--v2-accent) 65%, transparent);
+  transform: translate3d(0, -1px, 0);
   z-index: 2;
+}
+
+.heat-cell:not(.empty):active {
+  transform: translate3d(0, 0, 0) scale(0.96);
 }
 
 .heat-cell.intensity-0 {
@@ -688,15 +693,22 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .heat-cell.intensity-1 {
-  background: color-mix(in srgb, var(--v2-accent) 20%, var(--ui-well));
+  background: color-mix(in srgb, var(--v2-accent) 16%, var(--ui-well));
 }
 
 .heat-cell.intensity-2 {
-  background: color-mix(in srgb, var(--v2-accent) 44%, var(--ui-well));
+  background: color-mix(in srgb, var(--v2-accent) 30%, var(--ui-well));
+}
+
+.heat-cell.intensity-2 .day-number,
+.heat-cell.intensity-2 .cell-count,
+.heat-cell.intensity-2 .cell-task-count {
+  color: var(--v2-ink);
 }
 
 .heat-cell.intensity-3 {
   background: var(--v2-accent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
 }
 
 .day-number {
@@ -714,19 +726,24 @@ function steppedBarHeight(pomodoros: number): string {
   position: absolute;
   bottom: 3px;
   right: 3px;
-  width: 3px;
-  height: 3px;
-  border-radius: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
   background: currentColor;
-  opacity: 0.72;
+  opacity: 0.78;
 }
 
 .heat-cell.intensity-3 .cell-indicator {
   color: var(--v2-on-accent);
+  opacity: 0.95;
 }
 
 .cell-indicator.has-tasks {
   background: var(--v2-break);
+}
+
+.heat-cell.intensity-3 .cell-indicator.has-tasks {
+  background: var(--v2-on-accent);
 }
 
 .cell-tooltip {
@@ -782,11 +799,13 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .heat-cell.selected {
-  border-color: var(--v2-ink);
+  border-color: var(--v2-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v2-accent) 28%, transparent);
 }
 
 .heatmap-grid.detailed .heat-cell {
   aspect-ratio: 0.86;
+  border-radius: 8px;
 }
 
 .heatmap-grid.detailed .heat-cell .day-number {
@@ -807,7 +826,7 @@ function steppedBarHeight(pomodoros: number): string {
 .cell-count {
   position: absolute;
   display: flex;
-  font-size: 8px;
+  font-size: 8.5px;
   line-height: 1;
   color: var(--v2-secondary);
   pointer-events: none;
@@ -822,7 +841,7 @@ function steppedBarHeight(pomodoros: number): string {
 .pixel-dot {
   width: 4px;
   height: 4px;
-  border-radius: 1px;
+  border-radius: 50%;
   background: var(--v2-accent);
   flex-shrink: 0;
 }
@@ -831,22 +850,19 @@ function steppedBarHeight(pomodoros: number): string {
   background: var(--v2-on-accent);
 }
 
-.pixel-check {
-  width: 6px;
-  height: 4px;
-  border-left: 1.5px solid var(--v2-break);
-  border-bottom: 1.5px solid var(--v2-break);
-  transform: rotate(-45deg) translateY(-1px);
-  display: inline-block;
+.cell-check-icon {
   flex-shrink: 0;
+  color: inherit;
 }
 
-.heat-cell.intensity-3 .cell-count {
+.heat-cell.intensity-3 .cell-count,
+.heat-cell.intensity-3 .cell-task-count {
   color: var(--v2-on-accent);
+  opacity: 0.94;
 }
 
 .cell-task-count {
-  color: var(--v2-secondary);
+  color: var(--v2-break);
 }
 
 .legend-hint {

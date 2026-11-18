@@ -324,7 +324,8 @@ function recordMissedEmail(p: EmailNotificationPayload) {
   missedLatestRecordId = id
   const subject = (p.subject || '').trim() || '(无主题)'
   const from = (p.from || '').trim() || '未知发件人'
-  missedLatestLabel = `${from} · ${subject}`
+  const account = (p.account_address || '').trim() || (p.provider ? p.provider.toUpperCase() : '')
+  missedLatestLabel = account ? `[${account}] ${from} · ${subject}` : `${from} · ${subject}`
 }
 
 export function resetActiveFocusMissedSession() {

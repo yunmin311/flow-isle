@@ -813,11 +813,11 @@ onBeforeUnmount(() => {
     <!-- Task list -->
     <div class="task-list">
       <div v-if="displayTasks.length === 0 && displayCompleted.length === 0" class="empty-state">
-        <svg v-if="searchQuery" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg v-if="searchQuery" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v2-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="7"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <svg v-else width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5">
+        <svg v-else width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v2-muted)" stroke-width="1.5">
           <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
         </svg>
         <span>{{ searchQuery ? '没有匹配的任务' : '暂无任务' }}</span>
@@ -911,7 +911,7 @@ onBeforeUnmount(() => {
               </svg>
               {{ formatRepeatLabel(task) }}
             </span>
-            <span v-if="task.pomodoroCount > 0" class="task-pomodoro">🍅 {{ task.pomodoroCount }}</span>
+            <span v-if="task.pomodoroCount > 0" class="task-pomodoro" title="专注次数"><span class="pomo-dot" aria-hidden="true"></span><span>{{ task.pomodoroCount }}</span></span>
             <span v-if="task.dueDate && task.repeat !== 'daily'" class="task-date">
               {{ formatShortDate(task.dueDate) }}
             </span>
@@ -980,7 +980,7 @@ onBeforeUnmount(() => {
                 </button>
                 <span class="task-title" :class="{ 'line-through': !isRepeatEnded(task) }">{{ task.title }}</span>
                 <span v-if="isRepeatEnded(task)" class="task-repeat-badge ended">已结束</span>
-                <span v-if="task.pomodoroCount > 0" class="task-pomodoro completed-pomodoro">🍅 {{ task.pomodoroCount }}</span>
+                <span v-if="task.pomodoroCount > 0" class="task-pomodoro completed-pomodoro" title="专注次数"><span class="pomo-dot" aria-hidden="true"></span><span>{{ task.pomodoroCount }}</span></span>
               </div>
               <div v-if="task.dueDate || task.groupId || isRepeatEnded(task)" class="task-meta-row">
                 <span v-if="isRepeatEnded(task)" class="task-repeat-badge">{{ formatRepeatLabel(task) }}</span>
@@ -1174,8 +1174,8 @@ onBeforeUnmount(() => {
 }
 
 .repeat-chip.on {
-  color: color-mix(in srgb, var(--focus-color) 85%, #fff);
-  background: color-mix(in srgb, var(--focus-color) 10%, transparent);
+  color: var(--v2-accent);
+  background: var(--v2-accent-soft);
 }
 
 .repeat-label {
@@ -1194,8 +1194,8 @@ onBeforeUnmount(() => {
   gap: 2px;
   font-size: 9px;
   line-height: 1.2;
-  color: color-mix(in srgb, var(--focus-color) 70%, #fff);
-  background: color-mix(in srgb, var(--focus-color) 10%, transparent);
+  color: var(--v2-accent);
+  background: var(--v2-accent-soft);
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -1528,9 +1528,21 @@ onBeforeUnmount(() => {
 }
 
 .task-pomodoro {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 9.5px;
   line-height: 1.2;
   color: var(--v2-muted);
+}
+
+.pomo-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--focus-color);
+  flex-shrink: 0;
 }
 
 .task-pomodoro.completed-pomodoro {
@@ -1895,12 +1907,12 @@ onBeforeUnmount(() => {
 }
 
 .context-menu-item.danger {
-  color: #f87171;
+  color: var(--alert-color);
 }
 
 .context-menu-item.danger:hover {
-  background: rgba(248, 113, 113, 0.12);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--alert-color) 12%, transparent);
+  color: var(--alert-color);
 }
 
 .context-menu-item.flex-item {
@@ -2028,11 +2040,11 @@ onBeforeUnmount(() => {
 @keyframes dropdown-fade-in {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(-5px);
+    transform: translate3d(0, -4px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -2222,9 +2234,9 @@ onBeforeUnmount(() => {
 }
 
 .batch-btn.danger:hover {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.35);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--alert-color) 12%, transparent);
+  border-color: color-mix(in srgb, var(--alert-color) 36%, transparent);
+  color: var(--alert-color);
 }
 
 .batch-btn.subtle {
@@ -2239,14 +2251,14 @@ onBeforeUnmount(() => {
 }
 
 .batch-btn.subtle.danger:hover {
-  background: rgba(248, 113, 113, 0.1);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--alert-color) 10%, transparent);
+  color: var(--alert-color);
 }
 
 /* Selected card highlight */
 .task-card.is-selected {
-  background: color-mix(in srgb, var(--focus-color) 8%, rgba(255, 255, 255, 0.05));
-  border-color: color-mix(in srgb, var(--focus-color) 35%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 36%, transparent);
 }
 
 /* Batch-select checkbox beside each completed task */

@@ -243,7 +243,7 @@ function handleDoneTask(taskId: string) {
 <template>
   <div class="home-page">
     <!-- Timer hero -->
-    <section class="focus-hero" :class="{ 'is-break': phase === 'break' }" tabindex="-1" aria-label="专注计时">
+    <section class="focus-hero" :class="{ 'is-break': phase === 'break', 'is-running': running }" tabindex="-1" aria-label="专注计时">
       <div class="hero-eyebrow">
         <span class="pixel-status" aria-hidden="true"></span>
         <span>{{ heroEyebrow }}</span>
@@ -310,7 +310,7 @@ function handleDoneTask(taskId: string) {
           :style="{ '--active-color': phase === 'break' ? 'var(--break-color)' : 'var(--focus-color)' }"
         >
           <div class="task-row">
-            <span class="running-square" :class="{ paused: !running }" aria-hidden="true"></span>
+            <span class="running-dot" :class="{ paused: !running }" aria-hidden="true"></span>
             <span class="task-title running-title">{{ phase === 'break' ? '休息中' : '快速专注' }}</span>
             <span class="task-timer">{{ displayTime }}</span>
             <button class="queue-btn" @click="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
@@ -332,7 +332,7 @@ function handleDoneTask(taskId: string) {
           :style="activeTaskId === task.id ? { '--active-color': phase === 'break' ? 'var(--break-color)' : 'var(--focus-color)' } : undefined"
         >
           <div class="task-row">
-            <span v-if="activeTaskId === task.id" class="running-square" :class="{ paused: !running }" aria-hidden="true"></span>
+            <span v-if="activeTaskId === task.id" class="running-dot" :class="{ paused: !running }" aria-hidden="true"></span>
             <button
               v-else
               class="check-circle"
@@ -478,6 +478,21 @@ function handleDoneTask(taskId: string) {
   flex-shrink: 0;
   background: var(--v2-accent);
   border-radius: 1px;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease;
+}
+
+.focus-hero.is-running .pixel-status {
+  animation: pixel-heartbeat 1.8s steps(2, end) infinite;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--v2-accent) 26%, transparent);
+}
+
+.focus-hero.is-break.is-running .pixel-status {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--v2-break) 28%, transparent);
+}
+
+@keyframes pixel-heartbeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.22); opacity: 0.72; }
 }
 
 .focus-hero h1 {
@@ -659,19 +674,14 @@ function handleDoneTask(taskId: string) {
 
 .focus-task-item {
   padding: 8px 10px;
-  transition: background 140ms ease;
-}
-
-.focus-task-item + .focus-task-item {
-  border-top: 1px solid var(--v2-line);
-}
-
-.focus-task-item:hover {
-  background: var(--ui-well);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background 140ms ease, border-color 140ms ease;
 }
 
 .focus-task-item.is-running {
-  background: color-mix(in srgb, var(--active-color) 10%, transparent);
+  background: color-mix(in srgb, var(--active-color) 11%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--active-color) 34%, var(--v2-line));
 }
 
 .task-row {
@@ -681,16 +691,29 @@ function handleDoneTask(taskId: string) {
   min-height: 24px;
 }
 
-.running-square {
+.running-dot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 50%;
   background: var(--active-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-color) 18%, transparent);
   flex-shrink: 0;
+  animation: running-halo 2s ease-in-out infinite;
 }
 
-.running-square.paused {
+.running-dot.paused {
   opacity: 0.45;
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes running-halo {
+  0%, 100% {
+    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--active-color) 20%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4.5px color-mix(in srgb, var(--active-color) 10%, transparent);
+  }
 }
 
 .check-circle {

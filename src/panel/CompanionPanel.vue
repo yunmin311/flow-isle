@@ -677,7 +677,8 @@ button:focus-visible, summary:focus-visible {
 
 .picture-viewer::backdrop,
 .companion-chooser::backdrop {
-  background: rgba(30, 20, 12, 0.38);
+  border-radius: 22px;
+  background: color-mix(in srgb, #000 24%, transparent);
 }
 
 .picture-sheet {

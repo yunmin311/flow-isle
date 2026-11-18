@@ -110,12 +110,14 @@ function onBackdropClick(event: MouseEvent) {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  border-radius: 22px;
+  overflow: clip;
+  background: color-mix(in srgb, #000 24%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fade-in 0.2s ease-out;
+  animation: fade-in 0.16s ease-out;
 }
 
 @keyframes fade-in {
@@ -134,17 +136,17 @@ function onBackdropClick(event: MouseEvent) {
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  animation: scale-in 0.25s cubic-bezier(0.2, 0.8, 0.22, 1);
+  animation: dialog-rise 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes scale-in {
+@keyframes dialog-rise {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
