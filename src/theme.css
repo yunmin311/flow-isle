@@ -322,6 +322,27 @@
   --space-card: 16px;
   --space-heading: 12px;
   --space-control: 8px;
+
+  /* 玻璃外壳之下的像素风填充语义（无平滑高光渐变，统一 2px/3px 像素点阵与阶梯明暗） */
+  --pixel-dither: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-on-accent) 12%, transparent) 0% 25%,
+    transparent 0% 50%
+  ) 0 0 / 4px 4px;
+  --pixel-dither-coarse: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-on-accent) 15%, transparent) 0% 25%,
+    transparent 0% 50%
+  ) 0 0 / 6px 6px;
+  --pixel-bevel:
+    inset 0 2px 0 color-mix(in srgb, #fff 24%, transparent),
+    inset 2px 0 0 color-mix(in srgb, #fff 12%, transparent),
+    inset 0 -3px 0 color-mix(in srgb, #000 22%, transparent),
+    inset -2px 0 0 color-mix(in srgb, #000 14%, transparent);
+  --pixel-bevel-sm:
+    inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent),
+    inset 0 -2px 0 color-mix(in srgb, #000 22%, transparent);
+  --pixel-bevel-pressed:
+    inset 0 2px 0 color-mix(in srgb, #000 22%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, #fff 16%, transparent);
 }
 
 :root[data-color-mode="dark"],
@@ -331,4 +352,12 @@
   --panel-shell-edge:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 var(--v2-shadow);
+  --pixel-dither: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-on-accent) 10%, transparent) 0% 25%,
+    transparent 0% 50%
+  ) 0 0 / 4px 4px;
+  --pixel-dither-coarse: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-on-accent) 13%, transparent) 0% 25%,
+    transparent 0% 50%
+  ) 0 0 / 6px 6px;
 }

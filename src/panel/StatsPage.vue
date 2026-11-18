@@ -555,7 +555,9 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .tab.active {
-  background: var(--v2-accent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
 }
 
@@ -701,11 +703,21 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .heat-cell.intensity-1 {
-  background: color-mix(in srgb, var(--v2-accent) 16%, var(--ui-well));
+  background-color: var(--ui-well);
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-accent) 13%, transparent) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 6px 6px;
 }
 
 .heat-cell.intensity-2 {
-  background: color-mix(in srgb, var(--v2-accent) 30%, var(--ui-well));
+  background-color: color-mix(in srgb, var(--v2-accent) 16%, var(--ui-well));
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-accent) 17%, transparent) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 4px 4px;
 }
 
 .heat-cell.intensity-2 .day-number,
@@ -715,8 +727,9 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .heat-cell.intensity-3 {
-  background: var(--v2-accent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither-coarse);
+  box-shadow: var(--pixel-bevel-sm);
 }
 
 .day-number {
@@ -736,7 +749,7 @@ function steppedBarHeight(pomodoros: number): string {
   right: 3px;
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
   opacity: 0.78;
 }
@@ -1078,15 +1091,26 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .legend-box.intensity-1 {
-  background: color-mix(in srgb, var(--v2-accent) 20%, var(--ui-well));
+  background-color: var(--ui-well);
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-accent) 22%, transparent) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 4px 4px;
 }
 
 .legend-box.intensity-2 {
-  background: color-mix(in srgb, var(--v2-accent) 44%, var(--ui-well));
+  background-color: color-mix(in srgb, var(--v2-accent) 24%, var(--ui-well));
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--v2-accent) 32%, transparent) 0% 25%,
+    transparent 0% 50%
+  );
+  background-size: 4px 4px;
 }
 
 .legend-box.intensity-3 {
-  background: var(--v2-accent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
 }
 
 .charts-row {
@@ -1188,16 +1212,22 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .dist-bar-bg {
-  height: 5px;
+  height: 6px;
+  padding: 1px;
   background: var(--ui-well);
+  border: 1px solid var(--v2-line);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .dist-bar {
   height: 100%;
-  background: var(--v2-accent);
-  border-radius: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--v2-accent) 0 5px,
+    transparent 5px 8px
+  );
+  border-radius: 0;
   transition: width 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 

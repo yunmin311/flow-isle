@@ -14,7 +14,7 @@ const barHeight = computed(() => `${Math.max(2, 3 * props.scale)}px`)
 <template>
   <div class="dock-strip" :style="{ '--strip-color': color }">
     <div class="track" :style="{ height: barHeight }">
-      <div class="fill" :style="{ width: fillWidth, height: barHeight, background: color }" />
+      <div class="fill" :style="{ width: fillWidth, height: barHeight }" />
     </div>
   </div>
 </template>
@@ -31,18 +31,23 @@ const barHeight = computed(() => `${Math.max(2, 3 * props.scale)}px`)
 .track {
   width: 64%;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--strip-color) 20%, transparent);
+  background: color-mix(in srgb, var(--strip-color) 18%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   overflow: hidden;
   display: flex;
   align-items: stretch;
+  padding: 0 2px;
 }
 
 .fill {
   position: relative;
-  border-radius: 999px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--strip-color) 76%, #fff), var(--strip-color));
-  transition: width 0.56s cubic-bezier(0.22, 1, 0.36, 1), background 0.42s ease;
+  border-radius: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--strip-color) 0 4px,
+    transparent 4px 6px
+  );
+  transition: width 0.56s cubic-bezier(0.22, 1, 0.36, 1);
   min-width: 0;
 }
 </style>

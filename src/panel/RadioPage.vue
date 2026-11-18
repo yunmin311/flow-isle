@@ -169,17 +169,20 @@ async function scrollToPlaying() {
               :disabled="!currentStation"
               @click="!playing && triggerPixelBurstFromEvent($event, 'accent', 7); toggle()"
             >
-              <svg v-if="loading" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="7" cy="12" r="1.8" opacity="0.3" />
-                <circle cx="12" cy="12" r="1.8" opacity="0.6" />
-                <circle cx="17" cy="12" r="1.8" />
+              <svg v-if="loading" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                <rect x="1" y="4" width="1" height="1" opacity="0.35" />
+                <rect x="4" y="4" width="1" height="1" opacity="0.7" />
+                <rect x="7" y="4" width="1" height="1" />
               </svg>
-              <svg v-else-if="playing" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="7" y="5" width="3.5" height="14" rx="1" />
-                <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
+              <svg v-else-if="playing" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                <rect x="2" y="1" width="2" height="7" />
+                <rect x="5" y="1" width="2" height="7" />
               </svg>
-              <svg v-else viewBox="0 0 24 24" fill="currentColor">
-                <path d="M7.5 5.3v13.4a1 1 0 0 0 1.45.9l11.1-6.7a1 1 0 0 0 0-1.8L8.95 4.4a1 1 0 0 0-1.45.9Z" />
+              <svg v-else viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                <rect x="2" y="1" width="2" height="7" />
+                <rect x="4" y="2" width="2" height="5" />
+                <rect x="6" y="3" width="1" height="3" />
+                <rect x="7" y="4" width="1" height="1" />
               </svg>
             </button>
             <div class="volume-row">
@@ -670,9 +673,13 @@ async function scrollToPlaying() {
 .progress-fill {
   position: absolute;
   left: 0;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--focus-color);
+  height: 4px;
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--focus-color) 0 4px,
+    transparent 4px 6px
+  );
   pointer-events: none;
   transition: width 0.12s linear;
 }
@@ -683,11 +690,11 @@ async function scrollToPlaying() {
 
 .progress-thumb {
   position: absolute;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  box-shadow: var(--pixel-bevel-sm);
   transform: translateX(-50%);
   opacity: 0;
   pointer-events: none;
@@ -762,25 +769,15 @@ async function scrollToPlaying() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
-  border: 2px solid var(--v2-line);;
-  border-radius: 50%;
+  background: var(--ui-well);
+  border: 2px solid var(--v2-line);
+  border-radius: 14px;
   color: var(--v2-ink);
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.3s ease;
+  transition: background-color 220ms ease, border-color 220ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease;
   position: relative;
   overflow: hidden;
-}
-
-.play-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--focus-color) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
 }
 
 .play-btn:hover {
@@ -789,44 +786,24 @@ async function scrollToPlaying() {
 }
 
 .play-btn:active:not(:disabled) {
-  transform: scale(0.93);
-}
-
-.play-btn:hover::before {
-  opacity: 0.15;
+  transform: translate3d(0, 2px, 0);
 }
 
 .play-btn.is-playing {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--focus-color) 82%, #fff) 0%,
-    var(--focus-color) 100%
-  );
-  border-color: var(--focus-color);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither-coarse);
+  border-color: color-mix(in srgb, #000 20%, var(--focus-color));
   color: var(--v2-on-accent);
-  box-shadow: 0 0 20px color-mix(in srgb, var(--focus-color) 40%, transparent),
-              0 0 40px color-mix(in srgb, var(--focus-color) 20%, transparent);
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.play-btn.is-playing::before {
-  opacity: 0;
+  box-shadow: var(--pixel-bevel);
 }
 
 .play-btn.is-playing:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 25px color-mix(in srgb, var(--focus-color) 50%, transparent),
-              0 0 50px color-mix(in srgb, var(--focus-color) 25%, transparent);
+  filter: brightness(1.06);
 }
 
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px color-mix(in srgb, var(--focus-color) 40%, transparent),
-                0 0 40px color-mix(in srgb, var(--focus-color) 20%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 25px color-mix(in srgb, var(--focus-color) 50%, transparent),
-                0 0 50px color-mix(in srgb, var(--focus-color) 30%, transparent);
-  }
+.play-btn.is-playing:active:not(:disabled) {
+  transform: translate3d(0, 2px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
 }
 
 .play-btn:disabled {
@@ -891,21 +868,19 @@ async function scrollToPlaying() {
 
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.9) 100%);
-  border-radius: 50%;
+  width: 10px;
+  height: 12px;
+  background: var(--v2-accent);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  border-radius: 2px;
   cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.24),
-              0 0 0 1px color-mix(in srgb, var(--v2-ink) 10%, transparent),
-              0 0 0 3px rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease;
+  box-shadow: var(--pixel-bevel-sm);
+  transition: transform 0.16s ease, filter 0.16s ease;
 }
 
 .volume-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4),
-              0 0 0 3px color-mix(in srgb, var(--focus-color) 30%, transparent);
+  transform: scale(1.08);
+  filter: brightness(1.08);
 }
 
 .volume-slider::-webkit-slider-thumb:active {
@@ -1116,12 +1091,13 @@ async function scrollToPlaying() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--focus-color);
-  border: none;
-  border-radius: 50%;
-  color: var(--v2-ink);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--focus-color));
+  border-radius: 10px;
+  color: var(--v2-on-accent);
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: var(--pixel-bevel-sm);
   transition: all 0.2s ease;
   z-index: 20;
 }

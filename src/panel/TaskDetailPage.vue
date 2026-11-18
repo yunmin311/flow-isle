@@ -279,12 +279,12 @@ onBeforeUnmount(() => {
           <span class="timer-phase-label">{{ phase === 'focus' ? '专注' : '休息' }}</span>
           <span class="timer-time-label">{{ displayTime }}</span>
           <button class="timer-ctrl-btn" :class="{ 'is-paused': !running }" @click.stop="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
-            <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-            <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+            <svg v-if="running" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="5" y="1" width="2" height="7"/></svg>
+            <svg v-else width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
           </button>
         </div>
         <button v-else class="play-btn" @click.stop="handleStartTask($event)" title="开始专注">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+          <svg width="10" height="10" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
         </button>
       </div>
 
@@ -942,9 +942,9 @@ onBeforeUnmount(() => {
 
 .pomo-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
   background: var(--focus-color);
   flex-shrink: 0;
 }

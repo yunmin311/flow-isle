@@ -86,13 +86,17 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
           :height="pixelUnit"
         />
       </svg>
-      <span
+      <svg
         v-if="!running && remaining > 0"
-        class="text-[var(--capsule-muted)]"
-        :style="{ fontSize: `calc(10px * var(--island-scale, 1))` }"
+        class="capsule-pause-icon"
+        viewBox="0 0 7 9"
+        fill="currentColor"
+        shape-rendering="crispEdges"
+        aria-label="已暂停"
       >
-        ⏸
-      </span>
+        <rect x="0" y="0" width="2" height="9" />
+        <rect x="5" y="0" width="2" height="9" />
+      </svg>
       <div v-if="radioPlaying" class="wave-bars">
         <span class="wave-bar" />
         <span class="wave-bar" />
@@ -153,6 +157,14 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 .capsule-pixel-time rect {
   fill: var(--pixel-color);
   transition: fill 420ms ease;
+}
+
+.capsule-pause-icon {
+  width: calc(7px * var(--island-scale, 1));
+  height: calc(9px * var(--island-scale, 1));
+  color: var(--capsule-muted);
+  flex-shrink: 0;
+  image-rendering: pixelated;
 }
 
 .wave-bars {

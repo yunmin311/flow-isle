@@ -342,6 +342,7 @@ onDeactivated(() => { selectedEmail.value = null })
           min="0"
           max="100"
           :value="sysVolume"
+          :style="{ '--volume': `${sysMuted ? 0 : sysVolume}%` }"
           @input="onVolumeInput"
         />
         <span class="volume-value">{{ sysMuted ? '静音' : sysVolume }}</span>
@@ -523,8 +524,10 @@ onDeactivated(() => { selectedEmail.value = null })
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 5px;
-  background: var(--v2-accent);
+  border-radius: 4px;
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
   font-size: 10.5px;
   font-weight: 700;
@@ -699,7 +702,29 @@ onDeactivated(() => { selectedEmail.value = null })
 
 .volume-slider {
   flex: 1;
-  accent-color: var(--focus-color);
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--v2-accent) 45%, transparent) 0 var(--volume, 0%),
+    var(--ui-hover) var(--volume, 0%) 100%
+  );
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--v2-accent);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  cursor: pointer;
 }
 
 .volume-value {

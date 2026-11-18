@@ -196,8 +196,10 @@ const extendColor = computed(() => isFocusDone.value ? 'var(--focus-color)' : 'v
 }
 
 .notif-btn.primary {
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  background-color: var(--accent);
+  background-image: var(--pixel-dither);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--accent));
+  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
 }
 

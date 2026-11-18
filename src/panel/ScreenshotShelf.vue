@@ -165,14 +165,15 @@ async function clearAll() {
   left: 2px;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: 2px;
   background: var(--v2-on-accent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--pixel-bevel-sm);
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .capture-switch:checked {
-  background: var(--v2-accent);
-  border-color: transparent;
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 16%, var(--v2-accent));
 }
 .capture-switch:checked::after {
   transform: translate3d(12px, 0, 0);

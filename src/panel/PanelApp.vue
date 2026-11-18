@@ -846,9 +846,9 @@ async function closeWindow() {
   position: absolute;
   bottom: 2px;
   left: 50%;
-  width: 10px;
-  height: 2px;
-  border-radius: 1px;
+  width: 12px;
+  height: 3px;
+  border-radius: 0;
   background: var(--v2-accent);
   transform: translateX(-50%);
   animation: nav-pip-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;

@@ -872,14 +872,14 @@ onBeforeUnmount(() => {
               <span class="timer-time">{{ displayTime }}</span>
               <div class="timer-controls">
                 <button class="timer-btn" :class="{ 'is-paused': !running }" @click.stop="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
-                  <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                  <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+                  <svg v-if="running" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="5" y="1" width="2" height="7"/></svg>
+                  <svg v-else width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
                 </button>
                 <button class="timer-btn done-btn" @click.stop="handleDoneTimer($event)" title="完成">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
                 </button>
                 <button class="timer-btn stop-btn" @click.stop="abandon()" title="停止">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="2" width="5" height="5"/></svg>
                 </button>
               </div>
             </div>
@@ -891,7 +891,7 @@ onBeforeUnmount(() => {
               @click.stop="handleStartTask(task)"
               title="开始专注"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+              <svg width="10" height="10" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
             </button>
 
             <!-- Subtask toggle button (next to play button) -->
@@ -948,7 +948,7 @@ onBeforeUnmount(() => {
                 @click.stop="handleStartSubtask(task, sub.id)"
                 title="开始子任务"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
               </button>
             </div>
           </div>
@@ -1329,8 +1329,11 @@ onBeforeUnmount(() => {
 }
 
 .tab-item.active {
-  background: color-mix(in srgb, var(--focus-color) 15%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 30%, transparent);
+  background-color: color-mix(in srgb, var(--focus-color) 14%, transparent);
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--focus-color) 11%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 4px 4px;
+  border-color: color-mix(in srgb, var(--focus-color) 32%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--focus-color) 48%, transparent);
   color: var(--focus-color);
 }
 
@@ -1353,11 +1356,11 @@ onBeforeUnmount(() => {
 .overdue-divider::after {
   content: '';
   flex: 1;
-  height: 1px;
-  background: linear-gradient(
-    to var(--dir, right),
-    color-mix(in srgb, var(--focus-color) 35%, transparent),
-    transparent
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--focus-color) 36%, transparent) 0 4px,
+    transparent 4px 8px
   );
 }
 
@@ -1545,7 +1548,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: 1px;
   background: var(--focus-color);
   flex-shrink: 0;
 }

@@ -277,17 +277,37 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 
       <div class="hero-actions">
         <template v-if="pendingNotification === 'focus-done'">
-          <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'break', 8); confirmNotification()">开始休息</button>
+          <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'break', 8); confirmNotification()">
+            <svg class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="3" y="1" width="1" height="1" /><rect x="5" y="1" width="1" height="1" />
+              <rect x="2" y="3" width="5" height="4" /><rect x="7" y="4" width="1" height="2" />
+              <rect x="1" y="7" width="6" height="1" />
+            </svg>
+            <span>开始休息</span>
+          </button>
           <button class="quiet-action" @click="extendNotification()">+5m</button>
           <button class="quiet-action" @click="dismissNotification()">结束</button>
         </template>
         <template v-else-if="pendingNotification === 'break-done'">
-          <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'accent', 8); confirmNotification()">继续专注</button>
+          <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'accent', 8); confirmNotification()">
+            <svg class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
+              <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+            </svg>
+            <span>继续专注</span>
+          </button>
           <button class="quiet-action" @click="dismissNotification()">结束</button>
         </template>
         <template v-else>
           <button class="primary-action" @click="handleHeroAction($event)">
-            {{ activeTaskId ? (running ? '暂停' : '继续') : '开始专注' }}
+            <svg v-if="activeTaskId && running" class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="2" y="1" width="2" height="7" /><rect x="5" y="1" width="2" height="7" />
+            </svg>
+            <svg v-else class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
+              <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+            </svg>
+            <span>{{ activeTaskId ? (running ? '暂停' : '继续') : '开始专注' }}</span>
           </button>
           <button v-if="activeTaskId && phase === 'break'" class="quiet-action" @click="skipBreak()">跳过</button>
           <button v-if="activeTaskId" class="quiet-action" @click="abandon()">停止</button>
@@ -369,16 +389,38 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
             <template v-if="activeTaskId === task.id">
               <span class="task-timer">{{ displayTime }}</span>
               <button class="queue-btn icon-only" @click="handleStartTask(task, $event)" :title="running ? '暂停' : '继续'" :aria-label="running ? '暂停' : '继续'">
-                {{ running ? '❚❚' : '▶' }}
+                <svg v-if="running" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                  <rect x="2" y="1" width="2" height="7" /><rect x="5" y="1" width="2" height="7" />
+                </svg>
+                <svg v-else width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                  <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
+                  <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+                </svg>
               </button>
-              <button class="queue-btn icon-only done" @click="handleDoneTask(task.id, $event)" title="完成" aria-label="完成">✓</button>
-              <button class="queue-btn icon-only subtle" @click="abandon()" title="停止" aria-label="停止">■</button>
+              <button class="queue-btn icon-only done" @click="handleDoneTask(task.id, $event)" title="完成" aria-label="完成">
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                  <rect x="1" y="4" width="1" height="2" /><rect x="2" y="5" width="1" height="2" />
+                  <rect x="3" y="6" width="1" height="2" /><rect x="4" y="5" width="1" height="2" />
+                  <rect x="5" y="4" width="1" height="2" /><rect x="6" y="3" width="1" height="2" />
+                  <rect x="7" y="2" width="1" height="2" />
+                </svg>
+              </button>
+              <button class="queue-btn icon-only subtle" @click="abandon()" title="停止" aria-label="停止">
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                  <rect x="2" y="2" width="5" height="5" />
+                </svg>
+              </button>
             </template>
             <template v-else>
               <span v-if="task.pomodoroCount > 0" class="pomo-count">
                 <span class="pomo-dot" aria-hidden="true"></span>{{ task.pomodoroCount }}
               </span>
-              <button class="start-btn" @click="handleStartTask(task, $event)" title="开始">▶</button>
+              <button class="start-btn" @click="handleStartTask(task, $event)" title="开始" aria-label="开始">
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                  <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
+                  <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+                </svg>
+              </button>
             </template>
           </div>
         </div>
@@ -408,7 +450,11 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
           :title="`无需任务，直接开始 ${settings.focusDuration} 分钟专注`"
           @click="startQuick"
         >
-          ▶ {{ settings.focusDuration }}′
+          <svg class="px-btn-icon" width="8" height="8" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+            <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
+            <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+          </svg>
+          <span>{{ settings.focusDuration }}′</span>
         </button>
       </div>
     </div>
@@ -459,9 +505,12 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .focus-hero.is-break .pixel-status,
-.focus-hero.is-break .pixel-progress i.filled,
+.focus-hero.is-break .pixel-progress i.filled {
+  background-color: var(--v2-break);
+}
+
 .focus-hero.is-break .primary-action {
-  background: var(--v2-break);
+  --btn-fill: var(--v2-break);
 }
 
 .focus-hero.is-break .hero-clock {
@@ -547,10 +596,13 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 
 .pixel-progress i.filled {
   background: var(--v2-accent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
 }
 
 .focus-hero.is-running .pixel-progress i.filled {
-  box-shadow: 0 0 4px color-mix(in srgb, var(--v2-accent) 35%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 36%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, #000 22%, transparent);
 }
 
 .hero-meta {
@@ -582,19 +634,35 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .hero-actions .primary-action {
+  --btn-fill: var(--v2-accent);
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: linear-gradient(180deg, color-mix(in srgb, #fff 14%, var(--v2-accent)), var(--v2-accent));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  gap: 8px;
+  border-radius: 7px;
+  border-color: color-mix(in srgb, #000 20%, var(--btn-fill));
+  background-color: var(--btn-fill);
+  background-image: var(--pixel-dither-coarse);
+  box-shadow: var(--pixel-bevel);
   color: var(--v2-on-accent);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .hero-actions .primary-action:hover {
-  filter: brightness(1.06);
+  filter: brightness(1.05);
+}
+
+.hero-actions .primary-action:active:not(:disabled) {
+  transform: translate3d(0, 2px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
+}
+
+.px-btn-icon {
+  display: block;
+  flex-shrink: 0;
+  image-rendering: pixelated;
 }
 
 .hero-actions .quiet-action {
@@ -710,13 +778,12 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .running-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
   background: var(--active-color);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-color) 18%, transparent);
   flex-shrink: 0;
-  animation: running-halo 2s ease-in-out infinite;
+  animation: pixel-heartbeat 1.8s steps(2, end) infinite;
 }
 
 .running-dot.paused {
@@ -725,19 +792,10 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   animation: none;
 }
 
-@keyframes running-halo {
-  0%, 100% {
-    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--active-color) 20%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 4.5px color-mix(in srgb, var(--active-color) 10%, transparent);
-  }
-}
-
 .check-circle {
   width: 15px;
   height: 15px;
-  border-radius: 50%;
+  border-radius: 5px;
   border: 1.5px solid var(--v2-muted);
   background: transparent;
   cursor: pointer;
@@ -847,7 +905,9 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .start-btn:hover {
-  background: var(--v2-accent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
 }
 
@@ -925,6 +985,10 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .quick-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   flex-shrink: 0;
   height: 36px;
   padding: 0 11px;
@@ -937,11 +1001,13 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   font-variant-numeric: tabular-nums;
   font-family: inherit;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease, box-shadow 140ms ease;
 }
 
 .quick-add-btn:hover:not(:disabled) {
-  background: var(--v2-accent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
 }
 

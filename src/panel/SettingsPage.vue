@@ -823,8 +823,10 @@ onUnmounted(() => {
 }
 
 .mode-btn.active {
-  background: var(--focus-color);
-  color: var(--v2-ink);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 /* 更新 */
@@ -892,31 +894,32 @@ onUnmounted(() => {
   height: 24px;
   border-radius: 999px;
   background: var(--ui-hover);
-  border: 1px solid var(--v2-line);;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  border: 1px solid var(--v2-line);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .switch-track::after {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  transition: transform 0.2s ease, background 0.2s ease;
+  top: 4px;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: var(--pixel-bevel-sm);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
 }
 
 .switch input:checked + .switch-track {
-  background: color-mix(in srgb, var(--focus-color) 72%, rgba(255, 255, 255, 0.12));
-  border-color: color-mix(in srgb, var(--focus-color) 88%, transparent);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--focus-color));
 }
 
 .switch input:checked + .switch-track::after {
   transform: translateX(18px);
-  background: #fff;
+  background: var(--v2-on-accent);
 }
 
 .switch input:focus-visible + .switch-track {
@@ -1120,9 +1123,11 @@ onUnmounted(() => {
 }
 
 .email-provider-option.active {
-  background: var(--focus-color);
-  border-color: var(--focus-color);
-  color: var(--v2-ink);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--focus-color));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .email-actions {
@@ -1190,9 +1195,11 @@ onUnmounted(() => {
 }
 
 .update-btn.primary {
-  background: var(--focus-color);
-  border-color: var(--focus-color);
-  color: var(--v2-ink);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--focus-color));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .update-btn.danger {
@@ -1308,12 +1315,13 @@ onUnmounted(() => {
 
 .opacity-slider::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;
+  width: 10px;
   height: 12px;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: 2px;
+  background: var(--v2-accent);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--pixel-bevel-sm);
 }
 
 .opacity-value {

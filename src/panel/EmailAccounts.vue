@@ -145,9 +145,9 @@ summary { cursor: pointer; }
 .account-status.error { color: var(--alert-color); }
 .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
 .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; }
-.switch-track { display: block; width: 100%; height: 100%; border-radius: 12px; background: var(--ui-hover); border: 1px solid var(--v2-line); box-sizing: border-box; }
-.switch-track::after { content: ''; position: absolute; width: 16px; height: 16px; top: 3px; left: 3px; border-radius: 50%; background: var(--v2-muted); transition: transform .16s; }
-.switch input:checked + .switch-track { background: var(--v2-accent); }
-.switch input:checked + .switch-track::after { transform: translateX(16px); background: #fff; }
+.switch-track { display: block; width: 100%; height: 100%; border-radius: 12px; background: var(--ui-hover); border: 1px solid var(--v2-line); box-sizing: border-box; transition: background-color 200ms ease, border-color 200ms ease; }
+.switch-track::after { content: ''; position: absolute; width: 14px; height: 14px; top: 4px; left: 4px; border-radius: 3px; background: var(--v2-muted); box-shadow: var(--pixel-bevel-sm); transition: transform .18s cubic-bezier(0.22, 1, 0.36, 1), background .18s ease; }
+.switch input:checked + .switch-track { background-color: var(--v2-accent); background-image: var(--pixel-dither); border-color: color-mix(in srgb, #000 16%, var(--v2-accent)); }
+.switch input:checked + .switch-track::after { transform: translateX(16px); background: var(--v2-on-accent); }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--v2-accent); outline-offset: 3px; }
 </style>

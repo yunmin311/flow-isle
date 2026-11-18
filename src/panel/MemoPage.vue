@@ -202,9 +202,9 @@ function handleCloseCategoryDialog() {
           </button>
           <!-- 新建 -->
           <button class="header-new-btn" @click="handleNewMemo" title="新建备忘录">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
+            <svg width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="4" y="1" width="1" height="7" />
+              <rect x="1" y="4" width="7" height="1" />
             </svg>
             <span>新建</span>
           </button>
@@ -231,16 +231,41 @@ function handleCloseCategoryDialog() {
                 :aria-label="memo.isPinned ? '取消收藏置顶' : '收藏并置顶'"
               >
                 <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  :fill="memo.isPinned ? 'currentColor' : 'none'"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+                  v-if="memo.isPinned"
+                  class="px-pin-star"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 11 11"
+                  fill="currentColor"
+                  shape-rendering="crispEdges"
+                  aria-hidden="true"
                 >
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  <rect x="5" y="1" width="1" height="1" />
+                  <rect x="4" y="2" width="3" height="2" />
+                  <rect x="1" y="4" width="9" height="1" />
+                  <rect x="2" y="5" width="7" height="1" />
+                  <rect x="3" y="6" width="5" height="2" />
+                  <rect x="2" y="8" width="3" height="1" /><rect x="6" y="8" width="3" height="1" />
+                  <rect x="2" y="9" width="1" height="1" /><rect x="8" y="9" width="1" height="1" />
+                </svg>
+                <svg
+                  v-else
+                  class="px-pin-star"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 11 11"
+                  fill="currentColor"
+                  shape-rendering="crispEdges"
+                  aria-hidden="true"
+                >
+                  <rect x="5" y="1" width="1" height="1" />
+                  <rect x="4" y="2" width="1" height="2" /><rect x="6" y="2" width="1" height="2" />
+                  <rect x="1" y="4" width="3" height="1" /><rect x="7" y="4" width="3" height="1" />
+                  <rect x="1" y="5" width="1" height="1" /><rect x="9" y="5" width="1" height="1" />
+                  <rect x="2" y="6" width="1" height="1" /><rect x="8" y="6" width="1" height="1" />
+                  <rect x="2" y="7" width="1" height="3" /><rect x="8" y="7" width="1" height="3" />
+                  <rect x="4" y="7" width="3" height="1" />
+                  <rect x="3" y="8" width="1" height="1" /><rect x="7" y="8" width="1" height="1" />
                 </svg>
               </button>
               <button
@@ -272,9 +297,9 @@ function handleCloseCategoryDialog() {
           <div v-else class="empty-icon"></div>
           <div class="empty-text">{{ searchQuery ? '没有匹配的备忘录' : '还没有备忘录' }}</div>
           <button v-if="!searchQuery" class="empty-action-btn" @click="handleNewMemo">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
+            <svg width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="4" y="1" width="1" height="7" />
+              <rect x="1" y="4" width="7" height="1" />
             </svg>
             新建一条
           </button>
@@ -558,13 +583,32 @@ function handleCloseCategoryDialog() {
 }
 
 .memo-pinned-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   font-weight: 600;
   color: var(--v2-accent);
-  background: var(--v2-accent-soft);
+  background-color: var(--v2-accent-soft);
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 11%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 4px 4px;
   padding: 2px 6px;
   border-radius: 4px;
   line-height: 1.3;
+}
+
+.memo-pinned-tag::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background: var(--v2-accent);
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.px-pin-star {
+  display: block;
+  image-rendering: pixelated;
 }
 
 .memo-item-time {
