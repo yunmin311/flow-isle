@@ -647,9 +647,8 @@ onBeforeUnmount(() => {
   gap: 5px;
   padding: 3px 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--focus-color) 10%, rgba(26, 26, 32, 0.78));
-  backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid color-mix(in srgb, var(--focus-color) 25%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-popover));
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
   flex-shrink: 0;
 }
 
@@ -795,11 +794,9 @@ onBeforeUnmount(() => {
   min-width: 130px;
   padding: 4px;
   border-radius: 10px;
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
+  box-shadow: 0 12px 28px var(--v2-shadow);
   margin-top: 4px;
 }
 

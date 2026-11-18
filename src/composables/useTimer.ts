@@ -147,6 +147,13 @@ export function useTimer() {
     resume()
   }
 
+  function clearActiveContext() {
+    activeTaskId.value = null
+    activeTaskTitle.value = null
+    activeSubtaskId.value = null
+    activeSubtaskTitle.value = null
+  }
+
   function skipBreak() {
     pause()
     phase.value = 'focus'
@@ -155,8 +162,7 @@ export function useTimer() {
     const focusSecs = settings.value.focusDuration * 60
     remaining.value = focusSecs
     totalDuration.value = focusSecs
-    activeTaskId.value = null
-    activeTaskTitle.value = null
+    clearActiveContext()
   }
 
   /** User chose "休息" (after focus) or "继续" (after break) */
@@ -224,8 +230,7 @@ export function useTimer() {
     const focusSecs = settings.value.focusDuration * 60
     remaining.value = focusSecs
     totalDuration.value = focusSecs
-    activeTaskId.value = null
-    activeTaskTitle.value = null
+    clearActiveContext()
     running.value = false
   }
 
@@ -237,8 +242,7 @@ export function useTimer() {
     const focusSecs = settings.value.focusDuration * 60
     remaining.value = focusSecs
     totalDuration.value = focusSecs
-    activeTaskId.value = null
-    activeTaskTitle.value = null
+    clearActiveContext()
     running.value = false
   }
 

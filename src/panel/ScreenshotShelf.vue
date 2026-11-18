@@ -81,8 +81,8 @@ async function clearAll() {
 .capture-scope { font-size: 11px; color: var(--v2-secondary); }
 .clear-confirmation { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px; margin-bottom: 8px; border-radius: 6px; background: var(--ui-well); }
 .screenshot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.screenshot-card { min-width: 0; padding: 7px; border-radius: 8px; background: var(--ui-well); box-shadow: 0 2px 5px #00000008; }
-.screenshot-preview { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 4px; padding: 4px; background: #88888812; cursor: copy; }
+.screenshot-card { min-width: 0; padding: 7px; border-radius: 8px; background: var(--v2-surface); border: 1px solid var(--v2-line); }
+.screenshot-preview { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 4px; padding: 4px; background: var(--ui-well); cursor: copy; }
 .screenshot-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .screenshot-meta { margin: 6px 0; font-size: 11px; color: var(--v2-secondary); flex-wrap: wrap; gap: 2px; }
 .screenshot-actions button, .screenshot-more, .clear-screenshots, .clear-confirmation button { border: 0; background: transparent; color: var(--v2-secondary); font: inherit; cursor: pointer; padding: 3px 0; }

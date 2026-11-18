@@ -215,6 +215,7 @@ pub(crate) struct MailboxCursor {
     uid_validity: Option<u32>,
     seen: HashSet<u32>,
     max_uid: u32,
+    baseline_done: bool,
 }
 
 impl MailboxCursor {
@@ -225,6 +226,7 @@ impl MailboxCursor {
         if self.uid_validity != Some(uid_validity) {
             self.uid_validity = Some(uid_validity);
             self.seen.clear();
+            self.baseline_done = false;
             // Limit initial history to the latest 50 messages.
             self.max_uid = if uids.len() > 50 { uids[uids.len() - 51] } else { 0 };
         }
@@ -234,6 +236,16 @@ impl MailboxCursor {
 
     pub(crate) fn mark_seen(&mut self, uid: u32) {
         self.seen.insert(uid);
+    }
+
+    pub(crate) fn is_baseline_done(&self, uid_validity: u32) -> bool {
+        self.baseline_done && self.uid_validity == Some(uid_validity)
+    }
+
+    pub(crate) fn mark_baseline_done(&mut self, uid_validity: u32) {
+        if self.uid_validity == Some(uid_validity) {
+            self.baseline_done = true;
+        }
     }
 }
 
@@ -333,6 +345,12 @@ impl<S: Read + Write> Imap<S> {
 
     pub(crate) fn recent(&mut self) -> Result<Vec<u32>, Error> {
         self.search(&format!("UID SEARCH SINCE {}", recent_since()))
+    }
+
+    // Refresh mailbox state on polling servers (e.g. Coremail 163/126) that do
+    // not surface new EXISTS updates during a bare UID SEARCH in selected state.
+    pub(crate) fn noop(&mut self) -> Result<(), Error> {
+        self.command("NOOP").map(|_| ())
     }
 
     fn search(&mut self, query: &str) -> Result<Vec<u32>, Error> {
@@ -1366,13 +1384,26 @@ mod tests {
         let mut cursor = MailboxCursor::default();
         let validity = client.open_inbox("163", "fixture", "fake").unwrap();
         assert!(!client.supports_idle().unwrap());
+        assert!(!cursor.is_baseline_done(validity));
         for uid in cursor.pending(validity, client.unread().unwrap()) { cursor.mark_seen(uid); }
+        cursor.mark_baseline_done(validity);
+        assert!(cursor.is_baseline_done(validity));
         let pending = cursor.pending(validity, client.unread().unwrap());
         assert_eq!(client.fetch(&pending).unwrap()[0].subject, "poll fixture");
         assert_eq!(cursor.pending(validity + 1, vec![1]), [1]);
+        assert!(!cursor.is_baseline_done(validity + 1));
         let mut client =
             replay(b"* OK ready\r\nA1 BAD unsupported\r\n* SEARCH 1\r\nA2 OK done\r\n");
         assert!(!client.idle().unwrap());
         assert_eq!(client.unread().unwrap(), [1]);
+    }
+
+    #[test]
+    fn poll_noop_refreshes_mailbox_updates_before_search() {
+        let mut client = replay(b"* OK ready\r\n* 4 EXISTS\r\n* 1 RECENT\r\nA1 OK NOOP completed\r\n* SEARCH 101 102\r\nA2 OK SEARCH completed\r\n");
+        client.noop().unwrap();
+        assert_eq!(client.unread().unwrap(), [101, 102]);
+        let written = String::from_utf8(client.stream.into_inner().written).unwrap();
+        assert_eq!(written, "A1 NOOP\r\nA2 UID SEARCH UNSEEN\r\n");
     }
 }

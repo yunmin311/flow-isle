@@ -378,13 +378,10 @@ onBeforeUnmount(() => {
   top: calc(100% + 4px);
   min-width: 160px;
   max-width: 200px;
-  background: linear-gradient(180deg, rgba(32, 32, 38, 0.90), rgba(25, 25, 30, 0.88));
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
   border-radius: 8px;
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.5),
-    0 8px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 28px var(--v2-shadow);
   z-index: 1000;
   overflow: hidden;
 }

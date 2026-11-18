@@ -2,7 +2,6 @@ import { ref, watch, computed } from 'vue'
 import { readTextFile, writeTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { emitTo, listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useSettings } from './useSettings'
 import { useDailyStats } from './useDailyStats'
 
 // --- Date helpers ---
@@ -518,10 +517,11 @@ export function useTasks() {
   }
 
   const todayStats = computed(() => {
-    const { settings } = useSettings()
-    const totalPomodoros = tasks.value.reduce((sum, t) => sum + t.pomodoroCount, 0)
-    const focusMinutes = totalPomodoros * settings.value.focusDuration
-    return { totalPomodoros, focusMinutes, completedToday: todayStat.value.tasksCompleted }
+    return {
+      totalPomodoros: todayStat.value.pomodoros,
+      focusMinutes: todayStat.value.focusMinutes,
+      completedToday: todayStat.value.tasksCompleted,
+    }
   })
 
   return {

@@ -820,10 +820,11 @@ mod mouse_hook {
                 *slot = Some((info.pt.x, info.pt.y, Instant::now()));
             }
 
-            // 岛本身是点击穿透舞台：点击落在岛矩形内时吞掉这次左键，
+            // 岛本身是点击穿透舞台：仅当岛可见且开启捕获、点击落在岛矩形内时才吞掉左键，
             // 避免面板打开的同时触发后面应用的按钮。
             let capture = super::ISLAND_CLICK_CAPTURE
-                .load(std::sync::atomic::Ordering::Relaxed);
+                .load(std::sync::atomic::Ordering::Relaxed)
+                && !super::island_user_hidden();
             if capture {
                 if let Some(layout) = super::island_layout() {
                     if info.pt.x >= layout.x
@@ -1924,13 +1925,21 @@ fn run_email_imap_session<R: Runtime>(
     let mailbox_key = email_mailbox_key(config, host, uid_validity);
     email_diagnostic(app, &config.provider, if supports_idle { "listening IDLE" } else { "listening poll" });
 
-    let mut history_uids: Option<std::collections::HashSet<u32>> = None;
+    let mut polled_once = false;
     loop {
         if !current() {
             return Ok(());
         }
+        if !supports_idle && polled_once {
+            session.noop()?;
+        }
+        let initial_sync = !cursor.is_baseline_done(uid_validity);
         let pending = cursor.pending(uid_validity, session.recent()?);
-        let history = history_uids.get_or_insert_with(|| pending.iter().copied().collect());
+        let history: std::collections::HashSet<u32> = if initial_sync {
+            pending.iter().copied().collect()
+        } else {
+            std::collections::HashSet::new()
+        };
         for chunk in pending.chunks(50) {
             for mail in session.fetch(chunk)? {
                 if !current() {
@@ -1954,6 +1963,8 @@ fn run_email_imap_session<R: Runtime>(
                 }
             }
         }
+        cursor.mark_baseline_done(uid_validity);
+        polled_once = true;
         if supports_idle {
             supports_idle = session.watch_idle()?;
             if !supports_idle {
@@ -1961,7 +1972,12 @@ fn run_email_imap_session<R: Runtime>(
             }
         }
         if !supports_idle {
-            std::thread::sleep(Duration::from_secs(5));
+            for _ in 0..8 {
+                if !current() {
+                    return Ok(());
+                }
+                std::thread::sleep(Duration::from_secs(1));
+            }
         }
     }
 }
@@ -2031,7 +2047,7 @@ fn test_email_connection_blocking(
     let mut session = email_imap::connect_imap(&host).map_err(error_message)?;
     session.open_inbox(provider, email, &password).map_err(error_message)?;
     let unseen = session.unread().map_err(error_message)?.len();
-    let mode = if session.supports_idle().map_err(error_message)? { "支持 IDLE" } else { "5 秒轮询" };
+    let mode = if session.supports_idle().map_err(error_message)? { "支持 IDLE" } else { "8 秒轮询" };
     Ok(format!("连接成功：收件箱可用，未读 {unseen} 封（{mode}）"))
 }
 
@@ -2567,11 +2583,8 @@ pub fn run() {
                     }
                     "toggle_island" => {
                         if let Some(main) = app.get_webview_window("main") {
-                            if main.is_visible().unwrap_or(true) {
-                                let _ = main.hide();
-                            } else {
-                                let _ = main.show();
-                            }
+                            let visible = main.is_visible().unwrap_or(true);
+                            set_island_visible(app.clone(), !visible);
                         }
                     }
                     "quit" => {

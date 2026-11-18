@@ -235,16 +235,17 @@ function applyThemeToDOM() {
   const shell = hexToRgb(computed.getPropertyValue('--v2-shell'))
   const panelOpacity = Math.min(1, Math.max(0.4, settings.value.panelOpacity))
   const opacityProgress = (panelOpacity - 0.4) / 0.6
-  const islandAlpha = Math.min(1, Math.max(0.4, settings.value.islandOpacity))
+  const islandProgress = (Math.min(1, Math.max(0.4, settings.value.islandOpacity)) - 0.4) / 0.6
+  const islandAlpha = 0.78 + 0.22 * islandProgress
   const glass = settings.value.panelGlass
   const dark = resolvedColorMode === 'dark'
 
-  // 三种材质从不同透光量起步，滑条到顶时外壳统一完全不透明。
+  // WebView2 无系统级背景模糊；在真实文字/网页桌面之上必须保持足够托底不透明度，避免背景文字透出干扰阅读。
   const panelAlpha = glass === 'bright'
-    ? 0.40 + 0.60 * opacityProgress ** 1.25
+    ? 0.80 + 0.20 * Math.pow(opacityProgress, 0.72)
     : glass === 'frost'
-      ? 0.47 + 0.53 * opacityProgress ** 1.1
-      : 0.55 + 0.45 * opacityProgress ** 0.95
+      ? 0.82 + 0.18 * Math.pow(opacityProgress, 0.78)
+      : 0.86 + 0.14 * Math.pow(opacityProgress, 0.82)
 
   // 取主题光晕的色值，外壳的透明度独立由滑条控制。
   const glow = hexToRgb(computed.getPropertyValue('--v2-glow'))

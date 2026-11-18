@@ -448,13 +448,13 @@ function handleCloseCategoryDialog() {
 }
 
 .memo-item.is-pinned {
-  background: color-mix(in srgb, var(--focus-color) 8%, rgba(255, 255, 255, 0.04));
-  border-color: color-mix(in srgb, var(--focus-color) 25%, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--focus-color) 8%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--focus-color) 28%, var(--v2-line));
 }
 
 .memo-item.is-pinned:hover {
-  background: color-mix(in srgb, var(--focus-color) 12%, rgba(255, 255, 255, 0.08));
-  border-color: color-mix(in srgb, var(--focus-color) 35%, rgba(255, 255, 255, 0.15));
+  background: color-mix(in srgb, var(--focus-color) 12%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--focus-color) 40%, var(--v2-line));
 }
 
 .memo-item-header {
@@ -604,14 +604,13 @@ function handleCloseCategoryDialog() {
 }
 
 .delete-dialog {
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
   border-radius: 12px;
   padding: 20px 24px;
   min-width: 280px;
   max-width: 320px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 40px var(--v2-shadow);
 }
 
 .delete-dialog-title {

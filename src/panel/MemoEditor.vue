@@ -1026,11 +1026,10 @@ function formatUpdateTime(timestamp: number): string {
   display: flex;
   gap: 4px;
   padding: 6px;
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px var(--v2-shadow);
   z-index: 100;
 }
 
@@ -1266,14 +1265,13 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .delete-dialog {
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
   border-radius: 12px;
   padding: 20px 24px;
   min-width: 280px;
   max-width: 320px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 40px var(--v2-shadow);
 }
 
 .delete-dialog-title {
@@ -1335,13 +1333,11 @@ function formatUpdateTime(timestamp: number): string {
   z-index: 2000;
   min-width: 180px;
   max-width: 240px;
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
   border-radius: 10px;
   padding: 6px 0;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 28px var(--v2-shadow);
   font-size: 13px;
   user-select: none;
   animation: contextMenuIn 0.12s ease-out;

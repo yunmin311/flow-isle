@@ -578,23 +578,17 @@ async function scrollToPlaying() {
 
 .radio-content {
   position: relative;
-  background: linear-gradient(145deg,
-    rgba(28, 28, 32, 0.95) 0%,
-    rgba(20, 20, 24, 0.98) 100%
-  );
+  background: var(--v2-surface);
   border-radius: 14px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  backdrop-filter: blur(10px);
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--v2-line);;
-  transition: all 0.3s ease;
+    inset 0 1px 0 var(--v2-specular),
+    0 8px 20px var(--v2-shadow);
+  border: 1px solid var(--v2-line);
+  transition: all 0.2s ease;
 }
 
 .now-playing:hover .radio-content {

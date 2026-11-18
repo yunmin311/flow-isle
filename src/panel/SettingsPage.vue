@@ -1455,8 +1455,8 @@ onUnmounted(() => {
 /* 主题 */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .theme-card {
@@ -1467,7 +1467,7 @@ onUnmounted(() => {
   gap: 4px;
   padding: 6px 3px;
   border-radius: 8px;
-  border: 1px solid var(--v2-line);;
+  border: 1px solid var(--v2-line);
   background: var(--ui-well);
   cursor: pointer;
   transition: all 0.2s;

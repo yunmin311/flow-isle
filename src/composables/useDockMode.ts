@@ -59,13 +59,21 @@ export function useDockMode() {
       try {
         const input = await invoke<{ over: boolean; clicked: boolean; over_peek: boolean }>('poll_island_input', { pad: 2 })
         peekHover.value = input.over_peek
-        if (forceExpanded.value) {
+        if ((input.over || input.clicked) && state.value === 'alert') {
+          window.dispatchEvent(new MouseEvent('mousemove'))
+        }
+        if (notificationVisible.value) {
           if (dockExpanded.value) dockExpanded.value = false
           return
         }
-        // 点击刘海/胶囊打开面板（可在设置中关闭，仅快捷键/托盘）
+        // 点击刘海/胶囊打开面板（可在设置中关闭）；即使处于 idle alert 也不吞掉第一下点击
         if (input.clicked && !panelVisible.value && settings.value.notchClickOpensPanel) {
+          if (dockExpanded.value) dockExpanded.value = false
           void invoke('toggle_panel')
+          return
+        }
+        if (forceExpanded.value) {
+          if (dockExpanded.value) dockExpanded.value = false
           return
         }
         // 悬停展开只属于边缘停靠模式；常驻胶囊始终完整显示

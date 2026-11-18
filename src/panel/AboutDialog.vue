@@ -126,11 +126,10 @@ function onBackdropClick(event: MouseEvent) {
 .dialog-container {
   width: 280px;
   padding: 24px 22px;
-  background: linear-gradient(180deg, rgba(28, 28, 33, 0.90), rgba(21, 21, 26, 0.88));
-  backdrop-filter: blur(28px) saturate(1.3);
+  background: var(--v2-popover);
   border-radius: 16px;
-  border: 1px solid var(--v2-line);;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--v2-line);
+  box-shadow: 0 16px 40px var(--v2-shadow);
   display: flex;
   flex-direction: column;
   align-items: center;

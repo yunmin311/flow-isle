@@ -1228,11 +1228,9 @@ onBeforeUnmount(() => {
   min-width: 140px;
   padding: 4px;
   border-radius: 10px;
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
+  box-shadow: 0 12px 28px var(--v2-shadow);
   margin-top: 4px;
 }
 
@@ -1442,9 +1440,9 @@ onBeforeUnmount(() => {
 }
 
 .task-card.is-running {
-  background: color-mix(in srgb, var(--focus-color) 10%, rgba(28, 28, 32, 0.95));
-  border-color: color-mix(in srgb, var(--focus-color) 30%, transparent);
-  border-left: 3px solid var(--focus-color);
+  background: color-mix(in srgb, var(--v2-accent) 12%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
+  border-left: 3px solid var(--v2-accent);
   padding: 8px 10px;
 }
 
@@ -1592,9 +1590,9 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 4px 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--focus-color) 10%, rgba(26, 26, 32, 0.78));
-  backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid color-mix(in srgb, var(--focus-color) 25%, transparent);
+  background: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-popover));
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
+  box-shadow: 0 2px 8px var(--v2-shadow);
   flex-shrink: 0;
 }
 
@@ -1871,11 +1869,9 @@ onBeforeUnmount(() => {
   min-width: 130px;
   padding: 4px;
   border-radius: 10px;
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
+  box-shadow: 0 12px 28px var(--v2-shadow);
 }
 
 .context-menu-item {
@@ -1930,11 +1926,9 @@ onBeforeUnmount(() => {
   min-width: 130px;
   padding: 4px;
   border-radius: 10px;
-  background: rgba(26, 26, 32, 0.88);
-  backdrop-filter: blur(28px) saturate(1.3);
-  border: 1px solid var(--v2-line);;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
+  box-shadow: 0 12px 28px var(--v2-shadow);
   display: none;
   z-index: 1010;
   margin-left: 4px;
@@ -2018,17 +2012,14 @@ onBeforeUnmount(() => {
   top: calc(100% + 8px);
   right: 0;
   width: 140px;
-  background: rgba(28, 28, 34, 0.80);
-  backdrop-filter: blur(28px) saturate(1.3);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid var(--v2-line);;
+  background: var(--v2-popover);
+  border: 1px solid var(--v2-line);
   border-radius: 10px;
   padding: 5px;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 28px var(--v2-shadow);
   z-index: 1000;
   transform-origin: top right;
   animation: dropdown-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2215,8 +2206,8 @@ onBeforeUnmount(() => {
 }
 
 .batch-btn.restore {
-  color: color-mix(in srgb, var(--break-color) 80%, #fff);
-  border-color: color-mix(in srgb, var(--break-color) 20%, rgba(255, 255, 255, 0.08));
+  color: var(--break-color);
+  border-color: color-mix(in srgb, var(--break-color) 25%, var(--v2-line));
 }
 
 .batch-btn.restore:hover {

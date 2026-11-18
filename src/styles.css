@@ -485,8 +485,8 @@ textarea:focus-visible,
 #app .panel-root .focus-task-item.is-running {
   border: 0;
   border-bottom: 1px solid var(--v2-line);
-  border-left: 3px solid var(--active-color);
-  background: color-mix(in srgb, var(--active-color) 7%, transparent);
+  box-shadow: inset 3px 0 0 var(--active-color);
+  background: color-mix(in srgb, var(--active-color) 11%, var(--v2-surface));
   padding: 8px 12px;
 }
 
@@ -753,9 +753,9 @@ textarea:focus-visible,
 }
 
 #app .panel-root .todo-page .task-card.is-running {
-  background: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-surface));
+  background: color-mix(in srgb, var(--v2-accent) 11%, var(--v2-surface));
   border-color: color-mix(in srgb, var(--v2-accent) 30%, transparent);
-  border-left: 3px solid var(--v2-accent);
+  box-shadow: inset 3px 0 0 var(--v2-accent);
 }
 
 #app .panel-root .todo-page .empty-state {
@@ -953,14 +953,14 @@ textarea:focus-visible,
 }
 
 #app .panel-root .stats-page .stat-value,
-#app .panel-root .stats-page .page-title {
+#app .panel-root .stats-page .page-title,
+#app .panel-root .stats-page .section-title {
   color: var(--v2-ink);
 }
 
 #app .panel-root .stats-page .stat-label,
 #app .panel-root .stats-page .weekday,
-#app .panel-root .stats-page .day-number,
-#app .panel-root .stats-page .section-title {
+#app .panel-root .stats-page .day-number {
   color: var(--v2-muted);
 }
 
@@ -1049,8 +1049,12 @@ textarea:focus-visible,
   background: repeating-linear-gradient(to top, var(--v2-accent) 0 4px, transparent 4px 8px);
 }
 
+#app .panel-root .trend-bar.empty {
+  background: var(--v2-line);
+}
+
 #app .panel-root .charts-row {
-  gap: 20px;
+  gap: 10px;
 }
 
 #app .panel-root .achievement-badge {
@@ -1959,74 +1963,12 @@ textarea:focus-visible,
 
 @media (max-width: 349px) {
   #app .panel-root .focus-hero {
-    padding: 16px 12px;
+    padding: 13px 12px 10px;
   }
 
   #app .panel-root .hero-meta {
     flex-wrap: wrap;
   }
-}
-
-/* 面板打开时整张卡片会从岛尺寸缩放；像素数字在非整数缩放下会逐格抖动。
-   等缩放结束进入 steady 后再淡入，避免打开瞬间四个数字疯狂跳。 */
-#app .panel-root .pixel-time,
-#app .panel-root .pixel-progress {
-  transition: opacity 120ms ease;
-}
-
-#app .panel-root .motion-opening .pixel-time,
-#app .panel-root .motion-opening .pixel-progress,
-#app .panel-root .motion-opening-ready .pixel-time,
-#app .panel-root .motion-opening-ready .pixel-progress {
-  opacity: 0;
-  /* 即使 animationend 没触发、motion-opening 没被移除，也会在 300ms 后自己显示。 */
-  animation: pixel-time-in 120ms 300ms both;
-}
-
-@keyframes pixel-time-in {
-  to {
-    opacity: 1;
-  }
-}
-
-/* ===== 像素点缀：区块标记 / 取景角 / 硬边投影 ===== */
-#app .panel-root :is(.focus-zone .zone-header, .settings-page .section-title, .stats-page .section-title, .memo-page .section-title) {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-#app .panel-root :is(.focus-zone .zone-header, .settings-page .section-title, .stats-page .section-title, .memo-page .section-title)::before {
-  content: '';
-  flex: 0 0 6px;
-  width: 6px;
-  height: 6px;
-  background: var(--v2-accent);
-  box-shadow: 3px 3px 0 color-mix(in srgb, var(--v2-accent) 28%, transparent);
-}
-
-#app .panel-root .focus-hero::before,
-#app .panel-root .focus-hero::after {
-  content: '';
-  position: absolute;
-  width: 11px;
-  height: 11px;
-  border: 2px solid color-mix(in srgb, var(--v2-accent) 34%, transparent);
-  pointer-events: none;
-}
-
-#app .panel-root .focus-hero::before {
-  top: 9px;
-  left: 9px;
-  border-right: 0;
-  border-bottom: 0;
-}
-
-#app .panel-root .focus-hero::after {
-  top: 9px;
-  right: 9px;
-  border-left: 0;
-  border-bottom: 0;
 }
 
 @media (max-width: 349px) {
@@ -2123,9 +2065,8 @@ textarea:focus-visible,
 #app .panel-root .settings-page .settings-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
 #app .panel-root .settings-tabs button { flex: 1; padding: 8px 4px; font: inherit; font-size: 12px; color: var(--v2-secondary); border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
 #app .panel-root .settings-tabs button[aria-pressed="true"] { color: var(--v2-ink); font-weight: 600; background: var(--ui-hover); }
-#app .panel-root .settings-page .settings-section { padding: 10px 12px 12px; margin: 0 0 8px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--v2-shell) 94%, transparent); backdrop-filter: blur(12px); box-shadow: 0 2px 8px #00000008; }
-#app .panel-root .settings-page .section-title { font-family: inherit; font-size: 12px; font-weight: 650; color: var(--v2-ink); margin-bottom: 6px; }
-#app .panel-root .settings-page .section-title::before { content: none; }
+#app .panel-root .settings-page .settings-section { padding: 10px 12px 12px; margin: 0 0 8px; border: 1px solid var(--v2-line); border-radius: 10px; background: var(--v2-surface); box-shadow: none; }
+#app .panel-root .settings-page .section-title { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--v2-ink); margin-bottom: 6px; }
 #app .panel-root .settings-page .update-toggle-row { padding-top: 5px; padding-bottom: 5px; }
 #app .panel-root .settings-page .update-label { display: inline-flex; align-items: center; min-height: 24px; line-height: 24px; }
 #app .panel-root .settings-page :is(.setting-row, .setting-option-row:has(.update-copy)) { align-items: flex-start; }
