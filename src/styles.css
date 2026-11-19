@@ -30,15 +30,21 @@ body,
   box-sizing: border-box;
 }
 
-/* panel 窗口：允许文字选中和滚动 */
+/* panel 窗口：默认禁止全页拖选，仅放行输入区与正文阅读区 */
 .panel-root {
-  user-select: text;
-  -webkit-user-select: text;
+  user-select: none;
+  -webkit-user-select: none;
   overflow: hidden;
 }
 
 .panel-root input,
-.panel-root textarea {
+.panel-root textarea,
+.panel-root [contenteditable="true"],
+.panel-root .editor-content,
+.panel-root .reader-body,
+.panel-root .reader-meta,
+.panel-root .notif-detail,
+.panel-root .notif-title {
   user-select: text;
   -webkit-user-select: text;
 }
@@ -910,14 +916,22 @@ textarea:focus-visible,
 
 #app .panel-root .editor-content-wrapper {
   min-height: 0;
-  padding: 0 0 16px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface);
   scroll-padding-bottom: 16px;
   overscroll-behavior: contain;
+  transition: border-color 180ms ease;
+}
+
+#app .panel-root .editor-content-wrapper:focus-within {
+  border-color: color-mix(in srgb, var(--v2-accent) 45%, var(--v2-line));
 }
 
 #app .panel-root .editor-content {
   min-height: 100%;
-  padding: 0;
+  padding: 12px 14px 20px;
   font-size: 14px;
   line-height: 1.7;
   color: var(--v2-ink);

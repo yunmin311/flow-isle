@@ -19,6 +19,7 @@ let overlayCanvas: HTMLCanvasElement | null = null
 let rafId: number | null = null
 const particles: Particle[] = []
 let lastTs = 0
+let lastBurstAt = 0
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined'
@@ -117,6 +118,7 @@ export function triggerPixelBurstAt(x: number, y: number, tone: SparkTone = 'acc
   if (typeof window === 'undefined' || reducedMotion()) return
   const canvas = ensureCanvas()
   if (!canvas) return
+  lastBurstAt = performance.now()
   const colors = paletteFor(tone)
 
   for (let i = 0; i < count; i++) {
@@ -153,5 +155,58 @@ export function triggerPixelBurstFromEvent(event?: Event | null, tone: SparkTone
   if ('clientX' in event && typeof (event as MouseEvent).clientX === 'number') {
     const me = event as MouseEvent
     if (me.clientX || me.clientY) triggerPixelBurstAt(me.clientX, me.clientY, tone, count)
+  }
+}
+
+const GLOBAL_SPARK_SELECTOR = [
+  'button:not(:disabled)',
+  '.switch',
+  '.capture-switch',
+  '.heat-cell:not(.empty)',
+  '.station-item',
+].join(', ')
+
+/**
+ * 全站轻像素微粒交互（撒花/采花）：挂载在面板根节点，
+ * 自动为按钮、切换、开关、日历格、电台卡片等点击补上轻巧像素微粒，
+ * 并通过 120ms 防重守卫避免与组件内显式触发叠加。
+ */
+export function installGlobalPixelSpark(root: HTMLElement): () => void {
+  const onClick = (event: MouseEvent) => {
+    if (reducedMotion()) return
+    if (performance.now() - lastBurstAt < 120) return
+    const rawTarget = event.target as HTMLElement | null
+    if (!rawTarget) return
+    const interactive = rawTarget.closest<HTMLElement>(GLOBAL_SPARK_SELECTOR)
+    if (!interactive) return
+    if (interactive.matches('.btn-close, .search-clear, .error-dismiss, .day-detail-close')) return
+
+    let tone: SparkTone = 'accent'
+    let count = 5
+    if (interactive.matches('.primary-action, .confirm-btn, .update-btn.primary, .play-btn')) {
+      count = 8
+    } else if (interactive.matches('.pin-btn, .badge-btn')) {
+      tone = 'gold'
+      count = 7
+    } else if (interactive.matches('.check-circle, .task-checkbox, .subtask-checkbox, .queue-btn.done, .done-btn')) {
+      tone = 'break'
+      count = 7
+    } else if (interactive.matches('.nav-btn, .tab, .tab-item, .mode-btn, .settings-tabs button')) {
+      count = 5
+    }
+
+    if (event.clientX > 0 || event.clientY > 0) {
+      triggerPixelBurstAt(event.clientX, event.clientY, tone, count)
+    } else {
+      const rect = interactive.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        triggerPixelBurstAt(rect.left + rect.width / 2, rect.top + rect.height / 2, tone, count)
+      }
+    }
+  }
+
+  root.addEventListener('click', onClick, false)
+  return () => {
+    root.removeEventListener('click', onClick, false)
   }
 }

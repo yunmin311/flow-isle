@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { PIXEL_3X5, layoutPixelText } from '../utils/pixelFont'
 
 const props = withDefaults(defineProps<{ value: number; unit?: string; size?: number }>(), {
   unit: '',
@@ -7,43 +8,40 @@ const props = withDefaults(defineProps<{ value: number; unit?: string; size?: nu
 })
 
 const root = ref<HTMLElement>()
-const content = ref<HTMLElement>()
-const fontSize = ref(props.size)
+const containerWidth = ref(0)
 let observer: ResizeObserver | undefined
-let generation = 0
-let lastWidth = -1
 
-async function fit() {
-  const run = ++generation
-  fontSize.value = props.size
-  await nextTick()
-  if (run !== generation || !root.value || !content.value) return
-  const width = root.value.clientWidth
-  for (let attempt = 0; attempt < 3 && width > 0; attempt++) {
-    const needed = content.value.getBoundingClientRect().width
-    if (needed <= width || fontSize.value <= 12) break
-    fontSize.value = Math.max(12, Math.floor((fontSize.value * (width - 1)) / needed))
-    await nextTick()
-    if (run !== generation || !content.value) return
+const formattedValue = computed(() => String(props.value))
+
+const pixelUnit = computed(() => {
+  const baseUnit = props.size >= 24 ? 3 : 2
+  const w = containerWidth.value
+  if (w <= 0) return baseUnit
+  const unitAllowance = props.unit ? 16 : 0
+  const avail = Math.max(18, w - unitAllowance)
+  for (let u = baseUnit; u >= 2; u -= 1) {
+    const layout = layoutPixelText(formattedValue.value, PIXEL_3X5, u, 1)
+    if (layout.width <= avail) return u
   }
-}
+  return 2
+})
 
-watch(() => [props.value, props.unit, props.size], fit)
+const pixelLayout = computed(() => layoutPixelText(formattedValue.value, PIXEL_3X5, pixelUnit.value, 1))
 
 onMounted(() => {
-  observer = new ResizeObserver((entries) => {
-    const width = entries[0]?.contentRect.width ?? -1
-    if (width !== lastWidth) {
-      lastWidth = width
-      void fit()
-    }
-  })
-  if (root.value) observer.observe(root.value)
-  void fit()
+  if (root.value) {
+    containerWidth.value = root.value.clientWidth
+    observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0
+      if (Math.abs(width - containerWidth.value) >= 1) {
+        containerWidth.value = width
+      }
+    })
+    observer.observe(root.value)
+  }
 })
 
 onBeforeUnmount(() => {
-  generation++
   observer?.disconnect()
 })
 </script>
@@ -52,13 +50,29 @@ onBeforeUnmount(() => {
   <span
     ref="root"
     class="stat-number"
-    :data-long="String(value).length > 5"
-    :data-very-long="String(value).length > 9"
-    :title="String(value) + unit"
-    :aria-label="String(value) + unit"
+    :data-long="formattedValue.length > 5"
+    :data-very-long="formattedValue.length > 9"
+    :title="formattedValue + unit"
+    :aria-label="formattedValue + unit"
   >
-    <span ref="content" class="number-content" :style="{ fontSize: `${fontSize}px` }">
-      <span class="number-digits">{{ value }}</span>
+    <span class="number-content">
+      <svg
+        class="pixel-stat-digits"
+        :width="pixelLayout.width"
+        :height="pixelLayout.height"
+        :viewBox="`0 0 ${Math.max(1, pixelLayout.width)} ${Math.max(1, pixelLayout.height)}`"
+        shape-rendering="crispEdges"
+        aria-hidden="true"
+      >
+        <rect
+          v-for="cell in pixelLayout.cells"
+          :key="`${cell.x}-${cell.y}`"
+          :x="cell.x"
+          :y="cell.y"
+          :width="pixelUnit"
+          :height="pixelUnit"
+        />
+      </svg>
       <span v-if="unit" class="number-unit">{{ unit }}</span>
     </span>
   </span>
@@ -68,27 +82,34 @@ onBeforeUnmount(() => {
 .stat-number {
   display: flex;
   justify-content: center;
+  align-items: center;
   min-width: 0;
   width: 100%;
-  font-variant-numeric: tabular-nums;
+  min-height: 20px;
   white-space: nowrap;
   line-height: 1.25;
 }
 
 .number-content {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.16em;
+  align-items: flex-end;
+  gap: 3px;
   flex-shrink: 0;
 }
 
-.number-digits {
-  font-weight: 700;
+.pixel-stat-digits {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.pixel-stat-digits rect {
+  fill: currentColor;
 }
 
 .number-unit {
-  font-size: max(10px, 0.55em);
-  font-weight: 400;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
   opacity: 0.72;
 }
 </style>

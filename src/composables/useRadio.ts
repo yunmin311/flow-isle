@@ -196,6 +196,40 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const loaded = ref(false)
 
+let errorTimer: ReturnType<typeof setTimeout> | null = null
+const ERROR_AUTO_CLEAR_MS = 7000
+
+function formatRadioError(raw: unknown, fallback = '播放失败，请稍后重试'): string {
+  const text = (typeof raw === 'string' ? raw : raw instanceof Error ? raw.message : '').trim()
+  if (!text) return fallback
+  const lower = text.toLowerCase()
+  if (lower.includes('ssl') || lower.includes('eof occurred in violation of protocol')) {
+    return '网络连接中断（SSL 握手失败），请检查网络或代理后重试'
+  }
+  if (lower.includes('timed out') || lower.includes('timeout')) {
+    return '连接超时，请检查网络或代理后重试'
+  }
+  const cleaned = text.split('; please report this issue')[0].replace(/^下载失败:\s*ERROR:\s*/i, '').trim()
+  return cleaned.length > 96 ? `${cleaned.slice(0, 96)}…` : cleaned
+}
+
+function clearError() {
+  if (errorTimer !== null) {
+    clearTimeout(errorTimer)
+    errorTimer = null
+  }
+  error.value = null
+}
+
+function setError(raw: unknown, fallback?: string) {
+  clearError()
+  error.value = formatRadioError(raw, fallback)
+  errorTimer = setTimeout(() => {
+    errorTimer = null
+    error.value = null
+  }, ERROR_AUTO_CLEAR_MS)
+}
+
 // 播放进度（本地 / 导入音频可拖动；直播流 duration 为 Infinity，不显示进度）
 const currentTime = ref(0)
 const duration = ref(0)
@@ -392,6 +426,9 @@ let expectedSrc = ''
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let retryCount = 0
 let userPaused = false
+let playToken = 0
+let lastFailureToken = -1
+let lastFailureSrc = ''
 
 function clearRetry() {
   if (retryTimer !== null) {
@@ -415,9 +452,11 @@ function mediaErrorMessage(): string {
   }
 }
 
-async function loadAndPlay(url: string) {
+async function loadAndPlay(url: string, token: number) {
+  if (token !== playToken) return
   const a = getAudio()
   expectedSrc = url
+  lastFailureSrc = ''
   currentTime.value = 0
   duration.value = 0
   seekable.value = false
@@ -427,8 +466,9 @@ async function loadAndPlay(url: string) {
   try {
     await a.play()
   } catch {
+    if (token !== playToken) return
     // 部分失败不会派发 error 事件，这里兜底推进到下一个候选
-    handleStreamFailure()
+    handleStreamFailure('error', token)
   }
 }
 
@@ -449,7 +489,8 @@ function seekTo(seconds: number) {
   currentTime.value = target
 }
 
-function handleStreamFailure(reason: 'error' | 'ended' = 'error') {
+function handleStreamFailure(reason: 'error' | 'ended' = 'error', token: number = playToken) {
+  if (token !== playToken) return
   const station = currentStation.value
   // 本地 / 导入的有限音频：播完就停，不参与直播重连
   if (reason === 'ended' && seekable.value) {
@@ -458,11 +499,19 @@ function handleStreamFailure(reason: 'error' | 'ended' = 'error') {
     currentTime.value = duration.value
     return
   }
+  // 防止 a.play() reject 与 audio 'error' 事件对同一 URL 重复触发两次失败
+  if (reason === 'error' && lastFailureToken === token && lastFailureSrc === expectedSrc) {
+    return
+  }
+  if (reason === 'error') {
+    lastFailureToken = token
+    lastFailureSrc = expectedSrc
+  }
   const isLive = /^https?:/i.test(expectedSrc)
   if (!isLive) {
     // 本地文件 / 本地下载音频：播完就停，失败才提示
     loading.value = false
-    if (reason === 'error') error.value = mediaErrorMessage()
+    if (reason === 'error') setError(mediaErrorMessage())
     return
   }
   if (userPaused || !station) {
@@ -472,26 +521,27 @@ function handleStreamFailure(reason: 'error' | 'ended' = 'error') {
   // 1) 先试备用地址
   if (candidateIndex + 1 < srcCandidates.length) {
     candidateIndex += 1
-    error.value = null
+    clearError()
     loading.value = true
-    void loadAndPlay(srcCandidates[candidateIndex])
+    void loadAndPlay(srcCandidates[candidateIndex], token)
     return
   }
   // 2) 再按退避重试主地址
   if (retryTimer !== null) return
   if (retryCount >= RETRY_DELAYS.length) {
     loading.value = false
-    error.value = '音频流多次中断，点击播放可重连'
+    setError('音频流多次中断，点击播放可重连')
     return
   }
   const delay = RETRY_DELAYS[retryCount]
   retryCount += 1
-  error.value = null
+  clearError()
   loading.value = true
   retryTimer = setTimeout(() => {
     retryTimer = null
+    if (token !== playToken) return
     candidateIndex = 0
-    void loadAndPlay(srcCandidates[0] ?? expectedSrc)
+    void loadAndPlay(srcCandidates[0] ?? expectedSrc, token)
   }, delay)
 }
 
@@ -503,7 +553,7 @@ function getAudio(): HTMLAudioElement {
     audio.addEventListener('playing', () => {
       playing.value = true
       loading.value = false
-      error.value = null
+      clearError()
       retryCount = 0
     })
     audio.addEventListener('pause', () => {
@@ -600,8 +650,9 @@ async function play(stationId?: string) {
   const station = allStations.value.find(s => s.id === radioSettings.value.currentStationId)
   if (!station) return
 
+  const token = ++playToken
   loading.value = true
-  error.value = null
+  clearError()
   userPaused = false
   retryCount = 0
   clearRetry()
@@ -611,9 +662,11 @@ async function play(stationId?: string) {
     if (station.streamUrl === '__LOCAL__') {
       try {
         const filePath = await invoke<string>('get_local_audio_path')
+        if (token !== playToken) return
         src = convertFileSrc(filePath)
       } catch (e) {
-        error.value = typeof e === 'string' ? e : '本地音频文件不存在'
+        if (token !== playToken) return
+        setError(e, '本地音频文件不存在')
         loading.value = false
         return
       }
@@ -623,67 +676,93 @@ async function play(stationId?: string) {
       if (/bilibili\.com|b23\.tv/i.test(station.sourceUrl)) {
         try {
           const filePath = await invoke<string>('download_temp_audio', { url: station.sourceUrl })
+          if (token !== playToken) return
           src = convertFileSrc(filePath)
         } catch (e2) {
+          if (token !== playToken) return
           const msg = typeof e2 === 'string' ? e2 : '下载失败'
-          error.value = msg === 'YT_NOT_INSTALLED' ? '需要 yt-dlp：将自动下载' : msg
-          loading.value = false
-          return
-        }
-      } else {
-        const cached = resolvedCache.get(station.sourceUrl)
-      if (cached && Date.now() - cached.at < RESOLVE_TTL) {
-        src = cached.stream
-      } else {
-        try {
-          const res = await invoke<{ stream_url: string; title: string | null }>('resolve_audio_url', {
-            url: station.sourceUrl,
-          })
-          src = res.stream_url
-          resolvedCache.set(station.sourceUrl, { stream: src, at: Date.now() })
-        } catch (e) {
-          const msg = typeof e === 'string' ? e : '解析失败'
           if (msg === 'YT_NOT_INSTALLED') {
-            // 首次使用：自动下载 yt-dlp（约 17MB），完成后重试一次
-            loading.value = true
             try {
               await invoke<string>('ensure_ytdlp')
-              const res = await invoke<{ stream_url: string; title: string | null }>('resolve_audio_url', {
-                url: station.sourceUrl,
-              })
-              src = res.stream_url
-              resolvedCache.set(station.sourceUrl, { stream: src, at: Date.now() })
-            } catch (e2) {
-              error.value = typeof e2 === 'string' ? e2 : 'yt-dlp 获取失败'
+              if (token !== playToken) return
+              const filePath = await invoke<string>('download_temp_audio', { url: station.sourceUrl })
+              if (token !== playToken) return
+              src = convertFileSrc(filePath)
+            } catch (e3) {
+              if (token !== playToken) return
+              setError(e3, 'yt-dlp 获取或下载失败')
               loading.value = false
               return
             }
           } else {
-            error.value = msg
+            setError(msg, '音频下载失败，请检查网络或代理')
             loading.value = false
             return
           }
         }
-      }
+      } else {
+        const cached = resolvedCache.get(station.sourceUrl)
+        if (cached && Date.now() - cached.at < RESOLVE_TTL) {
+          src = cached.stream
+        } else {
+          try {
+            const res = await invoke<{ stream_url: string; title: string | null }>('resolve_audio_url', {
+              url: station.sourceUrl,
+            })
+            if (token !== playToken) return
+            src = res.stream_url
+            resolvedCache.set(station.sourceUrl, { stream: src, at: Date.now() })
+          } catch (e) {
+            if (token !== playToken) return
+            const msg = typeof e === 'string' ? e : '解析失败'
+            if (msg === 'YT_NOT_INSTALLED') {
+              // 首次使用：自动下载 yt-dlp（约 17MB），完成后重试一次
+              loading.value = true
+              try {
+                await invoke<string>('ensure_ytdlp')
+                if (token !== playToken) return
+                const res = await invoke<{ stream_url: string; title: string | null }>('resolve_audio_url', {
+                  url: station.sourceUrl,
+                })
+                if (token !== playToken) return
+                src = res.stream_url
+                resolvedCache.set(station.sourceUrl, { stream: src, at: Date.now() })
+              } catch (e2) {
+                if (token !== playToken) return
+                setError(e2, 'yt-dlp 获取失败')
+                loading.value = false
+                return
+              }
+            } else {
+              setError(msg, '解析失败')
+              loading.value = false
+              return
+            }
+          }
+        }
       }
     } else {
       src = station.streamUrl
     }
 
+    if (token !== playToken) return
     // 候选地址：主地址 + 备用镜像（仅直链有效；本地文件/yt-dlp 结果不参与重连）
     srcCandidates = [src, ...(station.fallbackUrls ?? [])]
     candidateIndex = 0
-    await loadAndPlay(src)
+    await loadAndPlay(src, token)
   } catch (e) {
+    if (token !== playToken) return
     playing.value = false
-    error.value = typeof e === 'string' ? e : '播放失败'
+    setError(e, '播放失败')
     loading.value = false
   }
 }
 
 async function pause() {
+  playToken += 1
   userPaused = true
   clearRetry()
+  clearError()
   retryCount = 0
   const a = getAudio()
   a.pause()
@@ -732,6 +811,7 @@ export function useRadio() {
     playing,
     loading,
     error,
+    clearError,
     volume,
     currentTime,
     duration,

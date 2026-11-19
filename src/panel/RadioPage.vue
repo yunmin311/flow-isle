@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref, nextTick, onDeactivated } from 'vue'
 import { useRadio, CATEGORY_LABELS, type StationCategory, type RadioStation } from '../composables/useRadio'
 import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const {
-  stations, currentStation, playing, loading, error, volume,
+  stations, currentStation, playing, loading, error, clearError, volume,
   currentTime, duration, seekable, progress, seekTo,
   toggle, switchStation, setVolume,
   importFromUrl, importFromFile, removeCustomStation, renameCustomStation,
 } = useRadio()
+
+onDeactivated(() => {
+  clearError()
+  importMsg.value = null
+})
 
 const isLocalMedia = computed(() => {
   const station = currentStation.value
@@ -169,20 +174,17 @@ async function scrollToPlaying() {
               :disabled="!currentStation"
               @click="!playing && triggerPixelBurstFromEvent($event, 'accent', 7); toggle()"
             >
-              <svg v-if="loading" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                <rect x="1" y="4" width="1" height="1" opacity="0.35" />
-                <rect x="4" y="4" width="1" height="1" opacity="0.7" />
-                <rect x="7" y="4" width="1" height="1" />
+              <svg v-if="loading" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="7" cy="12" r="1.8" opacity="0.35" />
+                <circle cx="12" cy="12" r="1.8" opacity="0.65" />
+                <circle cx="17" cy="12" r="1.8" />
               </svg>
-              <svg v-else-if="playing" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                <rect x="2" y="1" width="2" height="7" />
-                <rect x="5" y="1" width="2" height="7" />
+              <svg v-else-if="playing" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <rect x="7" y="5" width="3.5" height="14" rx="1" />
+                <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
               </svg>
-              <svg v-else viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                <rect x="2" y="1" width="2" height="7" />
-                <rect x="4" y="2" width="2" height="5" />
-                <rect x="6" y="3" width="1" height="3" />
-                <rect x="7" y="4" width="1" height="1" />
+              <svg v-else viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M8 5.4v13.2a1 1 0 0 0 1.5.86l10.6-6.6a1 1 0 0 0 0-1.72L9.5 4.54A1 1 0 0 0 8 5.4Z" />
               </svg>
             </button>
             <div class="volume-row">
@@ -226,7 +228,10 @@ async function scrollToPlaying() {
               <span class="live-hint">直播流 · 不可拖动</span>
             </template>
           </div>
-          <div v-if="error" class="error-msg">{{ error }}</div>
+          <div v-if="error" class="error-msg" role="alert">
+            <span class="error-text">{{ error }}</span>
+            <button type="button" class="error-dismiss" aria-label="关闭错误提示" title="关闭" @click="clearError">×</button>
+          </div>
         </div>
       </div>
     </div>
@@ -830,8 +835,45 @@ async function scrollToPlaying() {
 }
 
 .error-msg {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--v2-danger, #c44a3f) 10%, var(--ui-well));
+  border: 1px solid color-mix(in srgb, var(--v2-danger, #c44a3f) 28%, var(--v2-line));
   font-size: 11px;
-  color: #e85d3a;
+  line-height: 1.45;
+  color: var(--v2-danger, #c44a3f);
+}
+
+.error-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.error-dismiss {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.72;
+}
+
+.error-dismiss:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--v2-danger, #c44a3f) 14%, transparent);
 }
 
 .volume-row {

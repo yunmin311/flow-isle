@@ -490,42 +490,150 @@ fn ytdlp_path(app: &AppHandle) -> Option<std::path::PathBuf> {
     if p.exists() { Some(p) } else { None }
 }
 
+/// 执行外部命令并附带硬超时，防止 yt-dlp / PowerShell 网络卡死拖垮子进程。
+fn run_command_with_timeout(
+    mut cmd: std::process::Command,
+    timeout: std::time::Duration,
+) -> Result<std::process::Output, String> {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    let stdout_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = stdout_pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    });
+    let stderr_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = stderr_pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    });
+
+    let started = std::time::Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if started.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err("请求超时，请检查网络或代理后重试".into());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(e.to_string());
+            }
+        }
+    };
+
+    let stdout = stdout_reader.join().unwrap_or_default();
+    let stderr = stderr_reader.join().unwrap_or_default();
+    Ok(std::process::Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+/// 将 yt-dlp 冗长的英文/SSL 堆栈归纳为简短清晰的中文提示。
+fn summarize_ytdlp_error(stderr: &str) -> String {
+    let raw = stderr.trim();
+    let lower = raw.to_ascii_lowercase();
+    if lower.contains("ssl") || lower.contains("eof occurred in violation of protocol") || lower.contains("certificate") {
+        return "网络连接中断（SSL 握手失败），请检查网络或代理后重试".into();
+    }
+    if lower.contains("timed out") || lower.contains("timeout") {
+        return "连接超时，请检查网络或代理后重试".into();
+    }
+    if lower.contains("http error 403") || lower.contains("http error 412") || lower.contains("sign in") || lower.contains("login") {
+        return "该链接受防盗链或登录限制，暂时无法播放".into();
+    }
+    if lower.contains("video unavailable") || lower.contains("private video") || lower.contains("404") {
+        return "该视频或音频不可用，可能已下架或设为私密".into();
+    }
+    if lower.contains("unable to resolve") || lower.contains("failed to resolve") || lower.contains("connection refused") || lower.contains("connection reset") || lower.contains("getaddrinfo") {
+        return "网络无法访问该源，请检查网络或代理".into();
+    }
+    let last = raw
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("未知错误")
+        .trim();
+    let cleaned = last
+        .split("; please report this issue")
+        .next()
+        .unwrap_or(last)
+        .trim_start_matches("ERROR:")
+        .trim();
+    if cleaned.chars().count() > 96 {
+        let short: String = cleaned.chars().take(96).collect();
+        format!("{short}…")
+    } else if cleaned.is_empty() {
+        "音频源加载失败，请稍后重试".into()
+    } else {
+        cleaned.to_string()
+    }
+}
+
 /// 确保本机有 yt-dlp；没有则从 GitHub 下载到 AppData\bin（约 17MB，走系统代理）。
 #[tauri::command]
-fn ensure_ytdlp(app: AppHandle) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        if let Some(p) = ytdlp_path(&app) {
-            return Ok(p.to_string_lossy().into_owned());
+async fn ensure_ytdlp(app: AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            if let Some(p) = ytdlp_path(&app) {
+                return Ok(p.to_string_lossy().into_owned());
+            }
+            let dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| e.to_string())?
+                .join("bin");
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            let target = dir.join("yt-dlp.exe");
+            let ps = format!(
+                "Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' -OutFile '{}' -TimeoutSec 90",
+                target.to_string_lossy().replace('\'', "''")
+            );
+            let mut cmd = std::process::Command::new("powershell");
+            cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+                .creation_flags(CREATE_NO_WINDOW);
+            let out = run_command_with_timeout(cmd, std::time::Duration::from_secs(100))?;
+            if out.status.success() && target.exists() {
+                Ok(target.to_string_lossy().into_owned())
+            } else {
+                Err("下载 yt-dlp 失败，请检查网络/代理后重试".into())
+            }
         }
-        let dir = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| e.to_string())?
-            .join("bin");
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let target = dir.join("yt-dlp.exe");
-        let ps = format!(
-            "Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' -OutFile '{}' -TimeoutSec 300",
-            target.to_string_lossy().replace('\'', "''")
-        );
-        let out = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if out.status.success() && target.exists() {
-            Ok(target.to_string_lossy().into_owned())
-        } else {
-            Err("下载 yt-dlp 失败，请检查网络/代理后重试".into())
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = app;
+            Err("当前平台请自行安装 yt-dlp".into())
         }
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = app;
-        Err("当前平台请自行安装 yt-dlp".into())
-    }
+    })
+    .await
+    .map_err(|e| format!("后台任务异常: {e}"))?
 }
 
 fn is_direct_audio_url(url: &str) -> bool {
@@ -538,16 +646,17 @@ fn is_direct_audio_url(url: &str) -> bool {
 
 /// 把任意链接解析成纯音频直链：直链直接放行，其余交给 yt-dlp 取 bestaudio。
 #[tauri::command]
-fn resolve_audio_url(app: AppHandle, url: String) -> Result<AudioResolution, String> {
+async fn resolve_audio_url(app: AppHandle, url: String) -> Result<AudioResolution, String> {
     if is_direct_audio_url(&url) {
         return Ok(AudioResolution { stream_url: url, title: None });
     }
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        let yt = ytdlp_path(&app).ok_or_else(|| "YT_NOT_INSTALLED".to_string())?;
-        let out = std::process::Command::new(&yt)
-            .args([
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let yt = ytdlp_path(&app).ok_or_else(|| "YT_NOT_INSTALLED".to_string())?;
+            let mut cmd = std::process::Command::new(&yt);
+            cmd.args([
                 "--no-playlist",
                 "-f",
                 "bestaudio",
@@ -555,138 +664,143 @@ fn resolve_audio_url(app: AppHandle, url: String) -> Result<AudioResolution, Str
                 "--encoding",
                 "utf-8",
                 "--socket-timeout",
-                "30",
+                "12",
                 "--retries",
-                "3",
+                "1",
                 "--print",
                 "%(title)s",
                 "--print",
                 "%(url)s",
                 &url,
             ])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !out.status.success() {
-            let msg = String::from_utf8_lossy(&out.stderr);
-            let last = msg.lines().last().unwrap_or("未知错误");
-            return Err(format!("解析失败: {last}"));
+            .creation_flags(CREATE_NO_WINDOW);
+            let out = run_command_with_timeout(cmd, std::time::Duration::from_secs(28))?;
+            if !out.status.success() {
+                let msg = String::from_utf8_lossy(&out.stderr);
+                return Err(summarize_ytdlp_error(&msg));
+            }
+            let text = String::from_utf8_lossy(&out.stdout);
+            let mut lines = text.lines().filter(|l| !l.trim().is_empty());
+            let title = lines.next().unwrap_or("").trim().to_string();
+            let stream = lines.next().unwrap_or("").trim().to_string();
+            if stream.is_empty() {
+                return Err("未取到音频流".into());
+            }
+            Ok(AudioResolution {
+                stream_url: stream,
+                title: if title.is_empty() { None } else { Some(title) },
+            })
         }
-        let text = String::from_utf8_lossy(&out.stdout);
-        let mut lines = text.lines().filter(|l| !l.trim().is_empty());
-        let title = lines.next().unwrap_or("").trim().to_string();
-        let stream = lines.next().unwrap_or("").trim().to_string();
-        if stream.is_empty() {
-            return Err("未取到音频流".into());
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = app;
+            Err("当前平台请先安装 yt-dlp".into())
         }
-        Ok(AudioResolution {
-            stream_url: stream,
-            title: if title.is_empty() { None } else { Some(title) },
-        })
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = app;
-        Err("当前平台请先安装 yt-dlp".into())
-    }
+    })
+    .await
+    .map_err(|e| format!("后台任务异常: {e}"))?
 }
 
 /// 批量导入：视频/合集/歌单链接 → 条目列表（单视频返回 1 条）。
 #[tauri::command]
-fn import_media_entries(app: AppHandle, url: String) -> Result<Vec<MediaEntry>, String> {
+async fn import_media_entries(app: AppHandle, url: String) -> Result<Vec<MediaEntry>, String> {
     if is_direct_audio_url(&url) {
         let title = url.rsplit('/').next().unwrap_or("音频直链").to_string();
         return Ok(vec![MediaEntry { title, url }]);
     }
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        let yt = ytdlp_path(&app).ok_or_else(|| "YT_NOT_INSTALLED".to_string())?;
-        let out = std::process::Command::new(&yt)
-            .args([
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let yt = ytdlp_path(&app).ok_or_else(|| "YT_NOT_INSTALLED".to_string())?;
+            let mut cmd = std::process::Command::new(&yt);
+            cmd.args([
                 "--flat-playlist",
                 "--no-warnings",
                 "--encoding",
                 "utf-8",
                 "--socket-timeout",
-                "30",
+                "12",
                 "--retries",
-                "3",
+                "1",
                 "--print",
                 "%(title)s|||%(url)s",
                 &url,
             ])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !out.status.success() {
-            let msg = String::from_utf8_lossy(&out.stderr);
-            let last = msg.lines().last().unwrap_or("未知错误");
-            return Err(format!("解析失败: {last}"));
+            .creation_flags(CREATE_NO_WINDOW);
+            let out = run_command_with_timeout(cmd, std::time::Duration::from_secs(28))?;
+            if !out.status.success() {
+                let msg = String::from_utf8_lossy(&out.stderr);
+                return Err(summarize_ytdlp_error(&msg));
+            }
+            let text = String::from_utf8_lossy(&out.stdout);
+            let entries: Vec<MediaEntry> = text
+                .lines()
+                .filter(|l| l.contains("|||"))
+                .map(|l| {
+                    let (title, entry_url) = l.split_once("|||").unwrap_or((l, ""));
+                    let mut u = entry_url.trim().to_string();
+                    // flat-playlist 模式下单视频的 url 字段可能是 NA：回退到原始链接
+                    if u.is_empty() || u == "NA" {
+                        u = url.clone();
+                    }
+                    MediaEntry {
+                        title: title.trim().to_string(),
+                        url: u,
+                    }
+                })
+                .filter(|e| !e.title.is_empty())
+                .collect();
+            if entries.is_empty() {
+                return Err("未解析到任何条目".into());
+            }
+            Ok(entries)
         }
-        let text = String::from_utf8_lossy(&out.stdout);
-        let entries: Vec<MediaEntry> = text
-            .lines()
-            .filter(|l| l.contains("|||"))
-            .map(|l| {
-                let (title, entry_url) = l.split_once("|||").unwrap_or((l, ""));
-                let mut u = entry_url.trim().to_string();
-                // flat-playlist 模式下单视频的 url 字段可能是 NA：回退到原始链接
-                if u.is_empty() || u == "NA" {
-                    u = url.clone();
-                }
-                MediaEntry {
-                    title: title.trim().to_string(),
-                    url: u,
-                }
-            })
-            .filter(|e| !e.title.is_empty())
-            .collect();
-        if entries.is_empty() {
-            return Err("未解析到任何条目".into());
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = app;
+            Err("当前平台请先安装 yt-dlp".into())
         }
-        Ok(entries)
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = app;
-        Err("当前平台请先安装 yt-dlp".into())
-    }
+    })
+    .await
+    .map_err(|e| format!("后台任务异常: {e}"))?
 }
 
 /// 拉取远程 M3U/文本歌单（WebView 内受 CORS 限制，走系统 PowerShell）。
 #[tauri::command]
-fn http_get_text(url: String) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        let ps = format!(
-            "(Invoke-WebRequest -UseBasicParsing -Uri '{}' -TimeoutSec 20).Content",
-            url.replace('\'', "''")
-        );
-        let out = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if out.status.success() {
-            Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-        } else {
-            Err(String::from_utf8_lossy(&out.stderr).into_owned())
+async fn http_get_text(url: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let ps = format!(
+                "(Invoke-WebRequest -UseBasicParsing -Uri '{}' -TimeoutSec 15).Content",
+                url.replace('\'', "''")
+            );
+            let mut cmd = std::process::Command::new("powershell");
+            cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+                .creation_flags(CREATE_NO_WINDOW);
+            let out = run_command_with_timeout(cmd, std::time::Duration::from_secs(20))?;
+            if out.status.success() {
+                Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+            } else {
+                Err("拉取歌单失败，请检查链接或网络".into())
+            }
         }
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let out = std::process::Command::new("curl")
-            .args(["-sL", "--max-time", "20", &url])
-            .output()
-            .map_err(|e| e.to_string())?;
-        if out.status.success() {
-            Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-        } else {
-            Err("fetch failed".into())
+        #[cfg(not(target_os = "windows"))]
+        {
+            let mut cmd = std::process::Command::new("curl");
+            cmd.args(["-sL", "--max-time", "15", &url]);
+            let out = run_command_with_timeout(cmd, std::time::Duration::from_secs(20))?;
+            if out.status.success() {
+                Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+            } else {
+                Err("fetch failed".into())
+            }
         }
-    }
+    })
+    .await
+    .map_err(|e| format!("后台任务异常: {e}"))?
 }
 
 // ==== Windows 玻璃 v2：材质交给前端 CSS + 抓屏底图 ====
@@ -935,32 +1049,33 @@ fn get_last_panel_size(fallback: tauri::PhysicalSize<u32>) -> tauri::PhysicalSiz
 
 /// B 站等防盗链源：用 yt-dlp 直接下载音频到临时目录，返回本地路径供前端播放。
 #[tauri::command]
-fn download_temp_audio(app: AppHandle, url: String) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        let yt = ytdlp_path(&app).ok_or_else(|| "YT_NOT_INSTALLED".to_string())?;
-        let dir = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| e.to_string())?
-            .join("temp-audio");
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        // 清理上一次的临时音频
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for e in entries.flatten() {
-                let _ = std::fs::remove_file(e.path());
+async fn download_temp_audio(app: AppHandle, url: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let yt = ytdlp_path(&app).ok_or_else(|| "YT_NOT_INSTALLED".to_string())?;
+            let dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| e.to_string())?
+                .join("temp-audio");
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            // 清理上一次的临时音频
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for e in entries.flatten() {
+                    let _ = std::fs::remove_file(e.path());
+                }
             }
-        }
-        // 唯一文件名：旧临时音频可能仍被播放器占用（Windows 下删除挂起/写入拒绝），
-        // 用固定名会导致切歌或重播时下载失败
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0);
-        let template = dir.join(format!("audio-{stamp}.%(ext)s"));
-        let out = std::process::Command::new(&yt)
-            .args([
+            // 唯一文件名：旧临时音频可能仍被播放器占用（Windows 下删除挂起/写入拒绝），
+            // 用固定名会导致切歌或重播时下载失败
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            let template = dir.join(format!("audio-{stamp}.%(ext)s"));
+            let mut cmd = std::process::Command::new(&yt);
+            cmd.args([
                 "--no-playlist",
                 "-f",
                 "bestaudio",
@@ -968,40 +1083,41 @@ fn download_temp_audio(app: AppHandle, url: String) -> Result<String, String> {
                 "--encoding",
                 "utf-8",
                 "--socket-timeout",
-                "30",
+                "12",
                 "--retries",
-                "3",
+                "1",
                 "-o",
                 template.to_str().ok_or("无效的临时路径")?,
                 &url,
             ])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !out.status.success() {
-            let msg = String::from_utf8_lossy(&out.stderr);
-            let last = msg.lines().last().unwrap_or("未知错误");
-            return Err(format!("下载失败: {last}"));
-        }
-        let mut found = None;
-        for e in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
-            let p = e.path();
-            let ext = p.extension().map(|x| x.to_string_lossy().to_lowercase());
-            if matches!(ext.as_deref(), Some("m4a") | Some("mp3") | Some("webm") | Some("opus") | Some("ogg") | Some("m4s") | Some("aac")) {
-                found = Some(p);
-                break;
+            .creation_flags(CREATE_NO_WINDOW);
+            let out = run_command_with_timeout(cmd, std::time::Duration::from_secs(35))?;
+            if !out.status.success() {
+                let msg = String::from_utf8_lossy(&out.stderr);
+                return Err(summarize_ytdlp_error(&msg));
             }
+            let mut found = None;
+            for e in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+                let p = e.path();
+                let ext = p.extension().map(|x| x.to_string_lossy().to_lowercase());
+                if matches!(ext.as_deref(), Some("m4a") | Some("mp3") | Some("webm") | Some("opus") | Some("ogg") | Some("m4s") | Some("aac")) {
+                    found = Some(p);
+                    break;
+                }
+            }
+            found
+                .map(|p| p.to_string_lossy().into_owned())
+                .ok_or_else(|| "下载完成但未找到音频文件".to_string())
         }
-        found
-            .map(|p| p.to_string_lossy().into_owned())
-            .ok_or_else(|| "下载完成但未找到音频文件".to_string())
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = app;
-        let _ = url;
-        Err("仅支持 Windows".into())
-    }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = app;
+            let _ = url;
+            Err("仅支持 Windows".into())
+        }
+    })
+    .await
+    .map_err(|e| format!("后台任务异常: {e}"))?
 }
 
 fn panel_config_values<R: Runtime>(app: &AppHandle<R>) -> (f64, f64, f64, f64) {
@@ -2606,4 +2722,23 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod radio_error_tests {
+    use super::summarize_ytdlp_error;
+
+    #[test]
+    fn summarizes_bilibili_ssl_eof_without_issue_template() {
+        let stderr = "ERROR: [BiliBili] 1dQ4Q6CEcm: Unable to download webpage: EOF occurred in violation of protocol (_ssl.c:1007) (caused by SSLError('EOF occurred in violation of protocol (_ssl.c:1007)')); please report this issue on https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using yt-dlp -U";
+        let summary = summarize_ytdlp_error(stderr);
+        assert!(summary.contains("SSL"));
+        assert!(!summary.contains("github.com/yt-dlp"));
+    }
+
+    #[test]
+    fn summarizes_timeout_and_forbidden_cleanly() {
+        assert!(summarize_ytdlp_error("ERROR: read operation timed out").contains("超时"));
+        assert!(summarize_ytdlp_error("ERROR: HTTP Error 412: Precondition Failed").contains("防盗链"));
+    }
 }

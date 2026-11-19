@@ -290,9 +290,8 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
         </template>
         <template v-else-if="pendingNotification === 'break-done'">
           <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'accent', 8); confirmNotification()">
-            <svg class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
-              <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+            <svg class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7.5 5.2v13.6a1 1 0 0 0 1.52.85l10.8-6.8a1 1 0 0 0 0-1.7L9.02 4.35a1 1 0 0 0-1.52.85Z" />
             </svg>
             <span>继续专注</span>
           </button>
@@ -300,12 +299,12 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
         </template>
         <template v-else>
           <button class="primary-action" @click="handleHeroAction($event)">
-            <svg v-if="activeTaskId && running" class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="2" y="1" width="2" height="7" /><rect x="5" y="1" width="2" height="7" />
+            <svg v-if="activeTaskId && running" class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="6" y="4.5" width="4" height="15" rx="1" />
+              <rect x="14" y="4.5" width="4" height="15" rx="1" />
             </svg>
-            <svg v-else class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
-              <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+            <svg v-else class="btn-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7.5 5.2v13.6a1 1 0 0 0 1.52.85l10.8-6.8a1 1 0 0 0 0-1.7L9.02 4.35a1 1 0 0 0-1.52.85Z" />
             </svg>
             <span>{{ activeTaskId ? (running ? '暂停' : '继续') : '开始专注' }}</span>
           </button>
@@ -389,12 +388,11 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
             <template v-if="activeTaskId === task.id">
               <span class="task-timer">{{ displayTime }}</span>
               <button class="queue-btn icon-only" @click="handleStartTask(task, $event)" :title="running ? '暂停' : '继续'" :aria-label="running ? '暂停' : '继续'">
-                <svg v-if="running" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                  <rect x="2" y="1" width="2" height="7" /><rect x="5" y="1" width="2" height="7" />
+                <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" />
                 </svg>
-                <svg v-else width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                  <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
-                  <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+                <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M7.5 4.8v14.4L19.5 12z" />
                 </svg>
               </button>
               <button class="queue-btn icon-only done" @click="handleDoneTask(task.id, $event)" title="完成" aria-label="完成">
@@ -416,9 +414,8 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
                 <span class="pomo-dot" aria-hidden="true"></span>{{ task.pomodoroCount }}
               </span>
               <button class="start-btn" @click="handleStartTask(task, $event)" title="开始" aria-label="开始">
-                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                  <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
-                  <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M7.5 4.8v14.4L19.5 12z" />
                 </svg>
               </button>
             </template>
@@ -450,9 +447,8 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
           :title="`无需任务，直接开始 ${settings.focusDuration} 分钟专注`"
           @click="startQuick"
         >
-          <svg class="px-btn-icon" width="8" height="8" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-            <rect x="2" y="1" width="2" height="7" /><rect x="4" y="2" width="2" height="5" />
-            <rect x="6" y="3" width="1" height="3" /><rect x="7" y="4" width="1" height="1" />
+          <svg class="btn-icon" width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M7.5 4.8v14.4L19.5 12z" />
           </svg>
           <span>{{ settings.focusDuration }}′</span>
         </button>

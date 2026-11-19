@@ -16,6 +16,7 @@ import { useDailyStats } from '../composables/useDailyStats'
 import { useAchievements } from '../composables/useAchievements'
 import { useRadio } from '../composables/useRadio'
 import { useCompanion } from '../composables/useCompanion'
+import { installGlobalPixelSpark } from '../utils/pixelSpark'
 import TodoPage from './TodoPage.vue'
 import TaskArea from './TaskArea.vue'
 import TaskDetailPage from './TaskDetailPage.vue'
@@ -46,13 +47,21 @@ void startScreenshotCollection()
 useTaskReminders()
 const { tasks } = useTasks()
 const { statsSection } = useCompanion()
+const { clearError: clearRadioError } = useRadio()
+
+function clearDocumentSelection() {
+  try {
+    window.getSelection()?.removeAllRanges()
+  } catch {
+    // ignore
+  }
+}
 
 function prewarmPanelData() {
   useTaskGroups()
   useMemos()
   useDailyStats()
   useAchievements()
-  useRadio()
   useCompanion()
 }
 
@@ -94,6 +103,7 @@ function pulsePanelGlass(ms = 240) {
 function navigateTo(nextView: typeof currentView.value) {
   const prevView = currentView.value
   if (prevView === nextView) return
+  clearDocumentSelection()
   const prevChild = panelContent.value?.firstElementChild as HTMLElement | null
   if (prevChild) viewScrollMemory.set(prevView, prevChild.scrollTop)
 
@@ -167,45 +177,65 @@ const navItems = [
     key: 'tasks',
     label: '首页',
     title: '首页',
-    iconPaths: ['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'],
+    iconPaths: [
+      'M7 2h2v1H7z M5 3h6v1H5z M3 4h10v1H3z M2 5h12v2H2z',
+      'M3 7h2v7H3z M11 7h2v7h-2z M3 13h10v1H3z',
+      'M6 9h4v1H6z M6 10h1v4H6z M9 10h1v4H9z',
+    ],
   },
   {
     key: 'todo',
     label: 'TODO',
     title: 'TODO',
-    iconPaths: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M9 12l2 2 4-4'],
+    iconPaths: [
+      'M2 2h12v2H2z M2 12h12v2H2z M2 4h2v8H2z M12 4h2v8h-2z',
+      'M5 8h1v2H5z M6 9h1v2H6z M7 10h1v1H7z M8 8h1v2H8z M9 7h1v2H9z M10 6h1v2h-1z',
+    ],
   },
   {
     key: 'memos',
     label: '备忘',
     title: '备忘录',
-    iconPaths: ['M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M9 13h6', 'M9 17h6', 'M9 9h1'],
+    iconPaths: [
+      'M3 2h7v2H3z M10 3h2v2h-2z M11 5h2v9h-2z M3 4h2v10H3z M3 12h10v2H3z',
+      'M9 4h2v2H9z M6 7h4v1H6z M6 9h4v1H6z M6 11h3v1H6z',
+    ],
   },
   {
     key: 'stats',
     label: '统计',
     title: '统计',
-    iconPaths: ['M3 3v18h18', 'M8 16v-6', 'M13 16V8', 'M18 16v-3'],
+    iconPaths: [
+      'M2 13h12v1H2z',
+      'M3 8h2v5H3z M7 4h2v9H7z M11 6h2v7h-2z',
+    ],
   },
   {
     key: 'radio',
     label: '电台',
     title: '专注电台',
-    iconPaths: ['M9 18V5l12-2v13', 'M6 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M18 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z'],
+    iconPaths: [
+      'M5 2h9v2H5z M5 4h2v7H5z M12 4h2v6h-2z',
+      'M2 10h5v3H2z M9 9h5v3H9z',
+    ],
   },
   {
     key: 'notifications',
     label: '通知',
     title: '通知中心',
-    iconPaths: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],
+    iconPaths: [
+      'M7 2h2v1H7z M5 3h6v2H5z M4 5h8v5H4z',
+      'M2 10h12v2H2z M6 13h4v1H6z',
+    ],
   },
   {
     key: 'settings',
     label: '设置',
     title: '设置',
     iconPaths: [
-      'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
-      'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .66.39 1.26 1 1.51.16.07.33.1.51.1H21a2 2 0 1 1 0 4h-.09c-.66 0-1.26.39-1.51 1Z',
+      'M7 1h2v2H7z M7 13h2v2H7z M1 7h2v2H1z M13 7h2v2h-2z',
+      'M3 3h2v2H3z M11 3h2v2h-2z M3 11h2v2H3z M11 11h2v2h-2z',
+      'M5 4h6v2H5z M5 10h6v2H5z M4 5h2v6H4z M10 5h2v6h-2z',
     ],
   },
 ] as const
@@ -225,6 +255,7 @@ let unlistenMove: (() => void) | null = null
 let unlistenTransition: (() => void) | null = null
 let unlistenOpenNotifications: (() => void) | null = null
 let unlistenOpenTask: (() => void) | null = null
+let uninstallPixelSpark: (() => void) | null = null
 let closeFallbackTimer: number | null = null
 
 function clearCloseFallback() {
@@ -243,6 +274,7 @@ function scheduleCloseFallback() {
 
 async function finishCloseAnimation() {
   clearCloseFallback()
+  clearDocumentSelection()
   panelAnimState.value = 'hidden'
   isClosing.value = false
   // 等透明度真正提交两帧再隐藏窗口：否则 DWM 会保留最后一帧（页头）几帧，看起来像残留+闪烁
@@ -294,6 +326,8 @@ function runOpenAnimation() {
 
 async function runCloseAnimation() {
   if (panelAnimState.value === 'closing') return
+  clearDocumentSelection()
+  clearRadioError()
   scheduleCloseFallback()
   panelAnimState.value = 'closing'
 }
@@ -401,12 +435,15 @@ onMounted(async () => {
     void onWindowTransition(String(event.payload ?? ''))
   })
 
-
+  if (panelRootRef.value) {
+    uninstallPixelSpark = installGlobalPixelSpark(panelRootRef.value)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onPanelKeydown)
   clearCloseFallback()
+  if (uninstallPixelSpark) uninstallPixelSpark()
   if (unlistenResize) unlistenResize()
   if (unlistenMove) unlistenMove()
   if (unlistenTransition) unlistenTransition()
@@ -480,7 +517,7 @@ async function closeWindow() {
           @click="navigateTo(item.key)"
         >
           <span class="nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
               <path
                 v-for="(path, pathIndex) in item.iconPaths"
                 :key="`${item.key}-icon-${pathIndex}`"

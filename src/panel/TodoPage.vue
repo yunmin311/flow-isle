@@ -872,8 +872,8 @@ onBeforeUnmount(() => {
               <span class="timer-time">{{ displayTime }}</span>
               <div class="timer-controls">
                 <button class="timer-btn" :class="{ 'is-paused': !running }" @click.stop="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
-                  <svg v-if="running" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="5" y="1" width="2" height="7"/></svg>
-                  <svg v-else width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
+                  <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                  <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8v14.4L19.5 12z"/></svg>
                 </button>
                 <button class="timer-btn done-btn" @click.stop="handleDoneTimer($event)" title="完成">
                   <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
@@ -891,7 +891,7 @@ onBeforeUnmount(() => {
               @click.stop="handleStartTask(task)"
               title="开始专注"
             >
-              <svg width="10" height="10" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8v14.4L19.5 12z"/></svg>
             </button>
 
             <!-- Subtask toggle button (next to play button) -->
@@ -948,7 +948,7 @@ onBeforeUnmount(() => {
                 @click.stop="handleStartSubtask(task, sub.id)"
                 title="开始子任务"
               >
-                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="1" width="2" height="7"/><rect x="4" y="2" width="2" height="5"/><rect x="6" y="3" width="1" height="3"/><rect x="7" y="4" width="1" height="1"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8v14.4L19.5 12z"/></svg>
               </button>
             </div>
           </div>
