@@ -172,20 +172,6 @@ async function scrollToPlaying() {
           <div class="station-name">{{ currentStation?.name ?? '选择一个电台' }}</div>
           <div class="station-desc">{{ currentStation?.description ?? '让音乐陪伴你的专注时光' }}</div>
         </div>
-        <div class="radio-deck-screen" :class="{ active: playing, loading }" aria-hidden="true">
-          <div class="spectrum-bars">
-            <span
-              v-for="(peak, idx) in SPECTRUM_BARS"
-              :key="idx"
-              class="spectrum-bar"
-              :style="{ '--peak': `${peak}%`, '--delay': `${(idx % 6) * 0.11}s` }"
-            ></span>
-          </div>
-          <div class="deck-readout">
-            <span class="deck-tag">{{ isLocalMedia ? 'DECK' : 'FM' }}</span>
-            <span class="deck-state">{{ loading ? 'LOAD' : playing ? 'PLAY' : 'IDLE' }}</span>
-          </div>
-        </div>
         <div class="player-controls">
           <button
             class="play-btn"
@@ -235,7 +221,7 @@ async function scrollToPlaying() {
         </div>
         <div v-if="currentStation" class="timeline">
           <template v-if="isLocalMedia">
-            <span class="time-label">{{ formatTime(currentTime) }}</span>
+            <span class="time-label"><StatNumber :value="formatTime(currentTime)" :size="16" inline /></span>
             <div
               ref="progressTrack"
               class="progress-track"
@@ -248,15 +234,27 @@ async function scrollToPlaying() {
               <div class="progress-fill" :style="{ width: `${progress * 100}%` }"></div>
               <div class="progress-thumb" :style="{ left: `${progress * 100}%` }"></div>
             </div>
-            <span class="time-label">{{ formatTime(duration) }}</span>
+            <span class="time-label"><StatNumber :value="formatTime(duration)" :size="16" inline /></span>
           </template>
           <template v-else>
             <span class="live-badge">LIVE</span>
-            <div class="live-bars" :class="{ paused: !playing && !loading }">
-              <span></span><span></span><span></span><span></span>
-            </div>
+            <span class="live-divider" aria-hidden="true"></span>
             <span class="live-hint">直播流 · 不可拖动</span>
           </template>
+        </div>
+        <div class="radio-deck-screen" :class="{ active: playing, loading }" aria-hidden="true">
+          <div class="spectrum-bars">
+            <span
+              v-for="(peak, idx) in SPECTRUM_BARS"
+              :key="idx"
+              class="spectrum-bar"
+              :style="{ '--peak': `${peak}%`, '--delay': `${(idx % 6) * 0.11}s` }"
+            ></span>
+          </div>
+          <div class="deck-readout">
+            <span class="deck-tag">{{ isLocalMedia ? 'DECK' : 'FM' }}</span>
+            <span class="deck-state">{{ loading ? 'LOAD' : playing ? 'PLAY' : 'IDLE' }}</span>
+          </div>
         </div>
         <div v-if="error" class="error-msg" role="alert">
           <span class="error-text">{{ error }}</span>
@@ -798,12 +796,22 @@ async function scrollToPlaying() {
 }
 
 .time-label {
-  width: 36px;
-  font-size: 9px;
-  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--v2-muted);
-  text-align: center;
   flex-shrink: 0;
+}
+
+.live-divider {
+  flex: 1;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--v2-line) 0 4px,
+    transparent 4px 8px
+  );
 }
 
 .progress-track {

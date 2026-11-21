@@ -376,7 +376,7 @@ onDeactivated(() => { selectedEmail.value = null })
       >
         <div class="focus-missed-head">
           <div class="focus-missed-heading">
-            <span class="focus-missed-badge">{{ lastFocusMissed.total }}</span>
+            <span class="focus-missed-badge"><StatNumber :value="lastFocusMissed.total" :size="16" inline /></span>
             <span class="focus-missed-title">{{ focusMissedTitle }}</span>
           </div>
           <button type="button" class="text-btn focus-missed-close" @click="clearFocusMissedSummary(); missedSocialError = null">

@@ -142,6 +142,20 @@ export function triggerPixelBurstAt(x: number, y: number, tone: SparkTone = 'acc
   }
 }
 
+export function triggerPixelBurstAtElement(
+  el: HTMLElement | null | undefined,
+  tone: SparkTone = 'accent',
+  count = 6,
+  anchor: 'center' | 'right' = 'center',
+) {
+  if (typeof window === 'undefined' || !el || reducedMotion()) return
+  const rect = el.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return
+  const x = anchor === 'right' ? rect.right - 14 : rect.left + rect.width / 2
+  const y = rect.top + rect.height / 2
+  triggerPixelBurstAt(x, y, tone, count)
+}
+
 export function triggerPixelBurstFromEvent(event?: Event | null, tone: SparkTone = 'accent', count = 8) {
   if (typeof window === 'undefined' || !event || reducedMotion()) return
   const target = (event.currentTarget ?? event.target) as HTMLElement | null
@@ -205,8 +219,38 @@ export function installGlobalPixelSpark(root: HTMLElement): () => void {
     }
   }
 
+  let lastDetentAt = 0
+  let lastDetentKey = ''
+
+  const onRangeInput = (event: Event) => {
+    if (reducedMotion()) return
+    const target = event.target as HTMLInputElement | null
+    if (!target || target.tagName !== 'INPUT' || target.type !== 'range') return
+    const min = Number(target.min || 0)
+    const max = Number(target.max || 100)
+    const val = Number(target.value)
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return
+    const pct = Math.round(((val - min) / (max - min)) * 100)
+    const detent = pct <= 1 ? 0 : pct >= 99 ? 100 : Math.abs(pct - 50) <= 1 ? 50 : -1
+    if (detent === -1) {
+      lastDetentKey = ''
+      return
+    }
+    const key = `${target.className}:${detent}`
+    const now = performance.now()
+    if (key === lastDetentKey || now - lastDetentAt < 350) return
+    lastDetentKey = key
+    lastDetentAt = now
+    const rect = target.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) {
+      triggerPixelBurstAt(rect.left + (rect.width * detent) / 100, rect.top + rect.height / 2, 'accent', 3)
+    }
+  }
+
   root.addEventListener('click', onClick, false)
+  root.addEventListener('input', onRangeInput, false)
   return () => {
     root.removeEventListener('click', onClick, false)
+    root.removeEventListener('input', onRangeInput, false)
   }
 }

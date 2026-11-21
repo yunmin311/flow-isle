@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onBeforeUnmount, onDeactivated } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, onDeactivated } from 'vue'
 import { useTasks, type Task, isTaskDoneOnDate, todayString } from '../composables/useTasks'
 import { useTimerBridge } from '../composables/useTimerBridge'
 import { useTaskGroups } from '../composables/useTaskGroups'
@@ -7,7 +7,8 @@ import { useSettings } from '../composables/useSettings'
 import { useCompanion, resolveIslandCompanionSprite, ALBUM_MINUTES } from '../composables/useCompanion'
 import { getCategoryColor } from '../composables/useMemos'
 import PixelTime from '../components/PixelTime.vue'
-import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
+import StatNumber from '../components/StatNumber.vue'
+import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement } from '../utils/pixelSpark'
 
 const emit = defineEmits<{
   close: []
@@ -121,6 +122,13 @@ function handleHeroAction(event?: MouseEvent) {
 // --- Quick-add state ---
 const newTitle = ref('')
 const quickAddRef = ref<HTMLInputElement | null>(null)
+const heroRef = ref<HTMLElement | null>(null)
+
+watch(pendingNotification, (next, prev) => {
+  if (!prev && (next === 'focus-done' || next === 'break-done')) {
+    triggerPixelBurstAtElement(heroRef.value, next === 'focus-done' ? 'gold' : 'break', 10, 'center')
+  }
+})
 
 // --- Title scroll animation ---
 type ScrollPhase = 'start' | 'scroll' | 'end'
@@ -212,6 +220,7 @@ async function handleInput(event: KeyboardEvent) {
     if (!t) return
     const task = addTask(t)
     newTitle.value = ''
+    triggerPixelBurstAtElement(quickAddRef.value, 'accent', 4, 'right')
     if (event.shiftKey) {
       setTaskPriority(task.id, 1)
       start(task.id, task.title)
@@ -254,7 +263,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 <template>
   <div class="home-page">
     <!-- Timer hero -->
-    <section class="focus-hero" :class="{ 'is-break': phase === 'break', 'is-running': running }" tabindex="-1" aria-label="专注计时">
+    <section ref="heroRef" class="focus-hero" :class="{ 'is-break': phase === 'break', 'is-running': running }" tabindex="-1" aria-label="专注计时">
       <div class="hero-eyebrow">
         <span class="pixel-status" aria-hidden="true"></span>
         <span>{{ heroEyebrow }}</span>
@@ -342,7 +351,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
           <div class="task-row">
             <span class="running-dot" :class="{ paused: !running }" aria-hidden="true"></span>
             <span class="task-title running-title">{{ phase === 'break' ? '休息中' : '快速专注' }}</span>
-            <span class="task-timer">{{ displayTime }}</span>
+            <span class="task-timer"><StatNumber :value="displayTime" :size="16" inline /></span>
             <button class="queue-btn" @click="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
               {{ running ? '暂停' : '继续' }}
             </button>
@@ -386,7 +395,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
             </span>
 
             <template v-if="activeTaskId === task.id">
-              <span class="task-timer">{{ displayTime }}</span>
+              <span class="task-timer"><StatNumber :value="displayTime" :size="16" inline /></span>
               <button class="queue-btn icon-only" @click="handleStartTask(task, $event)" :title="running ? '暂停' : '继续'" :aria-label="running ? '暂停' : '继续'">
                 <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" />

@@ -6,6 +6,7 @@ import MemoCategoryDialog from './MemoCategoryDialog.vue'
 import MemoCategoryDropdown from './MemoCategoryDropdown.vue'
 import MemoCategoryTag from './MemoCategoryTag.vue'
 import BackButton from './BackButton.vue'
+import PixelIcon from '../components/PixelIcon.vue'
 import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const props = defineProps<{ searchQuery?: string }>()
@@ -195,10 +196,7 @@ function handleCloseCategoryDialog() {
           <span class="memo-count-badge">{{ memoCount }} 条</span>
           <!-- 分类设置 -->
           <button class="header-icon-btn" @click="handleManageCategories" title="管理分类">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
+            <PixelIcon name="gear" :size="16" />
           </button>
           <!-- 新建 -->
           <button class="header-new-btn" @click="handleNewMemo" title="新建备忘录">
@@ -273,10 +271,7 @@ function handleCloseCategoryDialog() {
                 @click="(e) => handleDeleteMemo(memo, e)"
                 title="删除"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
+                <PixelIcon name="trash" :size="12" />
               </button>
             </div>
           </div>

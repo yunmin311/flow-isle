@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useCompanion } from '../composables/useCompanion'
+import PixelIcon from '../components/PixelIcon.vue'
 
 const { selectedCompanion } = useCompanion()
 
@@ -38,10 +39,7 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
     </div>
 
     <div v-if="showSearch" class="titlebar-search">
-      <svg class="search-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="7"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
+      <PixelIcon name="search" :size="12" class="search-icon" />
       <input
         :value="searchQuery"
         type="text"

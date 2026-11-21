@@ -345,6 +345,10 @@ textarea:focus-visible,
   color: var(--v2-ink);
 }
 
+#app .panel-root .focus-missed-badge .stat-number {
+  color: var(--v2-on-accent);
+}
+
 #app .panel-root :is(.update-hint, .shortcut-hint, .email-hint, .task-time, .pomo-count, .task-group-badge,
   .card-label, .radio-status, .notif-detail, .notif-app, .notif-time, .group-count, .empty, .focus-empty-text,
   .stat-label, .station-desc, .item-desc, .memo-item-preview, .memo-preview, .theme-name, .text-btn,

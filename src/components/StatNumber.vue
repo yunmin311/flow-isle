@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { PIXEL_3X5, layoutPixelText } from '../utils/pixelFont'
 
-const props = withDefaults(defineProps<{ value: number; unit?: string; size?: number; inline?: boolean }>(), {
+const props = withDefaults(defineProps<{ value: number | string; unit?: string; size?: number; inline?: boolean }>(), {
   unit: '',
   size: 24,
   inline: false,

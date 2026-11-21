@@ -7,7 +7,9 @@ import { getCategoryColor } from '../composables/useMemos'
 import TaskGroupDialog from './TaskGroupDialog.vue'
 import CalendarDatePicker from './CalendarDatePicker.vue'
 import RepeatPicker from './RepeatPicker.vue'
-import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
+import PixelIcon from '../components/PixelIcon.vue'
+import StatNumber from '../components/StatNumber.vue'
+import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement } from '../utils/pixelSpark'
 
 const props = defineProps<{ initialTab?: string; searchQuery?: string }>()
 const emit = defineEmits<{
@@ -310,6 +312,7 @@ function handleAddTask() {
     repeatConfig.value
   )
   newTitle.value = ''
+  triggerPixelBurstAtElement(quickAddRef.value, 'accent', 4, 'right')
   quickAddRef.value?.focus()
 }
 
@@ -681,9 +684,7 @@ onBeforeUnmount(() => {
           @click.stop="showTabsDropdown = !showTabsDropdown"
           title="选择分类"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
+          <PixelIcon name="chevron-down" :size="12" />
         </button>
         <div v-if="showTabsDropdown" class="tabs-dropdown-menu">
           <button
@@ -707,10 +708,7 @@ onBeforeUnmount(() => {
       </div>
 
       <button class="header-btn gear-btn" @click.stop="showGroupDialog = !showGroupDialog" title="管理分组">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1 1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .66.39 1.26 1 1.51.16.07.33.1.51.1H21a2 2 0 0 1 0 4h-.09c-.66 0-1.26.39-1.51 1Z"/>
-        </svg>
+        <PixelIcon name="gear" :size="16" />
       </button>
     </header>
 
@@ -719,7 +717,7 @@ onBeforeUnmount(() => {
       <div class="quick-add-input-row">
         <button class="inline-chip group-chip" :class="{ active: showGroupDropdown }" @click.stop="showGroupDropdown = !showGroupDropdown; showDatePicker = false; showRepeatMenu = false" :title="'分组: ' + selectedGroupLabel">
           <span v-if="selectedGroupId" class="group-dot" :style="{ backgroundColor: getCategoryColor(groups.find(g => g.id === selectedGroupId)?.color ?? 'yellow').icon }"></span>
-          <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <PixelIcon v-else name="folder" :size="12" />
           <span class="chip-label">{{ selectedGroupLabel }}</span>
         </button>
         <input
@@ -732,15 +730,11 @@ onBeforeUnmount(() => {
           @focus="showGroupDropdown = false; showDatePicker = false; showRepeatMenu = false"
         />
         <button class="inline-chip repeat-chip" :class="{ active: showRepeatMenu, on: !!repeatConfig }" @click.stop="showRepeatMenu = !showRepeatMenu; showDatePicker = false; showGroupDropdown = false" :title="repeatConfig ? '每天重复任务' : '设置重复'">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-          </svg>
+          <PixelIcon name="repeat" :size="12" />
           <span class="chip-label repeat-label">{{ repeatConfig ? '每天' : '重复' }}</span>
         </button>
         <button v-if="!repeatConfig" class="inline-chip date-chip" :class="{ active: showDatePicker }" @click.stop="showDatePicker = !showDatePicker; showGroupDropdown = false; showRepeatMenu = false" :title="'到期: ' + (formatShortDate(selectedDate) || '无日期')">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
+          <PixelIcon name="calendar" :size="12" />
           <span class="chip-label">{{ formatShortDate(selectedDate) || '无日期' }}</span>
         </button>
       </div>
@@ -870,7 +864,7 @@ onBeforeUnmount(() => {
             <div v-if="activeTaskId === task.id" class="task-timer" @click.stop>
               <span class="timer-pixel-pip" :class="{ paused: !running }" aria-hidden="true"></span>
               <span class="timer-phase">{{ phase === 'focus' ? '专注' : '休息' }}</span>
-              <span class="timer-time">{{ displayTime }}</span>
+              <span class="timer-time"><StatNumber :value="displayTime" :size="16" inline /></span>
               <div class="timer-controls">
                 <button class="timer-btn" :class="{ 'is-paused': !running }" @click.stop="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
                   <svg v-if="running" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
