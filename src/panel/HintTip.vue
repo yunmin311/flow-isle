@@ -30,5 +30,5 @@ async function show() {
 .hint-trigger.hint-text { width: auto; height: auto; min-height: 24px; margin: 0; justify-content: flex-start; text-align: left; font: inherit; color: inherit; line-height: inherit; }
 .hint-text:hover { text-decoration: underline dotted; text-underline-offset: 4px; text-decoration-color: var(--v2-muted); }
 .hint-trigger:focus-visible { outline: 1px solid var(--v2-accent); border-radius: 3px; }
-.settings-hint-bubble { position: fixed; z-index: 10000; max-width: min(240px, calc(100vw - 24px)); box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--v2-line); border-radius: 7px; background: var(--v2-shell); color: var(--v2-ink); box-shadow: 0 3px 14px #0002; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 11px; font-weight: 400; line-height: 1.65; pointer-events: none; overflow-wrap: anywhere; }
+.settings-hint-bubble { position: fixed; z-index: 10000; max-width: min(240px, calc(100vw - 24px)); box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--v2-line); border-radius: 7px; background: var(--v2-shell); color: var(--v2-ink); box-shadow: 0 3px 14px #0002; font-family: var(--font-ui); font-size: 11px; font-weight: 400; line-height: 1.65; pointer-events: none; overflow-wrap: anywhere; }
 </style>

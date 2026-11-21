@@ -428,9 +428,9 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
     <div class="quick-add-zone">
       <div class="quick-add-row">
         <div class="quick-add-search">
-          <svg class="search-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-            <rect x="7" y="3" width="2" height="10" />
-            <rect x="3" y="7" width="10" height="2" />
+          <svg class="search-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+            <rect x="5" y="2" width="2" height="8" />
+            <rect x="2" y="5" width="8" height="2" />
           </svg>
           <input
             ref="quickAddRef"
@@ -469,7 +469,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   overflow-y: auto;
   background: transparent;
   color: var(--v2-ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
 }
 
 .home-page::-webkit-scrollbar {

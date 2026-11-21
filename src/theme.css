@@ -18,6 +18,8 @@
   --v2-idle: #776253;
   --v2-alert: #c96a32;
   --v2-danger: #b84237;
+  --font-ui: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, monospace;
   color-scheme: light;
 }
 

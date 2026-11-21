@@ -88,7 +88,7 @@ textarea:focus-visible,
   background: transparent;
   border: 0;
   box-shadow: none;
-  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family: var(--font-ui);
 }
 
 #app .panel-root .panel-inner {

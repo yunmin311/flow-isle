@@ -1071,7 +1071,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: transparent;
   color: var(--v2-ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
 }
 
 /* Header with integrated tabs */

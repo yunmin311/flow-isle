@@ -545,7 +545,7 @@ async function closeWindow() {
   box-shadow: none;
   overflow: clip;
   color: var(--panel-text);
-  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family: var(--font-ui);
   transform-origin: 50% 0;
   --panel-from-x: 0px;
   --panel-from-y: -34px;

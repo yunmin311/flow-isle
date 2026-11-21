@@ -2,6 +2,7 @@
 import { computed, ref, nextTick, onDeactivated } from 'vue'
 import { useRadio, CATEGORY_LABELS, type StationCategory, type RadioStation } from '../composables/useRadio'
 import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
+import StatNumber from '../components/StatNumber.vue'
 
 const {
   stations, currentStation, playing, loading, error, clearError, volume,
@@ -140,9 +141,6 @@ function removeStation(id: string, event: Event) {
 const scrollContainer = ref<HTMLElement | null>(null)
 const showScrollToPlaying = ref(false)
 const SPECTRUM_BARS = [42, 76, 58, 92, 66, 84, 52, 96, 70, 82, 48, 64]
-const VOLUME_SEGMENTS = 10
-
-const activeVolumeSegments = computed(() => Math.round((volume.value / 100) * VOLUME_SEGMENTS))
 
 function handleScroll() {
   if (!scrollContainer.value) return
@@ -185,7 +183,7 @@ async function scrollToPlaying() {
           </div>
           <div class="deck-readout">
             <span class="deck-tag">{{ isLocalMedia ? 'DECK' : 'FM' }}</span>
-            <span class="deck-vol">{{ String(volume).padStart(2, '0') }}</span>
+            <span class="deck-state">{{ loading ? 'LOAD' : playing ? 'PLAY' : 'IDLE' }}</span>
           </div>
         </div>
         <div class="player-controls">
@@ -208,33 +206,31 @@ async function scrollToPlaying() {
               <path d="M8 5.4v13.2a1 1 0 0 0 1.5.86l10.6-6.6a1 1 0 0 0 0-1.72L9.5 4.54A1 1 0 0 0 8 5.4Z" />
             </svg>
           </button>
-          <div class="volume-stack">
-            <div class="volume-row">
-              <svg class="vol-icon" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                <rect x="2" y="6" width="3" height="4" />
-                <rect x="5" y="5" width="2" height="6" />
-                <rect x="7" y="3" width="2" height="10" />
-                <rect v-if="volume > 0" x="11" y="6" width="1" height="4" />
-                <rect v-if="volume > 50" x="13" y="4" width="1" height="8" />
-              </svg>
-              <input
-                type="range"
-                class="volume-slider"
-                min="0"
-                max="100"
-                :value="volume"
-                :style="{ '--volume': `${volume}%` }"
-                @input="setVolume(Number(($event.target as HTMLInputElement).value))"
-              />
-              <span class="vol-value">{{ volume }}</span>
-            </div>
-            <div class="vol-meter" aria-hidden="true">
-              <i
-                v-for="n in VOLUME_SEGMENTS"
-                :key="n"
-                :class="{ filled: n <= activeVolumeSegments }"
-              />
-            </div>
+          <div class="volume-row">
+            <svg class="vol-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="1" y="6" width="3" height="4" />
+              <rect x="4" y="5" width="2" height="6" />
+              <rect x="6" y="3" width="2" height="10" />
+              <template v-if="volume === 0">
+                <rect x="10" y="5" width="2" height="2" /><rect x="14" y="5" width="2" height="2" />
+                <rect x="12" y="7" width="2" height="2" />
+                <rect x="10" y="9" width="2" height="2" /><rect x="14" y="9" width="2" height="2" />
+              </template>
+              <template v-else>
+                <rect x="10" y="6" width="2" height="4" />
+                <rect v-if="volume > 45" x="13" y="4" width="2" height="8" />
+              </template>
+            </svg>
+            <input
+              type="range"
+              class="volume-slider"
+              min="0"
+              max="100"
+              :value="volume"
+              :style="{ '--volume': `${volume}%` }"
+              @input="setVolume(Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="vol-value"><StatNumber :value="volume" :size="16" inline /></span>
           </div>
         </div>
         <div v-if="currentStation" class="timeline">
@@ -775,11 +771,16 @@ async function scrollToPlaying() {
   line-height: 1;
 }
 
-.deck-vol {
-  font-size: 10px;
+.deck-state {
+  font-size: 9px;
   font-weight: 700;
-  color: var(--v2-secondary);
+  letter-spacing: 0.08em;
+  color: var(--v2-muted);
   line-height: 1;
+}
+
+.radio-deck-screen.active .deck-state {
+  color: var(--v2-accent);
 }
 
 .player-controls {
@@ -1035,46 +1036,18 @@ async function scrollToPlaying() {
   background: color-mix(in srgb, var(--v2-danger, #c44a3f) 14%, transparent);
 }
 
-.volume-stack {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .volume-row {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
-}
-
-.vol-meter {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 3px;
-  height: 4px;
-  padding-left: 22px;
-  padding-right: 28px;
-}
-
-.vol-meter i {
-  display: block;
-  height: 4px;
-  border-radius: 1px;
-  background: var(--v2-line);
-  transition: background 140ms ease;
-}
-
-.vol-meter i.filled {
-  background: var(--v2-accent);
 }
 
 .vol-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--v2-muted);
+  width: 16px;
+  height: 16px;
+  color: var(--v2-secondary);
   flex-shrink: 0;
   image-rendering: pixelated;
 }
@@ -1084,13 +1057,19 @@ async function scrollToPlaying() {
   min-width: 0;
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
-  /* 只比原来清楚一点：未填充轨道用低透明度 ink，已填充部分略深，不抢内容。 */
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--v2-ink) 18%, transparent) 0 var(--volume, 0%),
-    color-mix(in srgb, var(--v2-ink) 9%, transparent) var(--volume, 0%) 100%
-  );
-  border-radius: 3px;
+  height: 6px;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      var(--v2-surface) 10px 13px
+    ),
+    linear-gradient(
+      90deg,
+      var(--v2-accent) 0 var(--volume, 0%),
+      color-mix(in srgb, var(--v2-ink) 12%, transparent) var(--volume, 0%) 100%
+    );
+  border-radius: 2px;
   outline: none;
   cursor: pointer;
   position: relative;
@@ -1099,7 +1078,7 @@ async function scrollToPlaying() {
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 10px;
-  height: 12px;
+  height: 14px;
   background: var(--v2-accent);
   border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
   border-radius: 2px;
@@ -1114,15 +1093,15 @@ async function scrollToPlaying() {
 }
 
 .volume-slider::-webkit-slider-thumb:active {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .vol-value {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--v2-muted);
-  min-width: 20px;
-  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--v2-secondary);
+  min-width: 26px;
   flex-shrink: 0;
 }
 

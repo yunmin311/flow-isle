@@ -20,6 +20,8 @@ import { useTasks } from '../composables/useTasks'
 import { emailInboxUrl, formatEmailSourceTag } from '../utils/emailLinks'
 import EmailReader from './EmailReader.vue'
 import ScreenshotShelf from './ScreenshotShelf.vue'
+import StatNumber from '../components/StatNumber.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const props = defineProps<{ focusRequest?: { recordId?: string; openSource?: boolean; destination?: 'timer'; focusMissed?: boolean } }>()
 const emit = defineEmits<{ back: []; openTask: [taskId: string]; openHome: []; openTodo: [] }>()
@@ -323,39 +325,33 @@ onDeactivated(() => { selectedEmail.value = null })
     <!-- 音量：紧凑工具条，进入邮件正文阅读时自动隐藏以让出阅读空间 -->
     <template v-if="!selectedEmail">
       <div v-if="volumeReady" class="volume-strip">
-        <div class="volume-top-row">
-          <span class="volume-pixel-pip" :class="{ muted: sysMuted || sysVolume === 0 }" aria-hidden="true"></span>
-          <span class="volume-label">音量</span>
-          <button class="mute-btn" :class="{ active: sysMuted }" @click="toggleMute" :title="sysMuted ? '取消静音' : '静音'">
-            <svg v-if="sysMuted || sysVolume === 0" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="2" y="6" width="3" height="4" /><rect x="5" y="5" width="2" height="6" /><rect x="7" y="3" width="2" height="10" />
-              <rect x="11" y="5" width="1" height="1" /><rect x="12" y="6" width="1" height="1" /><rect x="13" y="7" width="1" height="2" />
-              <rect x="12" y="9" width="1" height="1" /><rect x="11" y="10" width="1" height="1" />
-              <rect x="14" y="5" width="1" height="1" /><rect x="14" y="10" width="1" height="1" />
-            </svg>
-            <svg v-else viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="2" y="6" width="3" height="4" /><rect x="5" y="5" width="2" height="6" /><rect x="7" y="3" width="2" height="10" />
-              <rect x="11" y="6" width="1" height="4" /><rect v-if="sysVolume > 50" x="13" y="4" width="1" height="8" />
-            </svg>
-          </button>
-          <input
-            type="range"
-            class="volume-slider"
-            min="0"
-            max="100"
-            :value="sysVolume"
-            :style="{ '--volume': `${sysMuted ? 0 : sysVolume}%` }"
-            @input="onVolumeInput"
-          />
-          <span class="volume-value">{{ sysMuted ? '静音' : sysVolume }}</span>
-        </div>
-        <div class="sys-vol-meter" aria-hidden="true">
-          <i
-            v-for="n in 10"
-            :key="n"
-            :class="{ filled: !sysMuted && n <= Math.round((sysVolume / 100) * 10) }"
-          />
-        </div>
+        <span class="volume-pixel-pip" :class="{ muted: sysMuted || sysVolume === 0 }" aria-hidden="true"></span>
+        <span class="volume-label">音量</span>
+        <button class="mute-btn" :class="{ active: sysMuted }" @click="triggerPixelBurstFromEvent($event, 'accent', 4); toggleMute()" :title="sysMuted ? '取消静音' : '静音'">
+          <svg v-if="sysMuted || sysVolume === 0" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+            <rect x="1" y="6" width="3" height="4" /><rect x="4" y="5" width="2" height="6" /><rect x="6" y="3" width="2" height="10" />
+            <rect x="10" y="5" width="2" height="2" /><rect x="14" y="5" width="2" height="2" />
+            <rect x="12" y="7" width="2" height="2" />
+            <rect x="10" y="9" width="2" height="2" /><rect x="14" y="9" width="2" height="2" />
+          </svg>
+          <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+            <rect x="1" y="6" width="3" height="4" /><rect x="4" y="5" width="2" height="6" /><rect x="6" y="3" width="2" height="10" />
+            <rect x="10" y="6" width="2" height="4" /><rect v-if="sysVolume > 45" x="13" y="4" width="2" height="8" />
+          </svg>
+        </button>
+        <input
+          type="range"
+          class="volume-slider"
+          min="0"
+          max="100"
+          :value="sysVolume"
+          :style="{ '--volume': `${sysMuted ? 0 : sysVolume}%` }"
+          @input="onVolumeInput"
+        />
+        <span class="volume-value">
+          <template v-if="sysMuted">静音</template>
+          <StatNumber v-else :value="sysVolume" :size="16" inline />
+        </span>
       </div>
       <div v-else class="volume-hint">{{ volumeError ?? '读取系统音量中…' }}</div>
     </template>
@@ -669,41 +665,15 @@ onDeactivated(() => { selectedEmail.value = null })
 
 .volume-strip {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 7px 11px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
   margin-bottom: 10px;
   border-radius: 12px;
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
   box-shadow: inset 0 1px 0 var(--v2-specular);
   flex-shrink: 0;
-}
-
-.volume-top-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sys-vol-meter {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 3px;
-  height: 3px;
-  padding: 0 34px 0 66px;
-}
-
-.sys-vol-meter i {
-  display: block;
-  height: 3px;
-  border-radius: 1px;
-  background: var(--v2-line);
-  transition: background 140ms ease;
-}
-
-.sys-vol-meter i.filled {
-  background: var(--v2-accent);
 }
 
 .volume-pixel-pip {
@@ -741,8 +711,9 @@ onDeactivated(() => { selectedEmail.value = null })
 }
 
 .mute-btn svg {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
 }
 
 .mute-btn:hover {
@@ -757,15 +728,22 @@ onDeactivated(() => { selectedEmail.value = null })
 
 .volume-slider {
   flex: 1;
+  min-width: 0;
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 6px;
   border-radius: 2px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--v2-accent) 45%, transparent) 0 var(--volume, 0%),
-    var(--ui-hover) var(--volume, 0%) 100%
-  );
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      var(--v2-surface) 10px 13px
+    ),
+    linear-gradient(
+      90deg,
+      var(--v2-accent) 0 var(--volume, 0%),
+      color-mix(in srgb, var(--v2-ink) 12%, transparent) var(--volume, 0%) 100%
+    );
   outline: none;
   cursor: pointer;
 }
@@ -774,7 +752,7 @@ onDeactivated(() => { selectedEmail.value = null })
   -webkit-appearance: none;
   appearance: none;
   width: 10px;
-  height: 12px;
+  height: 14px;
   border-radius: 2px;
   background: var(--v2-accent);
   border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
@@ -783,8 +761,10 @@ onDeactivated(() => { selectedEmail.value = null })
 }
 
 .volume-value {
-  min-width: 26px;
-  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 28px;
   font-size: 11px;
   color: var(--v2-secondary);
   font-variant-numeric: tabular-nums;

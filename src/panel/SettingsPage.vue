@@ -9,6 +9,7 @@ import BackButton from './BackButton.vue'
 import EmailAccounts from './EmailAccounts.vue'
 import HintTip from './HintTip.vue'
 import StatNumber from '../components/StatNumber.vue'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 const settingsTab = ref('notifications')
 const emailEditing = ref(false)
 const settingsRoot = ref<HTMLElement | null>(null)
@@ -166,7 +167,6 @@ watch(
   { deep: true },
 )
 
-const opacityPercent = (v: number) => Math.round(v * 100) + '%'
 
 const showAbout = ref(false)
 const isRecording = ref(false)
@@ -583,9 +583,10 @@ onUnmounted(() => {
           min="0.4"
           max="1"
           step="0.01"
+          :style="{ '--slider-pct': `${Math.round(((settings.islandOpacity - 0.4) / 0.6) * 100)}%` }"
           v-model.number="settings.islandOpacity"
         />
-        <span class="opacity-value">{{ opacityPercent(settings.islandOpacity) }}</span>
+        <span class="opacity-value"><StatNumber :value="Math.round(settings.islandOpacity * 100)" unit="%" :size="16" inline /></span>
       </div>
       <div class="slider-row">
         <label class="slider-label">面板不透明度</label>
@@ -595,9 +596,10 @@ onUnmounted(() => {
           min="0.4"
           max="1"
           step="0.01"
+          :style="{ '--slider-pct': `${Math.round(((settings.panelOpacity - 0.4) / 0.6) * 100)}%` }"
           v-model.number="settings.panelOpacity"
         />
-        <span class="opacity-value">{{ opacityPercent(settings.panelOpacity) }}</span>
+        <span class="opacity-value"><StatNumber :value="Math.round(settings.panelOpacity * 100)" unit="%" :size="16" inline /></span>
       </div>
       <div class="opacity-hint">40% = 微透玻璃，100% = 完全实心</div>
       <div class="slider-row">
@@ -608,9 +610,10 @@ onUnmounted(() => {
           min="0.5"
           max="1.5"
           step="0.1"
+          :style="{ '--slider-pct': `${Math.round(((settings.islandScale - 0.5) / 1.0) * 100)}%` }"
           v-model.number="settings.islandScale"
         />
-        <span class="opacity-value">{{ Math.round(settings.islandScale * 100) }}%</span>
+        <span class="opacity-value"><StatNumber :value="Math.round(settings.islandScale * 100)" unit="%" :size="16" inline /></span>
       </div>
     </div>
 
@@ -634,18 +637,18 @@ onUnmounted(() => {
         <div class="duration-cell">
           <label class="duration-label">专注</label>
           <div class="stepper">
-            <button class="stepper-btn" @click="settings.focusDuration = Math.max(5, Math.floor((settings.focusDuration - 1) / 5) * 5)">−</button>
+            <button class="stepper-btn" @click="triggerPixelBurstFromEvent($event, 'accent', 4); settings.focusDuration = Math.max(5, Math.floor((settings.focusDuration - 1) / 5) * 5)">−</button>
             <span class="stepper-value"><StatNumber :value="settings.focusDuration" :size="16" class="stepper-pixel-num" /></span>
-            <button class="stepper-btn" @click="settings.focusDuration = Math.min(120, Math.ceil((settings.focusDuration + 1) / 5) * 5)">+</button>
+            <button class="stepper-btn" @click="triggerPixelBurstFromEvent($event, 'accent', 4); settings.focusDuration = Math.min(120, Math.ceil((settings.focusDuration + 1) / 5) * 5)">+</button>
           </div>
           <span class="duration-unit">分</span>
         </div>
         <div class="duration-cell">
           <label class="duration-label">休息</label>
           <div class="stepper">
-            <button class="stepper-btn" @click="settings.breakDuration = Math.max(1, settings.breakDuration - 1)">−</button>
+            <button class="stepper-btn" @click="triggerPixelBurstFromEvent($event, 'break', 4); settings.breakDuration = Math.max(1, settings.breakDuration - 1)">−</button>
             <span class="stepper-value"><StatNumber :value="settings.breakDuration" :size="16" class="stepper-pixel-num" /></span>
-            <button class="stepper-btn" @click="settings.breakDuration = Math.min(30, settings.breakDuration + 1)">+</button>
+            <button class="stepper-btn" @click="triggerPixelBurstFromEvent($event, 'break', 4); settings.breakDuration = Math.min(30, settings.breakDuration + 1)">+</button>
           </div>
           <span class="duration-unit">分</span>
         </div>
@@ -692,7 +695,7 @@ onUnmounted(() => {
           :key="theme.id"
           class="theme-card"
           :class="{ active: settings.activeThemeId === theme.id }"
-          @click="settings.activeThemeId = theme.id"
+          @click="settings.activeThemeId = theme.id; triggerPixelBurstFromEvent($event, 'accent', 7)"
         >
           <div class="theme-preview" aria-hidden="true">
             <span class="preview-pill" :style="{ background: theme.focusColor }"></span>
@@ -1307,17 +1310,29 @@ onUnmounted(() => {
 
 .opacity-slider {
   flex: 1;
+  min-width: 0;
   appearance: none;
-  height: 3px;
+  height: 6px;
   border-radius: 2px;
-  background: var(--ui-hover);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      var(--v2-shell) 10px 13px
+    ),
+    linear-gradient(
+      90deg,
+      var(--v2-accent) 0 var(--slider-pct, 50%),
+      color-mix(in srgb, var(--v2-ink) 12%, transparent) var(--slider-pct, 50%) 100%
+    );
   outline: none;
+  cursor: pointer;
 }
 
 .opacity-slider::-webkit-slider-thumb {
   appearance: none;
   width: 10px;
-  height: 12px;
+  height: 14px;
   border-radius: 2px;
   background: var(--v2-accent);
   border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
@@ -1326,11 +1341,12 @@ onUnmounted(() => {
 }
 
 .opacity-value {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   color: var(--v2-secondary);
-  min-width: 32px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  flex-shrink: 0;
 }
 
 /* 番茄钟 */

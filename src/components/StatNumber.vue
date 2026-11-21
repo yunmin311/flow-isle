@@ -2,9 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { PIXEL_3X5, layoutPixelText } from '../utils/pixelFont'
 
-const props = withDefaults(defineProps<{ value: number; unit?: string; size?: number }>(), {
+const props = withDefaults(defineProps<{ value: number; unit?: string; size?: number; inline?: boolean }>(), {
   unit: '',
   size: 24,
+  inline: false,
 })
 
 const root = ref<HTMLElement>()
@@ -50,6 +51,7 @@ onBeforeUnmount(() => {
   <span
     ref="root"
     class="stat-number"
+    :class="{ 'is-inline': inline }"
     :data-long="formattedValue.length > 5"
     :data-very-long="formattedValue.length > 9"
     :title="formattedValue + unit"
@@ -88,6 +90,12 @@ onBeforeUnmount(() => {
   min-height: 20px;
   white-space: nowrap;
   line-height: 1.25;
+}
+
+.stat-number.is-inline {
+  display: inline-flex;
+  width: auto;
+  min-height: 14px;
 }
 
 .number-content {

@@ -287,7 +287,7 @@ function selectCell(cell: CalendarCell) {
   padding: 10px;
   background: transparent;
   color: var(--v2-ink);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ui);
   user-select: none;
 }
 
