@@ -36,6 +36,7 @@ export interface ApprovedAction {
 export interface CompanionRecord {
   minutes: number
   collectedAt: number | null
+  nickname?: string
 }
 
 export interface CompanionSyncPayload {
@@ -137,7 +138,8 @@ function normalizeRecords(raw: unknown): Record<string, CompanionRecord> {
     const rec = entry as Partial<CompanionRecord>
     const minutes = typeof rec.minutes === 'number' && Number.isFinite(rec.minutes) && rec.minutes >= 0 ? rec.minutes : 0
     const collectedAt = typeof rec.collectedAt === 'number' && Number.isFinite(rec.collectedAt) ? rec.collectedAt : null
-    clean[id] = { minutes, collectedAt }
+    const nickname = typeof rec.nickname === 'string' && rec.nickname.trim() ? rec.nickname.trim().slice(0, 16) : undefined
+    clean[id] = nickname ? { minutes, collectedAt, nickname } : { minutes, collectedAt }
   }
   return clean
 }
@@ -273,6 +275,23 @@ export function collectCompanionPicture(id: string) {
   }
 }
 
+export function setCompanionNickname(id: string, rawNickname: string) {
+  if (!companionAnimals.some(a => a.id === id)) return
+  const prev = companionRecord(id)
+  const clean = rawNickname.trim().slice(0, 16)
+  const next: CompanionRecord = { minutes: prev.minutes, collectedAt: prev.collectedAt }
+  if (clean) next.nickname = clean
+  companionRecords.value = {
+    ...companionRecords.value,
+    [id]: next,
+  }
+}
+
+export function companionDisplayName(animal: CompanionAnimal): string {
+  const custom = companionRecord(animal.id).nickname?.trim()
+  return custom || animal.name
+}
+
 /** Deterministic zero-polling mood selector (xiaotang-daozai pattern using FlowIsle assets). */
 export function resolveIslandCompanionSprite(
   animal: CompanionAnimal,
@@ -342,6 +361,8 @@ export function useCompanion() {
     selectCompanion,
     recordCompanionMinutes,
     collectCompanionPicture,
+    setCompanionNickname,
+    companionDisplayName,
     applyExternalCompanionState,
     installCompanionSyncResponder,
   }

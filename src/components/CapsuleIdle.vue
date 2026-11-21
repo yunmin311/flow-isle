@@ -231,6 +231,18 @@ onUnmounted(() => {
 .companion-pixel {
     display: block;
     image-rendering: pixelated;
+    animation: idle-companion-breath 2.8s steps(2, end) infinite;
+}
+
+@keyframes idle-companion-breath {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .companion-pixel {
+        animation: none;
+    }
 }
 
 .alert-pip {

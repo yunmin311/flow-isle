@@ -128,6 +128,18 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 .companion-pixel {
   display: block;
   image-rendering: pixelated;
+  animation: focus-companion-breath 2.4s steps(2, end) infinite;
+}
+
+@keyframes focus-companion-breath {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-pixel {
+    animation: none;
+  }
 }
 
 .phase-pip {

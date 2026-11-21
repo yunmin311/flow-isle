@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import CompanionScene from '../components/CompanionScene.vue'
+import StatNumber from '../components/StatNumber.vue'
 import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 import {
   ALBUM_MINUTES,
   approvedCompanionActions,
   collectCompanionPicture,
   companionAnimals,
+  companionDisplayName,
   companionRecord,
   getCompanionStage,
   selectCompanion,
   selectedCompanion,
+  setCompanionNickname,
   type CompanionAnimal,
 } from '../composables/useCompanion'
 
@@ -110,10 +113,64 @@ function viewerClosed() {
 }
 
 const collectedStatus = ref<HTMLElement | null>(null)
+const displayName = computed(() => companionDisplayName(selectedCompanion.value))
+
+// 小动物自定义命名
+const editingName = ref(false)
+const nicknameDraft = ref('')
+const nicknameInputRef = ref<HTMLInputElement | null>(null)
+
+function startRenameCompanion() {
+  nicknameDraft.value = record.value.nickname ?? ''
+  editingName.value = true
+  void nextTick(() => nicknameInputRef.value?.focus())
+}
+
+function commitRenameCompanion() {
+  if (!editingName.value) return
+  setCompanionNickname(activeId.value, nicknameDraft.value)
+  editingName.value = false
+}
+
+function cancelRenameCompanion() {
+  editingName.value = false
+}
+
+// 轻触陪伴动物：像素轻跳 + 暖心气泡
+const petHopping = ref(false)
+const petWhisper = ref<string | null>(null)
+let petHopTimer: number | null = null
+let petWhisperTimer: number | null = null
+let petCount = 0
+
+const FAMILY_WHISPERS: Record<'cat' | 'dog' | 'fox', string[]> = {
+  cat: ['呼噜呼噜~', '蹭了蹭你的手', '蜷在暖光里陪你'],
+  dog: ['摇了摇尾巴!', '乖乖等你专注', '耳朵竖起来啦'],
+  fox: ['竖起耳朵听着呢', '尾巴轻轻扫过', '陪你守着这一轮'],
+}
+
+function petCompanion(event?: MouseEvent) {
+  petCount += 1
+  const pool = FAMILY_WHISPERS[selectedCompanion.value.family]
+  petWhisper.value = pool[petCount % pool.length]
+  petHopping.value = true
+  triggerPixelBurstFromEvent(event, 'gold', 7)
+  if (petHopTimer !== null) window.clearTimeout(petHopTimer)
+  if (petWhisperTimer !== null) window.clearTimeout(petWhisperTimer)
+  petHopTimer = window.setTimeout(() => { petHopping.value = false }, 360)
+  petWhisperTimer = window.setTimeout(() => { petWhisper.value = null }, 2100)
+}
+
+onBeforeUnmount(() => {
+  if (petHopTimer !== null) window.clearTimeout(petHopTimer)
+  if (petWhisperTimer !== null) window.clearTimeout(petWhisperTimer)
+})
 
 watch(activeId, () => {
   announcement.value = ''
   showScene.value = true
+  editingName.value = false
+  petWhisper.value = null
 })
 
 async function collect(event?: MouseEvent) {
@@ -129,10 +186,39 @@ async function collect(event?: MouseEvent) {
   <div class="companion-panel">
     <div class="companion-heading">
       <div class="companion-current">
-        <img :src="selectedCompanion.sitUrl" alt="" width="18" height="18" />
-        <div>
-          <p>正在陪伴 · {{ stage.label }}</p>
-          <h2>{{ selectedCompanion.name }}</h2>
+        <span class="companion-avatar-tile">
+          <img :src="selectedCompanion.sitUrl" alt="" width="36" height="36" class="heading-sprite" />
+        </span>
+        <div class="companion-title-col">
+          <p>正在陪伴 · {{ stage.label }}<template v-if="record.nickname"> · {{ selectedCompanion.name }}</template></p>
+          <div v-if="editingName" class="rename-row">
+            <input
+              ref="nicknameInputRef"
+              v-model="nicknameDraft"
+              class="nickname-input"
+              maxlength="16"
+              :placeholder="selectedCompanion.name"
+              @keydown.enter.prevent="commitRenameCompanion"
+              @keydown.esc.prevent="cancelRenameCompanion"
+              @blur="commitRenameCompanion"
+            />
+          </div>
+          <div v-else class="companion-name-row">
+            <h2>{{ displayName }}</h2>
+            <button
+              type="button"
+              class="rename-companion-btn"
+              title="给伙伴起个名字"
+              aria-label="给伙伴起个名字"
+              @click="startRenameCompanion"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                <rect x="8" y="1" width="2" height="2" /><rect x="6" y="3" width="2" height="2" />
+                <rect x="4" y="5" width="2" height="2" /><rect x="2" y="7" width="2" height="2" />
+                <rect x="1" y="9" width="2" height="2" /><rect x="5" y="10" width="6" height="1" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
       <button
@@ -149,24 +235,40 @@ async function collect(event?: MouseEvent) {
 
     <div class="collection-preview">
       <div class="collection-visual">
-        <div class="collection-art">
-          <CompanionScene
-            :name="selectedCompanion.name"
-            :background-url="selectedCompanion.backgroundUrl"
-            :portrait-url="selectedCompanion.portraitUrl"
-            :placement="selectedCompanion.placement"
-            :mode="showScene ? 'scene' : 'detail'"
-            :size="216"
-          />
-        </div>
-        <button class="text-button" :aria-pressed="!showScene" @click="showScene = !showScene">
-          {{ showScene ? '查看立绘' : '查看场景' }}
+        <button
+          type="button"
+          class="collection-art-frame"
+          :class="{ 'is-hopping': petHopping }"
+          :title="`轻拍 ${displayName}`"
+          @click="petCompanion($event)"
+        >
+          <div class="collection-art">
+            <CompanionScene
+              :name="displayName"
+              :background-url="selectedCompanion.backgroundUrl"
+              :portrait-url="selectedCompanion.portraitUrl"
+              :placement="selectedCompanion.placement"
+              :mode="showScene ? 'scene' : 'detail'"
+              :size="216"
+            />
+          </div>
+          <transition name="whisper-pop">
+            <span v-if="petWhisper" class="pet-whisper">{{ petWhisper }}</span>
+          </transition>
         </button>
+        <div class="visual-tools">
+          <button class="text-button" :aria-pressed="!showScene" @click="showScene = !showScene">
+            {{ showScene ? '查看立绘' : '查看场景' }}
+          </button>
+        </div>
       </div>
 
       <div class="collection-copy">
         <h3>{{ record.collectedAt ? '已经收藏' : ready ? '可以收藏了' : '一起度过的时间' }}</h3>
-        <p class="companion-time"><strong>{{ Math.floor(record.minutes) }}</strong> 分钟</p>
+        <p class="companion-time">
+          <StatNumber :value="Math.floor(record.minutes)" :size="24" inline class="companion-pixel-mins" />
+          <span class="companion-time-unit">分钟</span>
+        </p>
         <p class="hint collection-status">
           {{
             record.collectedAt
@@ -395,26 +497,31 @@ button:focus-visible, summary:focus-visible {
 
 .quiet-button {
   font-size: 12px;
+  font-weight: 500;
   color: var(--v2-ink);
   padding: 5px 10px;
   border: 1px solid var(--v2-line);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
   flex-shrink: 0;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
 }
 
 .quiet-button:hover {
   background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 34%, var(--v2-line));
 }
 
 .quiet-button:active {
-  background: var(--ui-pressed);
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .companion-heading, .companion-current {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .companion-heading {
@@ -425,27 +532,98 @@ button:focus-visible, summary:focus-visible {
   min-width: 0;
 }
 
+.companion-avatar-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.heading-sprite {
+  display: block;
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  animation: companion-idle-bob 2.6s steps(2, end) infinite;
+}
+
+.companion-title-col {
+  min-width: 0;
+}
+
 .companion-current p {
   font-size: 11px;
   color: var(--v2-muted);
 }
 
+.companion-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .companion-current h2 {
-  font-size: 18px;
+  font-size: 17px;
   overflow-wrap: anywhere;
+}
+
+.rename-companion-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
+  color: var(--v2-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rename-companion-btn:hover {
+  color: var(--v2-accent);
+  border-color: color-mix(in srgb, var(--v2-accent) 34%, var(--v2-line));
+}
+
+.rename-row {
+  margin-top: 2px;
+}
+
+.nickname-input {
+  width: 150px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--v2-accent);
+  background: var(--v2-surface);
+  color: var(--v2-ink);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
 }
 
 .collection-preview {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
+  gap: 14px;
+  padding: 15px;
   border: 1px solid var(--v2-line);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     radial-gradient(ellipse at 50% 15%, var(--v2-glow), transparent 65%),
     var(--v2-surface);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 35%, transparent), 0 6px 16px var(--v2-shadow);
+  box-shadow: inset 0 1px 0 var(--v2-specular), 0 6px 16px var(--v2-shadow);
 }
 
 .collection-visual {
@@ -453,14 +631,85 @@ button:focus-visible, summary:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 10px 0 8px;
+  padding: 4px 0 2px;
+}
+
+.collection-art-frame {
+  position: relative;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--v2-line);
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  box-shadow: var(--pixel-lcd-well);
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 140ms steps(2, end);
+}
+
+.collection-art-frame:hover {
+  border-color: color-mix(in srgb, var(--v2-accent) 38%, var(--v2-line));
+}
+
+.collection-art-frame.is-hopping .collection-art {
+  animation: companion-happy-hop 320ms steps(2, end);
 }
 
 .collection-art {
   display: flex;
   justify-content: center;
+}
+
+.pet-whisper {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--v2-popover);
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 42%, var(--v2-line));
+  box-shadow: var(--pixel-keycap), 0 4px 10px var(--v2-shadow);
+  color: var(--v2-ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.whisper-pop-enter-active,
+.whisper-pop-leave-active {
+  transition: opacity 180ms ease, transform 180ms steps(3, end);
+}
+
+.whisper-pop-enter-from,
+.whisper-pop-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
+}
+
+@keyframes companion-idle-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@keyframes companion-happy-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heading-sprite,
+  .collection-art-frame.is-hopping .collection-art {
+    animation: none;
+  }
+}
+
+.visual-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .collection-copy {
@@ -481,14 +730,19 @@ button:focus-visible, summary:focus-visible {
   grid-column: 2;
   grid-row: 1 / 3;
   margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
   font-variant-numeric: tabular-nums;
 }
 
-.companion-time strong {
-  font-size: 24px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: var(--v2-ink);
+.companion-pixel-mins {
+  color: var(--v2-accent);
+}
+
+.companion-time-unit {
+  font-size: 11px;
+  color: var(--v2-muted);
 }
 
 .collection-status {
@@ -500,21 +754,28 @@ button:focus-visible, summary:focus-visible {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   margin-top: 2px;
 }
 
 .stage-bar {
-  height: 4px;
-  background: var(--v2-line);
+  height: 6px;
+  padding: 1px;
+  border-radius: 2px;
+  background: var(--ui-well);
+  border: 1px solid var(--v2-line);
   overflow: hidden;
 }
 
 .stage-bar span {
   display: block;
   height: 100%;
-  background: var(--v2-accent);
-  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--v2-accent) 0 6px,
+    transparent 6px 8px
+  );
+  transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .stage-caption {
@@ -529,16 +790,24 @@ button:focus-visible, summary:focus-visible {
 }
 
 .text-button {
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
   padding: 4px 10px;
-  border: 0;
+  border: 1px solid var(--v2-line);
   border-radius: 6px;
   color: var(--v2-accent);
-  background: transparent;
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
 }
 
 .text-button:hover {
   background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 36%, var(--v2-line));
+}
+
+.text-button:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .collect-button {
@@ -548,14 +817,21 @@ button:focus-visible, summary:focus-visible {
   font-weight: 600;
   margin-top: 4px;
   padding: 7px 14px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--v2-accent);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  border-radius: 7px;
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
 }
 
 .collect-button:hover {
   filter: brightness(1.06);
+}
+
+.collect-button:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
 }
 
 .collected-label {

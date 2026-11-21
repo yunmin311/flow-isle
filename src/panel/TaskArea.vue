@@ -4,7 +4,7 @@ import { useTasks, type Task, isTaskDoneOnDate, todayString } from '../composabl
 import { useTimerBridge } from '../composables/useTimerBridge'
 import { useTaskGroups } from '../composables/useTaskGroups'
 import { useSettings } from '../composables/useSettings'
-import { useCompanion, resolveIslandCompanionSprite, ALBUM_MINUTES } from '../composables/useCompanion'
+import { useCompanion, resolveIslandCompanionSprite, companionDisplayName, ALBUM_MINUTES } from '../composables/useCompanion'
 import { getCategoryColor } from '../composables/useMemos'
 import PixelTime from '../components/PixelTime.vue'
 import StatNumber from '../components/StatNumber.vue'
@@ -98,7 +98,7 @@ const companionSummary = computed(() => {
       : 'idle'
   const sprite = resolveIslandCompanionSprite(animal, mode, Math.floor(rec.minutes / 5))
   const progressText = rec.minutes < ALBUM_MINUTES ? `${rec.minutes}/${ALBUM_MINUTES}m` : `${rec.minutes}m`
-  return { animal, rec, stage, sprite, progressText }
+  return { animal, displayName: companionDisplayName(animal), rec, stage, sprite, progressText }
 })
 
 function handleHeroAction(event?: MouseEvent) {
@@ -331,7 +331,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
           alt=""
           class="companion-sprite"
         />
-        <span class="companion-name">{{ companionSummary.animal.name }}</span>
+        <span class="companion-name">{{ companionSummary.displayName }}</span>
         <span class="companion-stage">{{ companionSummary.stage.label }}</span>
         <span class="companion-meter">{{ companionSummary.progressText }}</span>
       </button>
@@ -718,6 +718,23 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   flex-shrink: 0;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  animation: home-companion-breath 2.8s steps(2, end) infinite;
+}
+
+.hero-companion:hover .companion-sprite {
+  animation: none;
+  transform: translateY(-1px);
+}
+
+@keyframes home-companion-breath {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-sprite {
+    animation: none;
+  }
 }
 
 .companion-name {
