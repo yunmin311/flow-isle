@@ -428,9 +428,9 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
     <div class="quick-add-zone">
       <div class="quick-add-row">
         <div class="quick-add-search">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7"></circle>
-            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+          <svg class="search-icon" width="13" height="13" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+            <rect x="7" y="3" width="2" height="10" />
+            <rect x="3" y="7" width="10" height="2" />
           </svg>
           <input
             ref="quickAddRef"
@@ -663,11 +663,19 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 
 .hero-actions .quiet-action {
   border-color: var(--v2-line);
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
 }
 
 .hero-actions .quiet-action:hover {
   background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
+}
+
+.hero-actions .quiet-action:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 /* Hero Companion Micro-Bar */
@@ -730,22 +738,40 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .zone-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
-  color: var(--v2-muted);
+  color: var(--v2-secondary);
   margin-bottom: 6px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.4px;
+}
+
+.zone-header::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  opacity: 0.78;
+  flex-shrink: 0;
 }
 
 .focus-container {
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  border-radius: 12px;
+  border-radius: 13px;
+  box-shadow: inset 0 1px 0 var(--v2-specular);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   overflow: hidden;
 }
 
 .focus-empty {
-  padding: 12px 14px;
+  padding: 10px 10px;
 }
 
 .focus-empty-text {
@@ -755,15 +781,22 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .focus-task-item {
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: 10px;
-  border: 1px solid transparent;
-  transition: background 140ms ease, border-color 140ms ease;
+  background: var(--ui-well);
+  border: 1px solid color-mix(in srgb, var(--v2-line) 75%, transparent);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.focus-task-item:hover {
+  border-color: color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
 }
 
 .focus-task-item.is-running {
-  background: color-mix(in srgb, var(--active-color) 11%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--active-color) 34%, var(--v2-line));
+  background-color: color-mix(in srgb, var(--active-color) 11%, var(--v2-surface));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--active-color) 7%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border-color: color-mix(in srgb, var(--active-color) 38%, var(--v2-line));
 }
 
 .task-row {
@@ -791,17 +824,22 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 .check-circle {
   width: 15px;
   height: 15px;
-  border-radius: 5px;
+  border-radius: 4px;
   border: 1.5px solid var(--v2-muted);
-  background: transparent;
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 140ms ease, background 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
 }
 
 .check-circle:hover {
   border-color: var(--v2-accent);
   background: var(--v2-accent-soft);
+}
+
+.check-circle:active {
+  transform: translate3d(0, 1px, 0);
 }
 
 .task-title {
@@ -834,13 +872,19 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   padding: 0 8px;
   border-radius: 6px;
   border: 1px solid var(--v2-line);
-  background: var(--ui-well);
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-ink);
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition: background 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+
+.queue-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .queue-btn.icon-only {
@@ -890,6 +934,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--v2-accent) 32%, transparent);
   background: var(--v2-accent-soft);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-accent);
   font-size: 10px;
   cursor: pointer;
@@ -897,14 +942,20 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background 140ms ease, color 140ms ease, transform 120ms ease;
 }
 
 .start-btn:hover {
   background-color: var(--v2-accent);
   background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
   box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
+}
+
+.start-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
 }
 
 .task-group-badge {
@@ -950,6 +1001,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
   border-radius: 9px;
+  box-shadow: var(--pixel-lcd-well);
   transition: border-color 140ms ease, background 140ms ease;
 }
 
@@ -989,22 +1041,29 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   height: 36px;
   padding: 0 11px;
   border-radius: 9px;
-  border: 1px solid color-mix(in srgb, var(--v2-accent) 32%, transparent);
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 34%, transparent);
   background: var(--v2-accent-soft);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-accent);
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   font-family: inherit;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, opacity 140ms ease, box-shadow 140ms ease;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease, box-shadow 140ms ease, transform 120ms ease;
 }
 
 .quick-add-btn:hover:not(:disabled) {
   background-color: var(--v2-accent);
   background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
   box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
+}
+
+.quick-add-btn:active:not(:disabled) {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
 }
 
 .quick-add-btn:disabled {

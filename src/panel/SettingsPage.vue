@@ -8,6 +8,7 @@ import AboutDialog from './AboutDialog.vue'
 import BackButton from './BackButton.vue'
 import EmailAccounts from './EmailAccounts.vue'
 import HintTip from './HintTip.vue'
+import StatNumber from '../components/StatNumber.vue'
 const settingsTab = ref('notifications')
 const emailEditing = ref(false)
 const settingsRoot = ref<HTMLElement | null>(null)
@@ -634,7 +635,7 @@ onUnmounted(() => {
           <label class="duration-label">专注</label>
           <div class="stepper">
             <button class="stepper-btn" @click="settings.focusDuration = Math.max(5, Math.floor((settings.focusDuration - 1) / 5) * 5)">−</button>
-            <span class="stepper-value">{{ settings.focusDuration }}</span>
+            <span class="stepper-value"><StatNumber :value="settings.focusDuration" :size="16" class="stepper-pixel-num" /></span>
             <button class="stepper-btn" @click="settings.focusDuration = Math.min(120, Math.ceil((settings.focusDuration + 1) / 5) * 5)">+</button>
           </div>
           <span class="duration-unit">分</span>
@@ -643,7 +644,7 @@ onUnmounted(() => {
           <label class="duration-label">休息</label>
           <div class="stepper">
             <button class="stepper-btn" @click="settings.breakDuration = Math.max(1, settings.breakDuration - 1)">−</button>
-            <span class="stepper-value">{{ settings.breakDuration }}</span>
+            <span class="stepper-value"><StatNumber :value="settings.breakDuration" :size="16" class="stepper-pixel-num" /></span>
             <button class="stepper-btn" @click="settings.breakDuration = Math.min(30, settings.breakDuration + 1)">+</button>
           </div>
           <span class="duration-unit">分</span>
@@ -693,10 +694,10 @@ onUnmounted(() => {
           :class="{ active: settings.activeThemeId === theme.id }"
           @click="settings.activeThemeId = theme.id"
         >
-          <div class="theme-colors">
-            <span class="color-dot" :style="{ background: theme.focusColor }"></span>
-            <span class="color-dot" :style="{ background: theme.breakColor }"></span>
-            <span class="color-dot" :style="{ background: theme.idleColor }"></span>
+          <div class="theme-preview" aria-hidden="true">
+            <span class="preview-pill" :style="{ background: theme.focusColor }"></span>
+            <span class="preview-block" :style="{ background: theme.breakColor }"></span>
+            <span class="preview-bar" :style="{ background: theme.idleColor }"></span>
           </div>
           <span class="theme-name">{{ theme.name }}</span>
           <span v-if="settings.activeThemeId === theme.id" class="theme-check">✓</span>
@@ -1360,22 +1361,27 @@ onUnmounted(() => {
 .stepper {
   display: flex;
   align-items: center;
-  gap: 0;
-  background: var(--ui-well);
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
   border: 1px solid var(--v2-line);
-  border-radius: 6px;
-  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: var(--pixel-lcd-well);
 }
 
 .stepper-btn {
-  background: none;
-  border: none;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 5px;
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-secondary);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
   width: 24px;
   height: 24px;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background 140ms ease, color 140ms ease, transform 120ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1383,16 +1389,26 @@ onUnmounted(() => {
 
 .stepper-btn:hover {
   background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 34%, var(--v2-line));
   color: var(--v2-ink);
 }
 
+.stepper-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
+}
+
 .stepper-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--v2-ink);
-  min-width: 26px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v2-accent);
+  min-width: 34px;
+  padding: 0 4px;
+}
+
+.stepper-pixel-num {
+  min-height: 16px;
 }
 
 .duration-unit {
@@ -1495,16 +1511,36 @@ onUnmounted(() => {
   box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--v2-accent) 42%, transparent);
 }
 
-.theme-colors {
+.theme-preview {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
 }
 
-.color-dot {
-  width: 10px;
-  height: 10px;
+.preview-pill {
+  width: 14px;
+  height: 8px;
   border-radius: 2px;
   box-shadow: var(--pixel-bevel-sm);
+}
+
+.preview-block {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  box-shadow: var(--pixel-bevel-sm);
+}
+
+.preview-bar {
+  width: 8px;
+  height: 4px;
+  border-radius: 1px;
+  opacity: 0.78;
 }
 
 .theme-name {

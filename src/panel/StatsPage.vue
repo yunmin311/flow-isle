@@ -274,24 +274,32 @@ function steppedBarHeight(pomodoros: number): string {
       <!-- 4-Up Overview -->
       <div class="stats-cards">
         <div class="stat-card">
-          <StatNumber :value="currentStats.pomodoros" :size="20" class="stat-value" />
+          <div class="stat-lcd-bay">
+            <StatNumber :value="currentStats.pomodoros" :size="20" class="stat-value accent" />
+          </div>
           <div class="stat-label">番茄</div>
         </div>
         <div class="stat-card">
-          <StatNumber
-            :value="currentStats.focusMinutes < 60 ? currentStats.focusMinutes : Number((currentStats.focusMinutes / 60).toFixed(1))"
-            :unit="currentStats.focusMinutes < 60 ? 'm' : 'h'"
-            :size="20"
-            class="stat-value"
-          />
+          <div class="stat-lcd-bay">
+            <StatNumber
+              :value="currentStats.focusMinutes < 60 ? currentStats.focusMinutes : Number((currentStats.focusMinutes / 60).toFixed(1))"
+              :unit="currentStats.focusMinutes < 60 ? 'm' : 'h'"
+              :size="20"
+              class="stat-value"
+            />
+          </div>
           <div class="stat-label">专注时长</div>
         </div>
         <div class="stat-card">
-          <StatNumber :value="currentStats.tasksCompleted" :size="20" class="stat-value" />
+          <div class="stat-lcd-bay">
+            <StatNumber :value="currentStats.tasksCompleted" :size="20" class="stat-value" />
+          </div>
           <div class="stat-label">完成任务</div>
         </div>
         <div class="stat-card">
-          <StatNumber :value="state.streakDays" :size="20" class="stat-value" />
+          <div class="stat-lcd-bay">
+            <StatNumber :value="state.streakDays" :size="20" class="stat-value" />
+          </div>
           <div class="stat-label">连续天数</div>
         </div>
       </div>
@@ -582,17 +590,17 @@ function steppedBarHeight(pomodoros: number): string {
 .stat-card {
   background:
     radial-gradient(ellipse at 82% 14%, var(--v2-glow), transparent 72%),
-    var(--v2-elevated);
+    var(--v2-surface);
   border: 1px solid var(--v2-line);
   border-radius: 12px;
   box-shadow: inset 0 1px 0 var(--v2-specular);
-  padding: 10px 6px;
+  padding: 6px 6px 7px;
   text-align: center;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease;
 }
 
@@ -601,21 +609,40 @@ function steppedBarHeight(pomodoros: number): string {
   border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
 }
 
+.stat-lcd-bay {
+  width: 100%;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .stat-value {
   color: var(--v2-ink);
   font-weight: 600;
 }
 
+.stat-value.accent {
+  color: var(--v2-accent);
+}
+
 .stat-label {
   font-size: 10px;
+  font-weight: 500;
   color: var(--v2-muted);
   white-space: nowrap;
 }
 
 .section {
-  background: var(--v2-elevated);
+  background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   padding: 12px;
 }
 
@@ -627,9 +654,22 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   font-weight: 600;
   color: var(--v2-ink);
+}
+
+.section-title::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  opacity: 0.78;
+  flex-shrink: 0;
 }
 
 .month-nav {
@@ -646,15 +686,22 @@ function steppedBarHeight(pomodoros: number): string {
   background: var(--ui-well);
   border: 1px solid var(--v2-line);
   border-radius: 6px;
-  color: var(--v2-muted);
+  box-shadow: var(--pixel-keycap);
+  color: var(--v2-secondary);
   font-size: 12px;
   cursor: pointer;
-  transition: color 140ms ease, background 140ms ease;
+  transition: color 140ms ease, background 140ms ease, transform 120ms ease;
 }
 
 .nav-btn:hover {
   background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
+}
+
+.nav-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .heatmap {
@@ -804,11 +851,12 @@ function steppedBarHeight(pomodoros: number): string {
   border-radius: 6px;
   background: var(--ui-well);
   border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-secondary);
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
   white-space: nowrap;
 }
 
@@ -817,10 +865,17 @@ function steppedBarHeight(pomodoros: number): string {
   color: var(--v2-ink);
 }
 
+.expand-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
+}
+
 .expand-btn.active {
-  background: var(--v2-accent-soft);
-  border-color: color-mix(in srgb, var(--v2-accent) 42%, transparent);
-  color: var(--v2-accent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .section-hint {
@@ -1143,13 +1198,19 @@ function steppedBarHeight(pomodoros: number): string {
   flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 8px 6px 6px;
+  border-radius: 9px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
 }
 
 .trend-bars {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   align-items: end;
-  height: 96px;
+  height: 92px;
   gap: 4px;
 }
 
@@ -1174,13 +1235,19 @@ function steppedBarHeight(pomodoros: number): string {
 
 .trend-bar {
   width: 10px;
-  background: var(--v2-accent);
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--v2-accent) 0 3px,
+    transparent 3px 4px
+  );
   border-radius: 1px;
   transition: height 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .trend-bar.empty {
-  background: var(--v2-line);
+  background-color: var(--v2-line);
+  background-image: none;
 }
 
 .bar-value {
@@ -1201,6 +1268,12 @@ function steppedBarHeight(pomodoros: number): string {
   gap: 9px;
   justify-content: center;
   flex: 1;
+  padding: 8px 9px;
+  border-radius: 9px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
 }
 
 .dist-item {

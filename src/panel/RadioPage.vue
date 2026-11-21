@@ -139,6 +139,10 @@ function removeStation(id: string, event: Event) {
 
 const scrollContainer = ref<HTMLElement | null>(null)
 const showScrollToPlaying = ref(false)
+const SPECTRUM_BARS = [42, 76, 58, 92, 66, 84, 52, 96, 70, 82, 48, 64]
+const VOLUME_SEGMENTS = 10
+
+const activeVolumeSegments = computed(() => Math.round((volume.value / 100) * VOLUME_SEGMENTS))
 
 function handleScroll() {
   if (!scrollContainer.value) return
@@ -170,6 +174,20 @@ async function scrollToPlaying() {
           <div class="station-name">{{ currentStation?.name ?? '选择一个电台' }}</div>
           <div class="station-desc">{{ currentStation?.description ?? '让音乐陪伴你的专注时光' }}</div>
         </div>
+        <div class="radio-deck-screen" :class="{ active: playing, loading }" aria-hidden="true">
+          <div class="spectrum-bars">
+            <span
+              v-for="(peak, idx) in SPECTRUM_BARS"
+              :key="idx"
+              class="spectrum-bar"
+              :style="{ '--peak': `${peak}%`, '--delay': `${(idx % 6) * 0.11}s` }"
+            ></span>
+          </div>
+          <div class="deck-readout">
+            <span class="deck-tag">{{ isLocalMedia ? 'DECK' : 'FM' }}</span>
+            <span class="deck-vol">{{ String(volume).padStart(2, '0') }}</span>
+          </div>
+        </div>
         <div class="player-controls">
           <button
             class="play-btn"
@@ -190,20 +208,33 @@ async function scrollToPlaying() {
               <path d="M8 5.4v13.2a1 1 0 0 0 1.5.86l10.6-6.6a1 1 0 0 0 0-1.72L9.5 4.54A1 1 0 0 0 8 5.4Z" />
             </svg>
           </button>
-          <div class="volume-row">
-            <svg class="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 5L6 9H2v6h4l5 4V5z" />
-            </svg>
-            <input
-              type="range"
-              class="volume-slider"
-              min="0"
-              max="100"
-              :value="volume"
-              :style="{ '--volume': `${volume}%` }"
-              @input="setVolume(Number(($event.target as HTMLInputElement).value))"
-            />
-            <span class="vol-value">{{ volume }}</span>
+          <div class="volume-stack">
+            <div class="volume-row">
+              <svg class="vol-icon" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+                <rect x="2" y="6" width="3" height="4" />
+                <rect x="5" y="5" width="2" height="6" />
+                <rect x="7" y="3" width="2" height="10" />
+                <rect v-if="volume > 0" x="11" y="6" width="1" height="4" />
+                <rect v-if="volume > 50" x="13" y="4" width="1" height="8" />
+              </svg>
+              <input
+                type="range"
+                class="volume-slider"
+                min="0"
+                max="100"
+                :value="volume"
+                :style="{ '--volume': `${volume}%` }"
+                @input="setVolume(Number(($event.target as HTMLInputElement).value))"
+              />
+              <span class="vol-value">{{ volume }}</span>
+            </div>
+            <div class="vol-meter" aria-hidden="true">
+              <i
+                v-for="n in VOLUME_SEGMENTS"
+                :key="n"
+                :class="{ filled: n <= activeVolumeSegments }"
+              />
+            </div>
           </div>
         </div>
         <div v-if="currentStation" class="timeline">
@@ -269,64 +300,92 @@ async function scrollToPlaying() {
             @click="switchStation(station.id)"
           >
             <div class="item-icon">
-              <!-- Code Radio: code brackets -->
-              <svg v-if="station.icon === 'code'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />
+              <!-- Code Radio: pixel brackets </> -->
+              <svg v-if="station.icon === 'code'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="5" y="4" width="1" height="2" /><rect x="4" y="5" width="1" height="2" />
+                <rect x="3" y="7" width="1" height="2" /><rect x="4" y="9" width="1" height="2" />
+                <rect x="5" y="10" width="1" height="2" />
+                <rect x="10" y="4" width="1" height="2" /><rect x="11" y="5" width="1" height="2" />
+                <rect x="12" y="7" width="1" height="2" /><rect x="11" y="9" width="1" height="2" />
+                <rect x="10" y="10" width="1" height="2" />
+                <rect x="8" y="4" width="1" height="3" /><rect x="7" y="7" width="1" height="5" />
               </svg>
-              <!-- Groove Salad: equalizer bars -->
-              <svg v-else-if="station.icon === 'wave'" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="13" width="3" height="7" rx="1" opacity="0.7" />
-                <rect x="8" y="9" width="3" height="11" rx="1" opacity="0.85" />
-                <rect x="13" y="6" width="3" height="14" rx="1" />
-                <rect x="18" y="11" width="3" height="9" rx="1" opacity="0.7" />
+              <!-- Groove Salad: pixel equalizer bars -->
+              <svg v-else-if="station.icon === 'wave'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="2" y="9" width="2" height="5" opacity="0.75" />
+                <rect x="5" y="6" width="2" height="8" opacity="0.9" />
+                <rect x="8" y="3" width="2" height="11" />
+                <rect x="11" y="7" width="2" height="7" opacity="0.8" />
               </svg>
-              <!-- Drone Zone: concentric waves -->
-              <svg v-else-if="station.icon === 'drone'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <circle cx="12" cy="12" r="3" />
-                <circle cx="12" cy="12" r="7" opacity="0.55" />
-                <circle cx="12" cy="12" r="11" opacity="0.25" />
+              <!-- Drone Zone: pixel concentric ripple -->
+              <svg v-else-if="station.icon === 'drone'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="7" y="7" width="2" height="2" />
+                <rect x="5" y="4" width="6" height="1" opacity="0.65" /><rect x="5" y="11" width="6" height="1" opacity="0.65" />
+                <rect x="4" y="5" width="1" height="6" opacity="0.65" /><rect x="11" y="5" width="1" height="6" opacity="0.65" />
+                <rect x="4" y="2" width="8" height="1" opacity="0.3" /><rect x="4" y="13" width="8" height="1" opacity="0.3" />
+                <rect x="2" y="4" width="1" height="8" opacity="0.3" /><rect x="13" y="4" width="1" height="8" opacity="0.3" />
               </svg>
-              <!-- Deep Space One: planet with ring -->
-              <svg v-else-if="station.icon === 'planet'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <circle cx="12" cy="11" r="5" />
-                <ellipse cx="12" cy="11" rx="9" ry="3" transform="rotate(-18 12 11)" />
+              <!-- Deep Space One: pixel ringed planet -->
+              <svg v-else-if="station.icon === 'planet'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="6" y="4" width="4" height="1" /><rect x="5" y="5" width="6" height="6" />
+                <rect x="6" y="11" width="4" height="1" />
+                <rect x="2" y="9" width="3" height="1" opacity="0.7" /><rect x="11" y="6" width="3" height="1" opacity="0.7" />
+                <rect x="3" y="8" width="10" height="1" opacity="0.5" />
               </svg>
-              <!-- Space Station: star sparkle -->
-              <svg v-else-if="station.icon === 'star'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2l1.5 6.5L20 9l-5 4.5L17 20l-5-3-5 3 1.5-7L4 9l6.5-.5z" />
+              <!-- Space Station: pixel 4-point star -->
+              <svg v-else-if="station.icon === 'star'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="7" y="2" width="2" height="12" /><rect x="2" y="7" width="12" height="2" />
+                <rect x="5" y="5" width="6" height="6" />
               </svg>
-              <!-- Ambient Pill: pill shape -->
-              <svg v-else-if="station.icon === 'pill'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <rect x="3" y="7" width="18" height="10" rx="5" />
+              <!-- Ambient Pill: pixel capsule -->
+              <svg v-else-if="station.icon === 'pill'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="4" y="5" width="8" height="1" /><rect x="4" y="10" width="8" height="1" />
+                <rect x="3" y="6" width="1" height="4" /><rect x="12" y="6" width="1" height="4" />
+                <rect x="4" y="6" width="4" height="4" opacity="0.55" />
               </svg>
-              <!-- Lo-Fi / Coffee: coffee cup -->
-              <svg v-else-if="station.icon === 'coffee'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" />
+              <!-- Lo-Fi / Coffee: pixel coffee mug -->
+              <svg v-else-if="station.icon === 'coffee'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="4" y="2" width="1" height="2" opacity="0.65" /><rect x="7" y="2" width="1" height="2" opacity="0.65" />
+                <rect x="3" y="5" width="8" height="7" /><rect x="11" y="6" width="2" height="1" />
+                <rect x="12" y="7" width="1" height="2" /><rect x="11" y="9" width="2" height="1" />
+                <rect x="2" y="12" width="10" height="1" />
               </svg>
-              <!-- Jazz: saxophone -->
-              <svg v-else-if="station.icon === 'jazz'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v20M8 6h8M7 10h10M7 14h10M8 18h8" />
-                <circle cx="12" cy="12" r="2" fill="currentColor" />
+              <!-- Jazz: pixel eighth note -->
+              <svg v-else-if="station.icon === 'jazz'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="6" y="3" width="6" height="2" />
+                <rect x="6" y="5" width="2" height="6" /><rect x="11" y="5" width="2" height="5" />
+                <rect x="4" y="10" width="4" height="3" /><rect x="9" y="9" width="4" height="3" />
               </svg>
-              <!-- Secret Agent: spy glass -->
-              <svg v-else-if="station.icon === 'spy'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-                <circle cx="11" cy="11" r="3" />
+              <!-- Secret Agent: pixel spy glass -->
+              <svg v-else-if="station.icon === 'spy'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="5" y="3" width="4" height="1" /><rect x="5" y="10" width="4" height="1" />
+                <rect x="3" y="5" width="1" height="4" /><rect x="10" y="5" width="1" height="4" />
+                <rect x="4" y="4" width="1" height="1" /><rect x="9" y="4" width="1" height="1" />
+                <rect x="4" y="9" width="1" height="1" /><rect x="9" y="9" width="1" height="1" />
+                <rect x="6" y="6" width="2" height="2" opacity="0.65" />
+                <rect x="10" y="10" width="2" height="2" /><rect x="12" y="12" width="2" height="2" />
               </svg>
-              <!-- DEF CON: hacker terminal -->
-              <svg v-else-if="station.icon === 'hacker'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" />
-                <path d="M8 21h8M12 17v4M7 8l3 3-3 3M13 14h4" />
+              <!-- DEF CON: pixel terminal -->
+              <svg v-else-if="station.icon === 'hacker'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="2" y="3" width="12" height="1" /><rect x="2" y="11" width="12" height="1" />
+                <rect x="2" y="4" width="1" height="7" /><rect x="13" y="4" width="1" height="7" />
+                <rect x="4" y="6" width="1" height="1" /><rect x="5" y="7" width="1" height="1" /><rect x="4" y="8" width="1" height="1" />
+                <rect x="7" y="8" width="4" height="1" />
+                <rect x="5" y="13" width="6" height="1" />
               </svg>
-              <!-- 导入条目: link -->
-              <svg v-else-if="station.icon === 'link'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              <!-- 导入条目: pixel link -->
+              <svg v-else-if="station.icon === 'link'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="3" y="6" width="4" height="1" /><rect x="3" y="9" width="4" height="1" />
+                <rect x="2" y="7" width="1" height="2" />
+                <rect x="9" y="6" width="4" height="1" /><rect x="9" y="9" width="4" height="1" />
+                <rect x="13" y="7" width="1" height="2" />
+                <rect x="6" y="7" width="4" height="2" />
               </svg>
-              <!-- 本地音乐: folder -->
-              <svg v-else-if="station.icon === 'folder'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z" />
+              <!-- 本地音乐: pixel folder -->
+              <svg v-else-if="station.icon === 'folder'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+                <rect x="2" y="4" width="5" height="2" />
+                <rect x="2" y="6" width="12" height="7" />
+                <rect x="4" y="8" width="8" height="1" opacity="0.35" />
               </svg>
               <div v-if="currentStation?.id === station.id && playing" class="playing-indicator">
                 <span /><span /><span />
@@ -641,6 +700,88 @@ async function scrollToPlaying() {
   color: var(--v2-muted);
 }
 
+.radio-deck-screen {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  height: 36px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
+}
+
+.spectrum-bars {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+}
+
+.spectrum-bar {
+  height: 4px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--v2-accent) 30%, var(--v2-line));
+  transition: height 200ms steps(3, end), background 220ms ease;
+}
+
+.radio-deck-screen.active .spectrum-bar {
+  height: var(--peak, 68%);
+  background-color: var(--v2-accent);
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--v2-accent) 0 3px,
+    transparent 3px 5px
+  );
+  animation: deck-spectrum 0.96s steps(4, end) infinite;
+  animation-delay: var(--delay, 0s);
+  transform-origin: bottom;
+}
+
+.radio-deck-screen.loading .spectrum-bar {
+  height: 42%;
+  background: var(--v2-alert);
+  animation: deck-spectrum 0.6s steps(3, end) infinite;
+  animation-delay: var(--delay, 0s);
+  transform-origin: bottom;
+}
+
+@keyframes deck-spectrum {
+  0%, 100% { transform: scaleY(0.32); }
+  50% { transform: scaleY(1); }
+}
+
+.deck-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-tag {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--v2-accent);
+  line-height: 1;
+}
+
+.deck-vol {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--v2-secondary);
+  line-height: 1;
+}
+
 .player-controls {
   display: flex;
   align-items: center;
@@ -727,11 +868,13 @@ async function scrollToPlaying() {
 
 .live-badge {
   flex-shrink: 0;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(239, 68, 68, 0.14);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--v2-danger, #c44a3f) 14%, transparent);
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-danger, #c44a3f) 11%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 4px 4px;
+  border: 1px solid color-mix(in srgb, var(--v2-danger, #c44a3f) 34%, transparent);
+  color: var(--v2-danger, #c44a3f);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -788,9 +931,10 @@ async function scrollToPlaying() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ui-well);
-  border: 2px solid var(--v2-line);
-  border-radius: 14px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 11px;
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-ink);
   cursor: pointer;
   flex-shrink: 0;
@@ -801,11 +945,12 @@ async function scrollToPlaying() {
 
 .play-btn:hover {
   border-color: var(--v2-accent);
-  color: var(--v2-ink);
+  color: var(--v2-accent);
 }
 
 .play-btn:active:not(:disabled) {
   transform: translate3d(0, 2px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .play-btn.is-playing {
@@ -890,12 +1035,40 @@ async function scrollToPlaying() {
   background: color-mix(in srgb, var(--v2-danger, #c44a3f) 14%, transparent);
 }
 
-.volume-row {
+.volume-stack {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.volume-row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.vol-meter {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  height: 4px;
+  padding-left: 22px;
+  padding-right: 28px;
+}
+
+.vol-meter i {
+  display: block;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--v2-line);
+  transition: background 140ms ease;
+}
+
+.vol-meter i.filled {
+  background: var(--v2-accent);
 }
 
 .vol-icon {
@@ -903,6 +1076,7 @@ async function scrollToPlaying() {
   height: 14px;
   color: var(--v2-muted);
   flex-shrink: 0;
+  image-rendering: pixelated;
 }
 
 .volume-slider {
@@ -969,6 +1143,9 @@ async function scrollToPlaying() {
 }
 
 .category-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 600;
   color: var(--v2-secondary);
@@ -976,29 +1153,40 @@ async function scrollToPlaying() {
   letter-spacing: 0.3px;
 }
 
+.category-title::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  opacity: 0.72;
+  flex-shrink: 0;
+}
+
 .station-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .station-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 8px 10px;
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
-  border-radius: 10px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms ease;
   color: var(--v2-secondary);
   text-align: left;
 }
 
 .station-item:hover {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
+  background: color-mix(in srgb, var(--v2-accent) 5%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 30%, var(--v2-line));
   color: var(--v2-ink);
 }
 
@@ -1006,35 +1194,44 @@ async function scrollToPlaying() {
   background-color: color-mix(in srgb, var(--focus-color) 11%, var(--v2-surface));
   background-image: repeating-conic-gradient(color-mix(in srgb, var(--focus-color) 8%, transparent) 0% 25%, transparent 0% 50%);
   background-size: 6px 6px;
-  border-color: color-mix(in srgb, var(--focus-color) 38%, var(--v2-line));
-  box-shadow: inset 3px 0 0 var(--focus-color);
+  border-color: color-mix(in srgb, var(--focus-color) 42%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular), inset 3px 0 0 var(--focus-color);
   color: var(--v2-ink);
 }
 
 .item-icon {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   background: var(--ui-well);
-  border-radius: 8px;
-  transition: background 0.2s ease;
+  border: 1px solid var(--v2-line);
+  border-radius: 7px;
+  box-shadow: var(--pixel-keycap);
+  color: var(--v2-secondary);
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
 .station-item:hover .item-icon {
-  background: var(--ui-well);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
+  color: var(--v2-accent);
 }
 
 .station-item.active .item-icon {
-  background: color-mix(in srgb, var(--focus-color) 20%, transparent);
+  background-color: var(--focus-color);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--focus-color));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .item-icon svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
 }
 
 .playing-indicator {

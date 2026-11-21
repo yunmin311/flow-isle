@@ -926,23 +926,29 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .top-bar-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
 }
 
 .top-bar-btn:hover {
   background: var(--ui-hover);
-  border-color: var(--v2-muted);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
+}
+
+.top-bar-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .top-bar-actions {
@@ -1002,26 +1008,34 @@ function formatUpdateTime(timestamp: number): string {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
 }
 
 .toolbar-btn:hover {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
+  background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
 }
 
+.toolbar-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
+}
+
 .toolbar-btn.active {
-  background: color-mix(in srgb, var(--focus-color) 20%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 50%, transparent);
-  color: var(--focus-color);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .toolbar-divider {
@@ -1104,10 +1118,11 @@ function formatUpdateTime(timestamp: number): string {
   min-height: 0;
   overflow-y: auto;
   margin: 8px 12px 12px;
-  padding: 12px;
-  border-radius: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
 }
 
 .editor-content-wrapper::-webkit-scrollbar {

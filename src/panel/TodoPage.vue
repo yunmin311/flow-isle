@@ -854,14 +854,14 @@ onBeforeUnmount(() => {
               @click.stop="toggleOneSelected(task.id)"
               :title="selectedIds.has(task.id) ? '取消选择' : '选择'"
             >
-              <svg v-if="selectedIds.has(task.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+              <svg v-if="selectedIds.has(task.id)" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
             </button>
             <button
               class="task-checkbox"
               :class="{ checked: isDoneToday(task) }"
               @click="handleToggleComplete(task.id, $event)"
             >
-              <svg v-if="isDoneToday(task)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+              <svg v-if="isDoneToday(task)" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
             </button>
 
             <span class="task-title" :class="{ 'line-through': task.completed || isDoneToday(task) }" @click="emit('viewDetail', task.id)">{{ task.title }}</span>
@@ -1119,11 +1119,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0;
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
-  border-radius: 7px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: 9px;
+  box-shadow: var(--pixel-lcd-well);
   overflow: hidden;
-  transition: all 0.2s;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .quick-add-input-row:focus-within {
@@ -1309,33 +1310,40 @@ onBeforeUnmount(() => {
 .tab-item {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: var(--ui-well);
-  border: 1px solid transparent;
-  color: var(--v2-muted);
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
+  color: var(--v2-secondary);
   font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 140ms ease, box-shadow 140ms ease;
   font-family: inherit;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .tab-item:hover {
-  background: var(--ui-well);
+  background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
 }
 
+.tab-item:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
+}
+
 .tab-item.active {
-  background-color: color-mix(in srgb, var(--focus-color) 14%, transparent);
-  background-image: repeating-conic-gradient(color-mix(in srgb, var(--focus-color) 11%, transparent) 0% 25%, transparent 0% 50%);
-  background-size: 4px 4px;
-  border-color: color-mix(in srgb, var(--focus-color) 32%, transparent);
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--focus-color) 48%, transparent);
-  color: var(--focus-color);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
+  font-weight: 600;
 }
 
 .tab-label {
@@ -1344,6 +1352,15 @@ onBeforeUnmount(() => {
 
 .tab-count {
   font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--v2-ink) 8%, transparent);
+}
+
+.tab-item.active .tab-count {
+  background: color-mix(in srgb, var(--v2-on-accent) 22%, transparent);
+  color: var(--v2-on-accent);
 }
 
 .overdue-divider {
@@ -1431,26 +1448,28 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 6px 9px;
-  border-radius: 8px;
-  background: var(--ui-well);
+  gap: 3px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  box-shadow: 0 2px 8px var(--v2-shadow);
-  transition: all 0.2s;
+  box-shadow: inset 0 1px 0 var(--v2-specular);
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .task-card:hover {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
-  box-shadow: 0 4px 12px var(--v2-shadow);
+  background: color-mix(in srgb, var(--v2-accent) 4%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 30%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular), 0 4px 12px var(--v2-shadow);
 }
 
 .task-card.is-running {
-  background: color-mix(in srgb, var(--v2-accent) 12%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
+  background-color: color-mix(in srgb, var(--v2-accent) 11%, var(--v2-surface));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 6%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border-color: color-mix(in srgb, var(--v2-accent) 36%, var(--v2-line));
   border-left: 3px solid var(--v2-accent);
   padding: 8px 10px;
 }
@@ -1466,35 +1485,42 @@ onBeforeUnmount(() => {
 .task-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-height: 26px;
 }
 
 .task-checkbox {
-  width: 13px;
-  height: 13px;
-  border-radius: 999px;
-  background: transparent;
-  border: 2px solid var(--v2-line);;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  background: var(--ui-well);
+  border: 1.5px solid var(--v2-muted);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
   flex-shrink: 0;
   padding: 0;
 }
 
 .task-checkbox:hover {
-  border-color: var(--break-color);
-  background: color-mix(in srgb, var(--break-color) 20%, transparent);
+  border-color: var(--v2-accent);
+  background: var(--v2-accent-soft);
+}
+
+.task-checkbox:active {
+  transform: translate3d(0, 1px, 0);
 }
 
 .task-checkbox.checked {
-  border-color: color-mix(in srgb, var(--focus-color) 70%, transparent);
-  background: color-mix(in srgb, var(--focus-color) 25%, transparent);
-  color: var(--focus-color);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .task-title {
@@ -1571,22 +1597,23 @@ onBeforeUnmount(() => {
 }
 
 .task-play-btn {
-  min-width: 18px;
-  height: 18px;
+  min-width: 22px;
+  height: 22px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 9px;
   font-weight: 600;
-  background: color-mix(in srgb, var(--focus-color) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--focus-color) 30%, transparent);
+  background: var(--v2-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--focus-color) 32%, transparent);
+  box-shadow: var(--pixel-keycap);
   color: var(--focus-color);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.15s, background 0.2s, border-color 0.2s;
+  transition: opacity 0.15s, background 0.18s, border-color 0.18s, color 0.18s;
   flex-shrink: 0;
-  opacity: 0;
+  opacity: 0.72;
 }
 
 .task-card:hover .task-play-btn,
@@ -1595,13 +1622,16 @@ onBeforeUnmount(() => {
 }
 
 .task-play-btn svg {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
 }
 
 .task-play-btn:hover {
-  background: color-mix(in srgb, var(--focus-color) 25%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 50%, transparent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 /* Timer display */

@@ -393,58 +393,70 @@ function handleCloseCategoryDialog() {
 }
 
 .memo-count-badge {
-  font-size: 11px;
-  color: var(--v2-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-secondary);
   padding: 4px 8px;
   background: var(--ui-well);
-  border-radius: 4px;
+  border: 1px solid var(--v2-line);
+  border-radius: 6px;
   white-space: nowrap;
 }
 
 .header-icon-btn {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  background: var(--ui-well);
-  border: 1px solid var(--v2-line);;
+  border-radius: 7px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
   flex-shrink: 0;
 }
 
 .header-icon-btn:hover {
   background: var(--ui-hover);
-  border-color: var(--v2-muted);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
+}
+
+.header-icon-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .header-new-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   padding: 0 10px;
   height: 28px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--focus-color) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--focus-color) 30%, transparent);
-  color: var(--focus-color);
+  border-radius: 7px;
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: filter 160ms ease, transform 120ms ease, box-shadow 120ms ease;
   flex-shrink: 0;
 }
 
 .header-new-btn:hover {
-  background-color: var(--v2-accent);
-  background-image: var(--pixel-dither);
-  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
-  box-shadow: var(--pixel-bevel-sm);
-  color: var(--v2-on-accent);
+  filter: brightness(1.06);
+}
+
+.header-new-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
 }
 
 .header-new-btn span {
@@ -472,29 +484,33 @@ function handleCloseCategoryDialog() {
 }
 
 .memo-item {
-  padding: 10px 12px;
+  padding: 11px 12px;
   margin-bottom: 8px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--v2-surface);
   border: 1px solid var(--v2-line);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   cursor: pointer;
-  transition: background-color 0.16s ease, border-color 0.16s ease;
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .memo-item:hover {
   background: color-mix(in srgb, var(--v2-accent) 5%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular), 0 4px 12px var(--v2-shadow);
 }
 
 .memo-item.is-pinned {
-  background: color-mix(in srgb, var(--v2-accent) 8%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
+  background-color: color-mix(in srgb, var(--v2-accent) 8%, var(--v2-surface));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 6%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border-color: color-mix(in srgb, var(--v2-accent) 36%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular), inset 3px 0 0 var(--v2-accent);
 }
 
 .memo-item.is-pinned:hover {
-  background: color-mix(in srgb, var(--v2-accent) 12%, var(--v2-surface));
-  border-color: color-mix(in srgb, var(--v2-accent) 44%, var(--v2-line));
+  background-color: color-mix(in srgb, var(--v2-accent) 12%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 48%, var(--v2-line));
 }
 
 .memo-item-header {
@@ -655,19 +671,26 @@ function handleCloseCategoryDialog() {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 18px;
+  padding: 9px 18px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--focus-color) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--focus-color) 30%, transparent);
-  color: var(--focus-color);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: filter 160ms ease, transform 120ms ease;
 }
 
 .empty-action-btn:hover {
-  background: color-mix(in srgb, var(--focus-color) 25%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 50%, transparent);
+  filter: brightness(1.06);
+}
+
+.empty-action-btn:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-bevel-pressed);
 }
 
 /* Delete Confirmation Dialog */

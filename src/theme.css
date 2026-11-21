@@ -343,6 +343,17 @@
   --pixel-bevel-pressed:
     inset 0 2px 0 color-mix(in srgb, #000 22%, transparent),
     inset 0 -1px 0 color-mix(in srgb, #fff 16%, transparent);
+  --pixel-keycap:
+    inset 0 1px 0 var(--v2-specular),
+    inset 0 -2px 0 color-mix(in srgb, var(--v2-ink) 14%, transparent);
+  --pixel-keycap-pressed:
+    inset 0 2px 0 color-mix(in srgb, var(--v2-ink) 16%, transparent),
+    inset 0 -1px 0 var(--v2-specular);
+  --pixel-dot-grid:
+    radial-gradient(circle, color-mix(in srgb, var(--v2-ink) 10%, transparent) 1px, transparent 1px) 0 0 / 8px 8px;
+  --pixel-lcd-well:
+    inset 0 1px 2px color-mix(in srgb, var(--v2-ink) 10%, transparent),
+    inset 0 -1px 0 var(--v2-specular);
 }
 
 :root[data-color-mode="dark"],

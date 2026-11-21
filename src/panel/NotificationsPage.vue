@@ -323,30 +323,39 @@ onDeactivated(() => { selectedEmail.value = null })
     <!-- 音量：紧凑工具条，进入邮件正文阅读时自动隐藏以让出阅读空间 -->
     <template v-if="!selectedEmail">
       <div v-if="volumeReady" class="volume-strip">
-        <span class="volume-pixel-pip" :class="{ muted: sysMuted || sysVolume === 0 }" aria-hidden="true"></span>
-        <span class="volume-label">音量</span>
-        <button class="mute-btn" :class="{ active: sysMuted }" @click="toggleMute" :title="sysMuted ? '取消静音' : '静音'">
-          <svg v-if="sysMuted || sysVolume === 0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 5L6 9H2v6h4l5 4V5z" />
-            <line x1="23" y1="9" x2="17" y2="15" />
-            <line x1="17" y1="9" x2="23" y2="15" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 5L6 9H2v6h4l5 4V5z" />
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-          </svg>
-        </button>
-        <input
-          type="range"
-          class="volume-slider"
-          min="0"
-          max="100"
-          :value="sysVolume"
-          :style="{ '--volume': `${sysMuted ? 0 : sysVolume}%` }"
-          @input="onVolumeInput"
-        />
-        <span class="volume-value">{{ sysMuted ? '静音' : sysVolume }}</span>
+        <div class="volume-top-row">
+          <span class="volume-pixel-pip" :class="{ muted: sysMuted || sysVolume === 0 }" aria-hidden="true"></span>
+          <span class="volume-label">音量</span>
+          <button class="mute-btn" :class="{ active: sysMuted }" @click="toggleMute" :title="sysMuted ? '取消静音' : '静音'">
+            <svg v-if="sysMuted || sysVolume === 0" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="2" y="6" width="3" height="4" /><rect x="5" y="5" width="2" height="6" /><rect x="7" y="3" width="2" height="10" />
+              <rect x="11" y="5" width="1" height="1" /><rect x="12" y="6" width="1" height="1" /><rect x="13" y="7" width="1" height="2" />
+              <rect x="12" y="9" width="1" height="1" /><rect x="11" y="10" width="1" height="1" />
+              <rect x="14" y="5" width="1" height="1" /><rect x="14" y="10" width="1" height="1" />
+            </svg>
+            <svg v-else viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+              <rect x="2" y="6" width="3" height="4" /><rect x="5" y="5" width="2" height="6" /><rect x="7" y="3" width="2" height="10" />
+              <rect x="11" y="6" width="1" height="4" /><rect v-if="sysVolume > 50" x="13" y="4" width="1" height="8" />
+            </svg>
+          </button>
+          <input
+            type="range"
+            class="volume-slider"
+            min="0"
+            max="100"
+            :value="sysVolume"
+            :style="{ '--volume': `${sysMuted ? 0 : sysVolume}%` }"
+            @input="onVolumeInput"
+          />
+          <span class="volume-value">{{ sysMuted ? '静音' : sysVolume }}</span>
+        </div>
+        <div class="sys-vol-meter" aria-hidden="true">
+          <i
+            v-for="n in 10"
+            :key="n"
+            :class="{ filled: !sysMuted && n <= Math.round((sysVolume / 100) * 10) }"
+          />
+        </div>
       </div>
       <div v-else class="volume-hint">{{ volumeError ?? '读取系统音量中…' }}</div>
     </template>
@@ -660,8 +669,8 @@ onDeactivated(() => { selectedEmail.value = null })
 
 .volume-strip {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 5px;
   padding: 7px 11px;
   margin-bottom: 10px;
   border-radius: 12px;
@@ -669,6 +678,32 @@ onDeactivated(() => { selectedEmail.value = null })
   border: 1px solid var(--v2-line);
   box-shadow: inset 0 1px 0 var(--v2-specular);
   flex-shrink: 0;
+}
+
+.volume-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sys-vol-meter {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  height: 3px;
+  padding: 0 34px 0 66px;
+}
+
+.sys-vol-meter i {
+  display: block;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--v2-line);
+  transition: background 140ms ease;
+}
+
+.sys-vol-meter i.filled {
+  background: var(--v2-accent);
 }
 
 .volume-pixel-pip {
@@ -808,34 +843,49 @@ onDeactivated(() => { selectedEmail.value = null })
 }
 
 .group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--v2-secondary);
   letter-spacing: 0.3px;
 }
 
+.group-title::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  opacity: 0.78;
+  flex-shrink: 0;
+}
+
 .group-count {
   font-size: 10px;
-  color: var(--v2-muted);
-  background: var(--ui-well);
-  padding: 0 5px;
-  border-radius: 999px;
+  font-weight: 600;
+  color: var(--v2-secondary);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  padding: 1px 6px;
+  border-radius: 4px;
   font-variant-numeric: tabular-nums;
 }
 
 .notif-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .group-more {
   width: 100%;
   margin-top: 4px;
   padding: 6px;
-  border-radius: 7px;
-  background: var(--ui-well);
-  border: 1px dashed var(--v2-line);;
+  border-radius: 8px;
+  background: var(--v2-surface);
+  border: 1px dashed var(--v2-line);
   color: var(--v2-muted);
   font-size: 10.5px;
   font-family: inherit;
@@ -844,7 +894,7 @@ onDeactivated(() => { selectedEmail.value = null })
 }
 
 .group-more:hover {
-  background: var(--ui-well);
+  background: var(--ui-hover);
   border-color: var(--v2-muted);
   color: var(--v2-ink);
 }
@@ -856,21 +906,22 @@ onDeactivated(() => { selectedEmail.value = null })
   box-sizing: border-box;
   min-width: 0;
   padding: 9px 11px;
-  border-radius: 8px;
-  border: 1px solid var(--v2-line);;
-  background: var(--ui-well);
+  border-radius: 10px;
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
 .notif-item:hover {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
+  background: color-mix(in srgb, var(--v2-accent) 4%, var(--v2-surface));
+  border-color: color-mix(in srgb, var(--v2-accent) 30%, var(--v2-line));
 }
 
 .notif-item.unread {
-  border-color: var(--v2-muted);
-  background: var(--ui-well);
+  border-color: color-mix(in srgb, var(--v2-accent) 34%, var(--v2-line));
+  background-color: color-mix(in srgb, var(--v2-accent) 6%, var(--v2-surface));
 }
 
 .notif-item.focused {
@@ -881,14 +932,15 @@ onDeactivated(() => { selectedEmail.value = null })
 .notif-dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: 1px;
   margin-top: 5px;
-  background: var(--ui-hover);
+  background: var(--v2-line);
   flex-shrink: 0;
 }
 
 .notif-item.unread .notif-dot {
   background: var(--focus-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-color) 20%, transparent);
 }
 
 .notif-body {
@@ -987,21 +1039,28 @@ onDeactivated(() => { selectedEmail.value = null })
 
 .copy-btn {
   flex-shrink: 0;
-  border: none;
-  background: var(--ui-well);
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
   color: var(--v2-secondary);
   font-size: 10.5px;
   font-family: inherit;
   padding: 3px 9px;
-  border-radius: 5px;
+  border-radius: 6px;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 120ms ease;
 }
 
 .copy-btn:hover {
   background: var(--ui-hover);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
   color: var(--v2-ink);
+}
+
+.copy-btn:active:not(:disabled) {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--pixel-keycap-pressed);
 }
 
 .copy-btn:disabled {
