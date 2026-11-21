@@ -1488,20 +1488,23 @@ onUnmounted(() => {
 }
 
 .theme-card.active {
-  background: var(--ui-well);
-  border-color: var(--v2-muted);
+  background-color: color-mix(in srgb, var(--v2-accent) 9%, var(--v2-surface));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 9%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border-color: var(--v2-accent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--v2-accent) 42%, transparent);
 }
 
 .theme-colors {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 
 .color-dot {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  box-shadow: var(--pixel-bevel-sm);
 }
 
 .theme-name {

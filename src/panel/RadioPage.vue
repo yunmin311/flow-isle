@@ -160,80 +160,82 @@ async function scrollToPlaying() {
   <div class="radio-page">
     <!-- Now Playing (Fixed) -->
     <div class="now-playing">
-      <div class="radio-frame">
-        <div class="radio-glow" />
-        <div class="radio-content">
-          <div class="station-info">
-            <div class="station-name">{{ currentStation?.name ?? '选择一个电台' }}</div>
-            <div class="station-desc">{{ currentStation?.description ?? '让音乐陪伴你的专注时光' }}</div>
-          </div>
-          <div class="player-controls">
-            <button
-              class="play-btn"
-              :class="{ 'is-playing': playing }"
-              :disabled="!currentStation"
-              @click="!playing && triggerPixelBurstFromEvent($event, 'accent', 7); toggle()"
-            >
-              <svg v-if="loading" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <circle cx="7" cy="12" r="1.8" opacity="0.35" />
-                <circle cx="12" cy="12" r="1.8" opacity="0.65" />
-                <circle cx="17" cy="12" r="1.8" />
-              </svg>
-              <svg v-else-if="playing" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <rect x="7" y="5" width="3.5" height="14" rx="1" />
-                <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
-              </svg>
-              <svg v-else viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5.4v13.2a1 1 0 0 0 1.5.86l10.6-6.6a1 1 0 0 0 0-1.72L9.5 4.54A1 1 0 0 0 8 5.4Z" />
-              </svg>
-            </button>
-            <div class="volume-row">
-              <svg class="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 5L6 9H2v6h4l5 4V5z" />
-              </svg>
-              <input
-                type="range"
-                class="volume-slider"
-                min="0"
-                max="100"
-                :value="volume"
-                :style="{ '--volume': `${volume}%` }"
-                @input="setVolume(Number(($event.target as HTMLInputElement).value))"
-              />
-              <span class="vol-value">{{ volume }}</span>
-            </div>
-          </div>
-          <div v-if="currentStation" class="timeline">
-            <template v-if="isLocalMedia">
-              <span class="time-label">{{ formatTime(currentTime) }}</span>
-              <div
-                ref="progressTrack"
-                class="progress-track"
-                :class="{ disabled: !seekable, dragging }"
-                @pointerdown="onSeekDown"
-                @pointermove="onSeekMove"
-                @pointerup="onSeekUp"
-                @pointercancel="onSeekUp"
-              >
-                <div class="progress-fill" :style="{ width: `${progress * 100}%` }"></div>
-                <div class="progress-thumb" :style="{ left: `${progress * 100}%` }"></div>
-              </div>
-              <span class="time-label">{{ formatTime(duration) }}</span>
-            </template>
-            <template v-else>
-              <span class="live-badge">LIVE</span>
-              <div class="live-bars" :class="{ paused: !playing && !loading }">
-                <span></span><span></span><span></span><span></span>
-              </div>
-              <span class="live-hint">直播流 · 不可拖动</span>
-            </template>
-          </div>
-          <div v-if="error" class="error-msg" role="alert">
-            <span class="error-text">{{ error }}</span>
-            <button type="button" class="error-dismiss" aria-label="关闭错误提示" title="关闭" @click="clearError">×</button>
+      <section class="radio-content" :class="{ 'is-playing': playing, 'is-loading': loading }" aria-label="专注电台播放器">
+        <div class="radio-eyebrow">
+          <span class="pixel-status" :class="{ active: playing, loading }" aria-hidden="true"></span>
+          <span>{{ playing ? '正在播放' : loading ? '连接中…' : '专注电台' }}</span>
+          <span v-if="currentStation" class="radio-mode-chip">{{ isLocalMedia ? '音频' : 'LIVE' }}</span>
+        </div>
+        <div class="station-info">
+          <div class="station-name">{{ currentStation?.name ?? '选择一个电台' }}</div>
+          <div class="station-desc">{{ currentStation?.description ?? '让音乐陪伴你的专注时光' }}</div>
+        </div>
+        <div class="player-controls">
+          <button
+            class="play-btn"
+            :class="{ 'is-playing': playing }"
+            :disabled="!currentStation"
+            @click="!playing && triggerPixelBurstFromEvent($event, 'accent', 7); toggle()"
+          >
+            <svg v-if="loading" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="7" cy="12" r="1.8" opacity="0.35" />
+              <circle cx="12" cy="12" r="1.8" opacity="0.65" />
+              <circle cx="17" cy="12" r="1.8" />
+            </svg>
+            <svg v-else-if="playing" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="7" y="5" width="3.5" height="14" rx="1" />
+              <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5.4v13.2a1 1 0 0 0 1.5.86l10.6-6.6a1 1 0 0 0 0-1.72L9.5 4.54A1 1 0 0 0 8 5.4Z" />
+            </svg>
+          </button>
+          <div class="volume-row">
+            <svg class="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            </svg>
+            <input
+              type="range"
+              class="volume-slider"
+              min="0"
+              max="100"
+              :value="volume"
+              :style="{ '--volume': `${volume}%` }"
+              @input="setVolume(Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="vol-value">{{ volume }}</span>
           </div>
         </div>
-      </div>
+        <div v-if="currentStation" class="timeline">
+          <template v-if="isLocalMedia">
+            <span class="time-label">{{ formatTime(currentTime) }}</span>
+            <div
+              ref="progressTrack"
+              class="progress-track"
+              :class="{ disabled: !seekable, dragging }"
+              @pointerdown="onSeekDown"
+              @pointermove="onSeekMove"
+              @pointerup="onSeekUp"
+              @pointercancel="onSeekUp"
+            >
+              <div class="progress-fill" :style="{ width: `${progress * 100}%` }"></div>
+              <div class="progress-thumb" :style="{ left: `${progress * 100}%` }"></div>
+            </div>
+            <span class="time-label">{{ formatTime(duration) }}</span>
+          </template>
+          <template v-else>
+            <span class="live-badge">LIVE</span>
+            <div class="live-bars" :class="{ paused: !playing && !loading }">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span class="live-hint">直播流 · 不可拖动</span>
+          </template>
+        </div>
+        <div v-if="error" class="error-msg" role="alert">
+          <span class="error-text">{{ error }}</span>
+          <button type="button" class="error-dismiss" aria-label="关闭错误提示" title="关闭" @click="clearError">×</button>
+        </div>
+      </section>
     </div>
 
     <!-- Scrollable Content -->
@@ -456,12 +458,28 @@ async function scrollToPlaying() {
   color: var(--v2-ink);
   border-radius: 7px;
   font-size: 10.5px;
-  padding: 4px 10px;
+  font-weight: 500;
+  padding: 5px 10px;
   cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.import-btn:not(.ghost):not(:disabled) {
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
+  font-weight: 600;
 }
 
 .import-btn:hover:not(:disabled) {
   background: var(--ui-hover);
+}
+
+.import-btn:not(.ghost):hover:not(:disabled) {
+  background-color: var(--v2-accent);
+  filter: brightness(1.06);
 }
 
 .import-btn:disabled {
@@ -538,76 +556,72 @@ async function scrollToPlaying() {
   background: rgba(248, 113, 113, 0.12);
 }
 
-.radio-frame {
-  position: relative;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border-radius: 18px;
-  padding: 6px;
-  overflow: visible;
-}
-
-.radio-frame::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  padding: 2px;
-  background: linear-gradient(135deg,
-    var(--focus-color) 0%,
-    color-mix(in srgb, var(--focus-color) 60%, #a855f7) 50%,
-    color-mix(in srgb, var(--focus-color) 40%, #06b6d4) 100%
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.6;
-  transition: opacity 0.3s ease;
-}
-
-.radio-frame:hover::before {
-  opacity: 0.85;
-}
-
-.radio-glow {
-  position: absolute;
-  inset: -40px;
-  background: radial-gradient(circle at 50% 0%,
-    color-mix(in srgb, var(--focus-color) 15%, transparent) 0%,
-    transparent 60%
-  );
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-  z-index: -1;
-}
-
-.now-playing:hover .radio-glow {
-  opacity: 1;
-}
-
 .radio-content {
   position: relative;
-  background: var(--v2-surface);
-  border-radius: 14px;
-  padding: 14px;
+  border-radius: 16px;
+  padding: 15px 16px 13px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 11px;
+  background:
+    radial-gradient(ellipse at 82% 14%, var(--v2-glow), transparent 64%),
+    var(--v2-surface);
   box-shadow:
     inset 0 1px 0 var(--v2-specular),
     0 8px 20px var(--v2-shadow);
   border: 1px solid var(--v2-line);
-  transition: all 0.2s ease;
+  transition: background 360ms ease, border-color 280ms ease, box-shadow 280ms ease;
 }
 
-.now-playing:hover .radio-content {
-  box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.5),
-    0 4px 12px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
-    0 0 0 1px color-mix(in srgb, var(--focus-color) 10%, transparent);
-  transform: translateY(-1px);
+.radio-content.is-playing {
+  border-color: color-mix(in srgb, var(--v2-accent) 34%, var(--v2-line));
+}
+
+.radio-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--v2-secondary);
+  font-size: 11px;
+  min-width: 0;
+}
+
+.pixel-status {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 1px;
+  background: var(--v2-muted);
+  transition: background 240ms ease, box-shadow 240ms ease;
+}
+
+.pixel-status.active {
+  background: var(--v2-accent);
+  animation: radio-pixel-beat 1.8s steps(2, end) infinite;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--v2-accent) 26%, transparent);
+}
+
+.pixel-status.loading {
+  background: var(--v2-alert);
+  animation: radio-pixel-beat 0.9s steps(2, end) infinite;
+}
+
+@keyframes radio-pixel-beat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+.radio-mode-chip {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--v2-accent-soft);
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 11%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 4px 4px;
+  color: var(--v2-accent);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
 .station-info {
@@ -989,8 +1003,11 @@ async function scrollToPlaying() {
 }
 
 .station-item.active {
-  background: color-mix(in srgb, var(--focus-color) 10%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 35%, transparent);
+  background-color: color-mix(in srgb, var(--focus-color) 11%, var(--v2-surface));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--focus-color) 8%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border-color: color-mix(in srgb, var(--focus-color) 38%, var(--v2-line));
+  box-shadow: inset 3px 0 0 var(--focus-color);
   color: var(--v2-ink);
 }
 

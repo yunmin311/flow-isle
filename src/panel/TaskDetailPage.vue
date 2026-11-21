@@ -276,6 +276,7 @@ onBeforeUnmount(() => {
 
         <!-- Timer or play button -->
         <div v-if="activeTaskId === task!.id && !activeSubtaskId" class="timer-inline" @click.stop>
+          <span class="detail-pixel-pip" :class="{ paused: !running }" aria-hidden="true"></span>
           <span class="timer-phase-label">{{ phase === 'focus' ? '专注' : '休息' }}</span>
           <span class="timer-time-label">{{ displayTime }}</span>
           <button class="timer-ctrl-btn" :class="{ 'is-paused': !running }" @click.stop="running ? pause() : resume()" :title="running ? '暂停' : '继续'">
@@ -679,9 +680,24 @@ onBeforeUnmount(() => {
   gap: 5px;
   padding: 3px 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-popover));
-  border: 1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
+  background-color: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-popover));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 7%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 30%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   flex-shrink: 0;
+}
+
+.detail-pixel-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  flex-shrink: 0;
+}
+
+.detail-pixel-pip.paused {
+  opacity: 0.4;
 }
 
 .timer-phase-label {

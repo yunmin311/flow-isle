@@ -868,6 +868,7 @@ onBeforeUnmount(() => {
 
             <!-- Timer display (if running on this task) -->
             <div v-if="activeTaskId === task.id" class="task-timer" @click.stop>
+              <span class="timer-pixel-pip" :class="{ paused: !running }" aria-hidden="true"></span>
               <span class="timer-phase">{{ phase === 'focus' ? '专注' : '休息' }}</span>
               <span class="timer-time">{{ displayTime }}</span>
               <div class="timer-controls">
@@ -1610,10 +1611,31 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 4px 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-popover));
-  border: 1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
-  box-shadow: 0 2px 8px var(--v2-shadow);
+  background-color: color-mix(in srgb, var(--v2-accent) 10%, var(--v2-popover));
+  background-image: repeating-conic-gradient(color-mix(in srgb, var(--v2-accent) 7%, transparent) 0% 25%, transparent 0% 50%);
+  background-size: 6px 6px;
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 30%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular), 0 2px 8px var(--v2-shadow);
   flex-shrink: 0;
+}
+
+.timer-pixel-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  flex-shrink: 0;
+  animation: todo-pip-beat 1.8s steps(2, end) infinite;
+}
+
+.timer-pixel-pip.paused {
+  opacity: 0.4;
+  animation: none;
+}
+
+@keyframes todo-pip-beat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.65; }
 }
 
 .timer-phase {

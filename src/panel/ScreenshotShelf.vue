@@ -63,6 +63,7 @@ async function clearAll() {
   <section class="screenshot-shelf" aria-label="截图">
     <div class="screenshot-heading">
       <div class="screenshot-heading-left">
+        <span class="shelf-pixel-pip" :class="{ active: enabled }" aria-hidden="true"></span>
         <span class="screenshot-title" title="收集运行期间复制到剪贴板的图片（包括截图），仅保存在本机；最多 20 张，保留 7 天。不会收集启动前的图片。">截图</span>
         <span class="screenshot-count">{{ records.length }}</span>
       </div>
@@ -114,6 +115,19 @@ async function clearAll() {
 .screenshot-heading, .screenshot-meta, .screenshot-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .screenshot-heading { margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
 .screenshot-heading-left, .screenshot-heading-actions { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.shelf-pixel-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--v2-muted);
+  opacity: 0.45;
+  flex-shrink: 0;
+  transition: background 180ms ease, opacity 180ms ease;
+}
+.shelf-pixel-pip.active {
+  background: var(--v2-accent);
+  opacity: 1;
+}
 .screenshot-heading-actions { flex-wrap: wrap; justify-content: flex-end; }
 .screenshot-title { font-size: 13px; font-weight: 600; color: var(--v2-ink); }
 .screenshot-count {

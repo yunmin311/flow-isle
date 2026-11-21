@@ -440,8 +440,11 @@ function handleCloseCategoryDialog() {
 }
 
 .header-new-btn:hover {
-  background: color-mix(in srgb, var(--focus-color) 25%, transparent);
-  border-color: color-mix(in srgb, var(--focus-color) 50%, transparent);
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border-color: color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  color: var(--v2-on-accent);
 }
 
 .header-new-btn span {

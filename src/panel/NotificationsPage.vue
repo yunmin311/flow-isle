@@ -323,6 +323,7 @@ onDeactivated(() => { selectedEmail.value = null })
     <!-- 音量：紧凑工具条，进入邮件正文阅读时自动隐藏以让出阅读空间 -->
     <template v-if="!selectedEmail">
       <div v-if="volumeReady" class="volume-strip">
+        <span class="volume-pixel-pip" :class="{ muted: sysMuted || sysVolume === 0 }" aria-hidden="true"></span>
         <span class="volume-label">音量</span>
         <button class="mute-btn" :class="{ active: sysMuted }" @click="toggleMute" :title="sysMuted ? '取消静音' : '静音'">
           <svg v-if="sysMuted || sysVolume === 0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -491,11 +492,13 @@ onDeactivated(() => { selectedEmail.value = null })
 .notif-account { font-size: 11px; font-weight: 400; color: var(--v2-secondary); margin-top: 3px; overflow-wrap: anywhere; line-height: 1.5; }
 
 .focus-missed-card {
-  padding: 9px 10px 9px 12px;
-  border-radius: 10px;
-  background: var(--v2-surface);
-  border: 1px solid var(--v2-line);
-  box-shadow: inset 3px 0 0 var(--v2-accent);
+  padding: 11px 12px 11px 13px;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 86% 12%, var(--v2-glow), transparent 64%),
+    var(--v2-surface);
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
+  box-shadow: inset 0 1px 0 var(--v2-specular), inset 3px 0 0 var(--v2-accent);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -659,10 +662,27 @@ onDeactivated(() => { selectedEmail.value = null })
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 2px 8px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--v2-line);
+  padding: 7px 11px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   flex-shrink: 0;
+}
+
+.volume-pixel-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--v2-accent);
+  flex-shrink: 0;
+  transition: background 180ms ease, opacity 180ms ease;
+}
+
+.volume-pixel-pip.muted {
+  background: var(--v2-muted);
+  opacity: 0.45;
 }
 
 .volume-label {

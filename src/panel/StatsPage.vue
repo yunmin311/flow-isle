@@ -580,16 +580,25 @@ function steppedBarHeight(pomodoros: number): string {
 }
 
 .stat-card {
-  background: var(--v2-elevated);
+  background:
+    radial-gradient(ellipse at 82% 14%, var(--v2-glow), transparent 72%),
+    var(--v2-elevated);
   border: 1px solid var(--v2-line);
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 var(--v2-specular);
   padding: 10px 6px;
   text-align: center;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease;
+}
+
+.stat-card:hover {
+  transform: translate3d(0, -1px, 0);
+  border-color: color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
 }
 
 .stat-value {
@@ -948,6 +957,7 @@ function steppedBarHeight(pomodoros: number): string {
   border-radius: 8px;
   background: var(--ui-well);
   border: 1px solid var(--v2-line);
+  box-shadow: inset 0 1px 0 var(--v2-specular);
 }
 
 .mini-value {
