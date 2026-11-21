@@ -2,14 +2,17 @@
 import { computed } from 'vue'
 import { useTimer } from '../composables/useTimer'
 import { useTasks } from '../composables/useTasks'
-import { useCompanion, resolveIslandCompanionSprite } from '../composables/useCompanion'
+import { useCompanion, resolveIslandCompanionSprite, installCompanionReactionListener } from '../composables/useCompanion'
 import { PIXEL_3X5, layoutPixelText } from '../utils/pixelFont'
+import CompanionEmote, { type CompanionEmoteKind } from './CompanionEmote.vue'
 
 const { displayTime, phase, activeTaskId, activeTaskTitle, activeSubtaskTitle, running, remaining } = useTimer()
 const { tasks } = useTasks()
-const { selectedCompanion } = useCompanion()
+const { selectedCompanion, activeReaction } = useCompanion()
 
-defineProps<{ radioPlaying?: boolean }>()
+installCompanionReactionListener()
+
+const props = defineProps<{ radioPlaying?: boolean }>()
 
 const activeTask = computed(() =>
   tasks.value.find(t => t.id === activeTaskId.value),
@@ -26,9 +29,21 @@ const phaseColor = computed(() =>
 const companionSprite = computed(() =>
   resolveIslandCompanionSprite(
     selectedCompanion.value,
-    phase.value === 'break' ? 'break' : 'focus',
+    activeReaction.value ? 'focus' : phase.value === 'break' ? 'break' : 'focus',
   ),
 )
+
+const companionEmote = computed<CompanionEmoteKind | null>(() => {
+  const r = activeReaction.value
+  if (r) {
+    if (r.kind === 'mail') return 'mail'
+    if (r.kind === 'notif') return 'notif'
+    return 'heart'
+  }
+  if (phase.value === 'break') return 'sleep'
+  if (props.radioPlaying) return 'music'
+  return null
+})
 
 // 固定 3px：与 idle 时钟保持一致
 const pixelUnit = 3
@@ -37,7 +52,7 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
 
 <template>
   <div class="capsule-focus">
-    <div class="focus-companion">
+    <div class="focus-companion" :class="{ 'is-reacting': Boolean(activeReaction) }">
       <img
         class="companion-pixel"
         :src="companionSprite.url"
@@ -49,6 +64,7 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
           height: `calc(18px * var(--island-scale, 1))`,
         }"
       />
+      <CompanionEmote v-if="companionEmote" :kind="companionEmote" compact />
       <span
         class="phase-pip"
         :class="{ 'is-running': running }"
@@ -131,9 +147,18 @@ const pixelTime = computed(() => layoutPixelText(displayTime.value, PIXEL_3X5, p
   animation: focus-companion-breath 2.4s steps(2, end) infinite;
 }
 
+.focus-companion.is-reacting .companion-pixel {
+  animation: focus-companion-hop 0.42s steps(2, end) 2;
+}
+
 @keyframes focus-companion-breath {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-1px); }
+}
+
+@keyframes focus-companion-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

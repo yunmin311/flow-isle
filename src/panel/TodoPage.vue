@@ -10,6 +10,7 @@ import RepeatPicker from './RepeatPicker.vue'
 import PixelIcon from '../components/PixelIcon.vue'
 import StatNumber from '../components/StatNumber.vue'
 import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement } from '../utils/pixelSpark'
+import { triggerCompanionReaction } from '../composables/useCompanion'
 
 const props = defineProps<{ initialTab?: string; searchQuery?: string }>()
 const emit = defineEmits<{
@@ -349,7 +350,10 @@ function handleToggleComplete(taskId: string, event?: MouseEvent) {
     abandon()
   }
   toggleComplete(taskId)
-  if (!wasDone) triggerPixelBurstFromEvent(event, 'accent', 8)
+  if (!wasDone) {
+    triggerPixelBurstFromEvent(event, 'accent', 8)
+    triggerCompanionReaction('task-done')
+  }
 }
 
 function handleDoneTimer(event?: MouseEvent) {

@@ -4,10 +4,12 @@ import { useTasks, type Task, isTaskDoneOnDate, todayString } from '../composabl
 import { useTimerBridge } from '../composables/useTimerBridge'
 import { useTaskGroups } from '../composables/useTaskGroups'
 import { useSettings } from '../composables/useSettings'
-import { useCompanion, resolveIslandCompanionSprite, companionDisplayName, ALBUM_MINUTES } from '../composables/useCompanion'
+import { useCompanion, resolveIslandCompanionSprite, companionDisplayName, triggerCompanionReaction, ALBUM_MINUTES } from '../composables/useCompanion'
+import { useRadio } from '../composables/useRadio'
 import { getCategoryColor } from '../composables/useMemos'
 import PixelTime from '../components/PixelTime.vue'
 import StatNumber from '../components/StatNumber.vue'
+import CompanionEmote, { type CompanionEmoteKind } from '../components/CompanionEmote.vue'
 import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement } from '../utils/pixelSpark'
 
 const emit = defineEmits<{
@@ -47,7 +49,8 @@ const {
 } = useTimerBridge()
 
 const { settings } = useSettings()
-const { selectedCompanion, companionRecord, getCompanionStage } = useCompanion()
+const { selectedCompanion, companionRecord, getCompanionStage, activeReaction } = useCompanion()
+const { playing: radioPlaying } = useRadio()
 
 // 快速专注：不依赖 TODO，直接用虚拟任务启动一个番茄
 const QUICK_TASK_ID = 'quick-focus'
@@ -98,7 +101,26 @@ const companionSummary = computed(() => {
       : 'idle'
   const sprite = resolveIslandCompanionSprite(animal, mode, Math.floor(rec.minutes / 5))
   const progressText = rec.minutes < ALBUM_MINUTES ? `${rec.minutes}/${ALBUM_MINUTES}m` : `${rec.minutes}m`
-  return { animal, displayName: companionDisplayName(animal), rec, stage, sprite, progressText }
+  const r = activeReaction.value
+  let emote: CompanionEmoteKind | null = null
+  if (r) {
+    emote = r.kind === 'mail' ? 'mail' : r.kind === 'notif' ? 'notif' : 'heart'
+  } else if (phase.value === 'break' && activeTaskId.value) {
+    emote = 'sleep'
+  } else if (radioPlaying.value) {
+    emote = 'music'
+  }
+  return {
+    animal,
+    displayName: companionDisplayName(animal),
+    rec,
+    stage,
+    sprite,
+    progressText,
+    emote,
+    statusText: r ? r.whisper : stage.label,
+    reacting: Boolean(r),
+  }
 })
 
 function handleHeroAction(event?: MouseEvent) {
@@ -127,6 +149,7 @@ const heroRef = ref<HTMLElement | null>(null)
 watch(pendingNotification, (next, prev) => {
   if (!prev && (next === 'focus-done' || next === 'break-done')) {
     triggerPixelBurstAtElement(heroRef.value, next === 'focus-done' ? 'gold' : 'break', 10, 'center')
+    triggerCompanionReaction('done')
   }
 })
 
@@ -256,7 +279,10 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
     abandon()
   }
   toggleComplete(taskId)
-  if (!doneToday) triggerPixelBurstFromEvent(event, 'accent', 9)
+  if (!doneToday) {
+    triggerPixelBurstFromEvent(event, 'accent', 9)
+    triggerCompanionReaction('task-done')
+  }
 }
 </script>
 
@@ -323,16 +349,19 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
       </div>
 
       <!-- Companion Micro-Bar -->
-      <button class="hero-companion" title="打开陪伴与相册" @click="emit('openCompanion')">
-        <img
-          :src="companionSummary.sprite.url"
-          :width="companionSummary.sprite.width"
-          :height="companionSummary.sprite.height"
-          alt=""
-          class="companion-sprite"
-        />
+      <button class="hero-companion" :class="{ 'is-reacting': companionSummary.reacting }" title="打开陪伴与相册" @click="emit('openCompanion')">
+        <span class="companion-sprite-wrap">
+          <img
+            :src="companionSummary.sprite.url"
+            :width="companionSummary.sprite.width"
+            :height="companionSummary.sprite.height"
+            alt=""
+            class="companion-sprite"
+          />
+          <CompanionEmote v-if="companionSummary.emote" :kind="companionSummary.emote" compact />
+        </span>
         <span class="companion-name">{{ companionSummary.displayName }}</span>
-        <span class="companion-stage">{{ companionSummary.stage.label }}</span>
+        <span class="companion-stage">{{ companionSummary.statusText }}</span>
         <span class="companion-meter">{{ companionSummary.progressText }}</span>
       </button>
     </section>
@@ -711,6 +740,14 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   border-color: var(--v2-accent);
 }
 
+.companion-sprite-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .companion-sprite {
   display: block;
   width: 18px;
@@ -721,6 +758,10 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   animation: home-companion-breath 2.8s steps(2, end) infinite;
 }
 
+.hero-companion.is-reacting .companion-sprite {
+  animation: home-companion-hop 0.42s steps(2, end) 2;
+}
+
 .hero-companion:hover .companion-sprite {
   animation: none;
   transform: translateY(-1px);
@@ -729,6 +770,11 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 @keyframes home-companion-breath {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-1px); }
+}
+
+@keyframes home-companion-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,14 +2,17 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useTasks } from "../composables/useTasks";
 import { useSettings } from "../composables/useSettings";
-import { useCompanion, resolveIslandCompanionSprite } from "../composables/useCompanion";
+import { useCompanion, resolveIslandCompanionSprite, installCompanionReactionListener } from "../composables/useCompanion";
 import { useIslandState } from "../composables/useIslandState";
 import { PIXEL_3X5, layoutPixelText } from "../utils/pixelFont";
+import CompanionEmote, { type CompanionEmoteKind } from "./CompanionEmote.vue";
 
 const { recentFocusTasks } = useTasks();
 const { settings } = useSettings();
-const { selectedCompanion } = useCompanion();
+const { selectedCompanion, activeReaction } = useCompanion();
 const { state } = useIslandState();
+
+installCompanionReactionListener();
 
 const props = defineProps<{ radioPlaying?: boolean }>();
 
@@ -104,10 +107,22 @@ const clockPixels = computed(() => layoutPixelText(clock.value, PIXEL_3X5, pixel
 const companionSprite = computed(() =>
     resolveIslandCompanionSprite(
         selectedCompanion.value,
-        isAlert.value ? "alert" : "idle",
+        activeReaction.value ? "hover" : isAlert.value ? "alert" : "idle",
         minuteBucket.value,
     ),
 );
+
+const companionEmote = computed<CompanionEmoteKind | null>(() => {
+    const r = activeReaction.value;
+    if (r) {
+        if (r.kind === "mail") return "mail";
+        if (r.kind === "notif") return "notif";
+        return "heart";
+    }
+    if (props.radioPlaying) return "music";
+    if (isAlert.value || companionSprite.value.url === selectedCompanion.value.sleepUrl) return "sleep";
+    return null;
+});
 
 watch(
     () => carouselItems.value.length,
@@ -140,7 +155,7 @@ onUnmounted(() => {
 
 <template>
     <div class="capsule-idle" :class="{ 'is-alert': isAlert }">
-        <div class="idle-companion">
+        <div class="idle-companion" :class="{ 'is-reacting': Boolean(activeReaction) }">
             <img
                 class="companion-pixel"
                 :src="companionSprite.url"
@@ -152,6 +167,7 @@ onUnmounted(() => {
                     height: `calc(18px * var(--island-scale, 1))`,
                 }"
             />
+            <CompanionEmote v-if="companionEmote" :kind="companionEmote" compact />
             <span v-if="isAlert" class="alert-pip" aria-hidden="true" />
         </div>
 
@@ -234,9 +250,18 @@ onUnmounted(() => {
     animation: idle-companion-breath 2.8s steps(2, end) infinite;
 }
 
+.idle-companion.is-reacting .companion-pixel {
+    animation: idle-companion-hop 0.42s steps(2, end) 2;
+}
+
 @keyframes idle-companion-breath {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-1px); }
+}
+
+@keyframes idle-companion-hop {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

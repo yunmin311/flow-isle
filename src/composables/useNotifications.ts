@@ -6,6 +6,12 @@ import { shouldMirrorSystemNotification, rememberSystemNotificationSource, useSe
 import { useTimer } from './useTimer'
 import { isTransientSocialNotification } from '../utils/notificationSources'
 
+function notifyCompanionReaction(kind: 'mail' | 'notif') {
+  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('flowisle:companion-reaction', { detail: { kind } }))
+  }
+}
+
 export type NotificationKind = 'focus-done' | 'break-done' | 'system' | 'task-reminder' | 'email'
 
 export interface NotificationRecord {
@@ -229,6 +235,9 @@ function addSystemRecord(p: SystemNotificationPayload) {
     aumid: p.aumid || undefined,
   }
   addAfterLoad(record)
+  if (!isFocusSilenced()) {
+    notifyCompanionReaction('notif')
+  }
 }
 
 export interface EmailHistorySummary {
@@ -273,6 +282,7 @@ function addEmailRecord(p: EmailNotificationPayload) {
   }
   addAfterLoad(record, () => {
     if (p.historical) queueHistorySummary(record, p.mailbox_key)
+    else if (!isFocusSilenced()) notifyCompanionReaction('mail')
   })
 }
 

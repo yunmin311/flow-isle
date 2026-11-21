@@ -44,6 +44,14 @@ export interface CompanionSyncPayload {
   records: Record<string, CompanionRecord>
 }
 
+export type CompanionReactionKind = 'mail' | 'notif' | 'task-done' | 'done'
+
+export interface CompanionReaction {
+  kind: CompanionReactionKind
+  whisper: string
+  id: number
+}
+
 export interface CompanionStage {
   tier: 'new' | 'growing' | 'album' | 'bonded'
   label: string
@@ -123,6 +131,70 @@ let loadingPromise: Promise<void> | undefined
 let pendingSave = Promise.resolve()
 let suppressEmit = false
 let syncListenersInstalled = false
+let reactionListenerInstalled = false
+let reactionTimer: ReturnType<typeof setTimeout> | null = null
+let reactionSeq = 0
+
+const activeReaction = ref<CompanionReaction | null>(null)
+
+const REACTION_WHISPERS: Record<CompanionReactionKind, Record<'cat' | 'dog' | 'fox', string>> = {
+  mail: {
+    cat: '叼来一封新邮件',
+    dog: '汪！有新邮件到了',
+    fox: '竖起耳朵：收到新邮件',
+  },
+  notif: {
+    cat: '竖起耳朵望了望通知',
+    dog: '提醒你：有新消息哦',
+    fox: '轻点尾巴提醒有消息',
+  },
+  'task-done': {
+    cat: '呼噜呼噜 · 做得真棒',
+    dog: '开心摇尾巴 · 又完成一件!',
+    fox: '满意点头 · 推进顺利',
+  },
+  done: {
+    cat: '蹭蹭你 · 这一轮很棒',
+    dog: '辛苦啦 · 休息一下吧',
+    fox: '暖光相伴 · 专注达成',
+  },
+}
+
+function applyCompanionReaction(kind: CompanionReactionKind, customWhisper?: string) {
+  const family = selectedCompanion.value?.family ?? 'cat'
+  const whisper = customWhisper?.trim() || REACTION_WHISPERS[kind][family]
+  reactionSeq += 1
+  activeReaction.value = { kind, whisper, id: reactionSeq }
+  if (reactionTimer !== null) clearTimeout(reactionTimer)
+  const duration = kind === 'mail' || kind === 'done' ? 4200 : 3200
+  reactionTimer = setTimeout(() => {
+    activeReaction.value = null
+    reactionTimer = null
+  }, duration)
+}
+
+export function triggerCompanionReaction(kind: CompanionReactionKind, customWhisper?: string) {
+  applyCompanionReaction(kind, customWhisper)
+  emit('companion-reaction', { kind, whisper: customWhisper }).catch(() => {})
+}
+
+export function installCompanionReactionListener() {
+  if (reactionListenerInstalled) return
+  reactionListenerInstalled = true
+  listen<{ kind: CompanionReactionKind; whisper?: string }>('companion-reaction', (event) => {
+    if (event.payload?.kind) {
+      applyCompanionReaction(event.payload.kind, event.payload.whisper)
+    }
+  }).catch(() => {})
+  if (typeof window !== 'undefined') {
+    window.addEventListener('flowisle:companion-reaction', (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: CompanionReactionKind; whisper?: string }>).detail
+      if (detail?.kind) {
+        triggerCompanionReaction(detail.kind, detail.whisper)
+      }
+    })
+  }
+}
 
 function normalizeCompanionId(id: unknown): string {
   if (typeof id === 'string' && companionAnimals.some(a => a.id === id)) return id
@@ -353,6 +425,7 @@ export function useCompanion() {
     selectedId: readonly(selectedId),
     selectedCompanion,
     selectedBadges,
+    activeReaction: readonly(activeReaction),
     records: readonly(companionRecords),
     statsSection,
     loaded: readonly(loaded),
@@ -363,6 +436,8 @@ export function useCompanion() {
     collectCompanionPicture,
     setCompanionNickname,
     companionDisplayName,
+    triggerCompanionReaction,
+    installCompanionReactionListener,
     applyExternalCompanionState,
     installCompanionSyncResponder,
   }

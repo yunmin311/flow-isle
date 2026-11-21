@@ -1,9 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useCompanion } from '../composables/useCompanion'
+import { useCompanion, companionDisplayName, installCompanionReactionListener } from '../composables/useCompanion'
+import { useRadio } from '../composables/useRadio'
 import PixelIcon from '../components/PixelIcon.vue'
+import CompanionEmote, { type CompanionEmoteKind } from '../components/CompanionEmote.vue'
 
-const { selectedCompanion } = useCompanion()
+const { selectedCompanion, activeReaction } = useCompanion()
+installCompanionReactionListener()
+const { playing: radioPlaying } = useRadio()
+
+const companionName = computed(() => companionDisplayName(selectedCompanion.value))
+const titlebarEmote = computed<CompanionEmoteKind | null>(() => {
+  const r = activeReaction.value
+  if (r) {
+    if (r.kind === 'mail') return 'mail'
+    if (r.kind === 'notif') return 'notif'
+    return 'heart'
+  }
+  if (radioPlaying.value) return 'music'
+  return null
+})
 
 const props = defineProps<{
   title?: string
@@ -66,11 +82,13 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
       <button
         type="button"
         class="companion-button"
-        :aria-label="`查看${selectedCompanion.name}陪伴相册`"
-        :title="selectedCompanion.name"
+        :class="{ 'is-reacting': Boolean(activeReaction) }"
+        :aria-label="`查看${companionName}陪伴相册`"
+        :title="activeReaction ? `${companionName} · ${activeReaction.whisper}` : companionName"
         @click="emit('openCompanion')"
       >
-        <img :src="selectedCompanion.sitUrl" alt="" width="18" height="18" />
+        <img :src="selectedCompanion.sitUrl" alt="" width="18" height="18" class="titlebar-companion-img" />
+        <CompanionEmote v-if="titlebarEmote" :kind="titlebarEmote" compact />
       </button>
       <button class="btn-close" @click="$emit('close')" title="关闭">✕</button>
     </div>
@@ -219,6 +237,7 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
 }
 
 .titlebar-actions .companion-button {
+  position: relative;
   border-radius: 8px;
 }
 
@@ -233,7 +252,16 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
   background: var(--ui-hover);
 }
 
-.titlebar-actions .btn-close {
+.titlebar-actions .companion-button.is-reacting .titlebar-companion-img {
+  animation: titlebar-companion-hop 0.42s steps(2, end) 2;
+}
+
+@keyframes titlebar-companion-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.btn-close {
   background: var(--ui-well);
   color: var(--v2-muted);
   font-size: 12px;
