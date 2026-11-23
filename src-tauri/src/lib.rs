@@ -2366,7 +2366,7 @@ async fn activate_notification_source(app: String, aumid: String) -> Result<(), 
         .map_err(|_| "无法打开来源应用".to_owned())?
 }
 
-/// 引导打开 Windows 专注助手设置。
+/// 引导打开 Windows 通知与免打扰设置（ms-settings:notifications）。
 #[cfg(target_os = "windows")]
 #[tauri::command]
 fn open_focus_assist_settings() -> Result<(), String> {
@@ -2375,175 +2375,39 @@ fn open_focus_assist_settings() -> Result<(), String> {
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     let operation = HSTRING::from("open");
-    let target = HSTRING::from("ms-settings:quiethours");
+    let target = HSTRING::from("ms-settings:notifications");
     let result = unsafe { ShellExecuteW(None, &operation, &target, None, None, SW_SHOWNORMAL) };
     if result.0 as isize > 32 {
         Ok(())
     } else {
-        Err("无法打开 Windows 专注助手设置".into())
+        Err("无法打开 Windows 通知设置".into())
     }
 }
 
-#[cfg(target_os = "windows")]
-static FLOWISLE_SUPPRESSED_TOAST: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-#[cfg(target_os = "windows")]
-static ORIGINAL_TOAST_ENABLED: std::sync::atomic::AtomicU32 =
-    std::sync::atomic::AtomicU32::new(u32::MAX);
-
-#[cfg(target_os = "windows")]
-fn read_windows_toast_enabled_reg() -> Result<u32, String> {
-    use windows::core::w;
-    use windows::Win32::Foundation::ERROR_SUCCESS;
-    use windows::Win32::System::Registry::{
-        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER, KEY_READ,
-        REG_DWORD, REG_VALUE_TYPE,
-    };
-
-    let mut key = HKEY::default();
-    let status = unsafe {
-        RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            w!("Software\\Microsoft\\Windows\\CurrentVersion\\PushNotifications"),
-            Some(0),
-            KEY_READ,
-            &mut key,
-        )
-    };
-    if status != ERROR_SUCCESS {
-        return Ok(1);
-    }
-
-    let mut value: u32 = 1;
-    let mut size = std::mem::size_of::<u32>() as u32;
-    let mut kind = REG_VALUE_TYPE::default();
-    let qstatus = unsafe {
-        RegQueryValueExW(
-            key,
-            w!("ToastEnabled"),
-            None,
-            Some(&mut kind),
-            Some(&mut value as *mut u32 as *mut u8),
-            Some(&mut size),
-        )
-    };
-    unsafe {
-        let _ = RegCloseKey(key);
-    }
-    if qstatus == ERROR_SUCCESS && kind == REG_DWORD {
-        Ok(value)
-    } else {
-        Ok(1)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn write_windows_toast_enabled_reg(enabled: u32) -> Result<(), String> {
-    use windows::core::w;
-    use windows::Win32::Foundation::{ERROR_SUCCESS, LPARAM, WPARAM};
-    use windows::Win32::System::Registry::{
-        RegCloseKey, RegCreateKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_WRITE,
-        REG_DWORD, REG_OPTION_NON_VOLATILE,
-    };
-    use windows::Win32::UI::WindowsAndMessaging::{
-        SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
-    };
-
-    let mut key = HKEY::default();
-    let status = unsafe {
-        RegCreateKeyExW(
-            HKEY_CURRENT_USER,
-            w!("Software\\Microsoft\\Windows\\CurrentVersion\\PushNotifications"),
-            Some(0),
-            None,
-            REG_OPTION_NON_VOLATILE,
-            KEY_WRITE,
-            None,
-            &mut key,
-            None,
-        )
-    };
-    if status != ERROR_SUCCESS {
-        return Err(format!("无法写入 Windows 通知设置 (code {})", status.0));
-    }
-
-    let bytes = enabled.to_le_bytes();
-    let set_status = unsafe { RegSetValueExW(key, w!("ToastEnabled"), Some(0), REG_DWORD, Some(&bytes)) };
-    unsafe {
-        let _ = RegCloseKey(key);
-    }
-    if set_status != ERROR_SUCCESS {
-        return Err(format!("更新 ToastEnabled 失败 (code {})", set_status.0));
-    }
-
-    let section = w!("Policy");
-    unsafe {
-        let _ = SendMessageTimeoutW(
-            HWND_BROADCAST,
-            WM_SETTINGCHANGE,
-            WPARAM(0),
-            LPARAM(section.as_ptr() as isize),
-            SMTO_ABORTIFHUNG,
-            400,
-            None,
-        );
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn restore_windows_toast_if_suppressed() {
-    use std::sync::atomic::Ordering;
-    if FLOWISLE_SUPPRESSED_TOAST.swap(false, Ordering::SeqCst) {
-        let original = ORIGINAL_TOAST_ENABLED.load(Ordering::SeqCst);
-        let restore_val = if original == u32::MAX { 1 } else { original };
-        let _ = write_windows_toast_enabled_reg(restore_val);
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn restore_windows_toast_if_suppressed() {}
-
+/// 读取 Windows 11 原生「免打扰」状态（只读 WinRT API，不修改受保护系统状态）。
 #[cfg(target_os = "windows")]
 #[tauri::command]
-fn get_windows_toast_suppression() -> Result<bool, String> {
-    Ok(read_windows_toast_enabled_reg()? == 0)
-}
+fn get_windows_dnd_mode() -> Result<String, String> {
+    use windows::UI::Notifications::{ToastNotificationManager, ToastNotificationMode};
 
-#[cfg(target_os = "windows")]
-#[tauri::command]
-fn set_windows_toast_suppression(suppressed: bool) -> Result<bool, String> {
-    use std::sync::atomic::Ordering;
-    if suppressed {
-        if ORIGINAL_TOAST_ENABLED.load(Ordering::SeqCst) == u32::MAX {
-            let current = read_windows_toast_enabled_reg().unwrap_or(1);
-            ORIGINAL_TOAST_ENABLED.store(current, Ordering::SeqCst);
-        }
-        write_windows_toast_enabled_reg(0)?;
-        FLOWISLE_SUPPRESSED_TOAST.store(true, Ordering::SeqCst);
-        Ok(true)
-    } else {
-        let restore_val = if FLOWISLE_SUPPRESSED_TOAST.swap(false, Ordering::SeqCst) {
-            let orig = ORIGINAL_TOAST_ENABLED.load(Ordering::SeqCst);
-            if orig == u32::MAX { 1 } else { orig }
-        } else {
-            1
-        };
-        write_windows_toast_enabled_reg(restore_val)?;
-        Ok(restore_val == 0)
-    }
+    let manager = ToastNotificationManager::GetDefault()
+        .map_err(|e| format!("无法读取 Windows 通知状态: {e}"))?;
+    let mode = manager
+        .NotificationMode()
+        .map_err(|e| format!("无法读取免打扰模式: {e}"))?;
+    let label = match mode {
+        ToastNotificationMode::Unrestricted => "off",
+        ToastNotificationMode::PriorityOnly => "priority",
+        ToastNotificationMode::AlarmsOnly => "alarms",
+        _ => "unknown",
+    };
+    Ok(label.to_owned())
 }
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-fn get_windows_toast_suppression() -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(not(target_os = "windows"))]
-#[tauri::command]
-fn set_windows_toast_suppression(_suppressed: bool) -> Result<bool, String> {
-    Err("仅支持 Windows".into())
+fn get_windows_dnd_mode() -> Result<String, String> {
+    Ok("unknown".to_owned())
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -2715,8 +2579,7 @@ pub fn run() {
             read_email_body,
             activate_notification_source,
             open_focus_assist_settings,
-            get_windows_toast_suppression,
-            set_windows_toast_suppression,
+            get_windows_dnd_mode,
         ])
         .setup(|app| {
             // 点击刘海判定依赖真实点击坐标；钩子只需要安装一次
@@ -2876,7 +2739,6 @@ pub fn run() {
                         }
                     }
                     "quit" => {
-                        restore_windows_toast_if_suppressed();
                         app.exit(0);
                     }
                     _ => {}
@@ -2885,13 +2747,8 @@ pub fn run() {
 
             Ok(())
         })
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|_app, event| {
-            if let tauri::RunEvent::Exit = event {
-                restore_windows_toast_if_suppressed();
-            }
-        });
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
 
 #[cfg(test)]

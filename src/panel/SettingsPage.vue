@@ -81,16 +81,37 @@ async function probeNotificationSources() {
 }
 
 const focusAssistStatus = ref('')
+const windowsDndMode = ref<'off' | 'priority' | 'alarms' | 'unknown'>('unknown')
+
+async function refreshWindowsDndMode() {
+  try {
+    const mode = await invoke<string>('get_windows_dnd_mode')
+    if (mode === 'off' || mode === 'priority' || mode === 'alarms') {
+      windowsDndMode.value = mode
+    } else {
+      windowsDndMode.value = 'unknown'
+    }
+  } catch {
+    windowsDndMode.value = 'unknown'
+  }
+}
 
 async function openFocusAssistSettings() {
   focusAssistStatus.value = ''
   try {
     await invoke('open_focus_assist_settings')
-    focusAssistStatus.value = '已打开 Windows 专注助手设置'
+    focusAssistStatus.value = '已打开 Windows 通知与免打扰设置'
   } catch (e) {
-    focusAssistStatus.value = typeof e === 'string' ? e : '无法打开专注助手设置'
+    focusAssistStatus.value = typeof e === 'string' ? e : '无法打开 Windows 通知设置'
   }
 }
+
+onMounted(() => {
+  void refreshWindowsDndMode()
+  window.addEventListener('focus', refreshWindowsDndMode)
+})
+onActivated(() => { void refreshWindowsDndMode() })
+onUnmounted(() => { window.removeEventListener('focus', refreshWindowsDndMode) })
 
 function isSourceMuted(source: string): boolean {
   const list = settings.value.systemNotificationMutedApps ?? []
@@ -523,43 +544,18 @@ onUnmounted(() => {
           <span class="switch-track"></span>
         </label>
       </div>
-      <div class="update-toggle-row row-spaced">
-        <div class="update-copy">
-          <span class="update-label"><HintTip label="屏蔽 Windows 原生弹窗" text="开启后隐藏 Windows 右下角系统通知横幅，关闭开关或退出 FlowIsle 时自动恢复；开启期间系统通知中心可能暂停接收新 Toast，但邮件与番茄提醒不受影响" /></span>
-        </div>
-        <label class="switch" aria-label="屏蔽 Windows 原生弹窗">
-          <input v-model="settings.suppressWindowsToast" type="checkbox" />
-          <span class="switch-track"></span>
-        </label>
-      </div>
-      <div v-if="settings.suppressWindowsToast" class="setting-option-row">
-        <span class="update-label">屏蔽范围</span>
-        <div class="mode-toggle">
-          <button
-            type="button"
-            class="mode-btn"
-            :class="{ active: (settings.suppressWindowsToastScope ?? 'always') === 'always' }"
-            @click="settings.suppressWindowsToastScope = 'always'"
-          >
-            始终屏蔽
-          </button>
-          <button
-            type="button"
-            class="mode-btn"
-            :class="{ active: settings.suppressWindowsToastScope === 'focus-only' }"
-            @click="settings.suppressWindowsToastScope = 'focus-only'"
-          >
-            仅专注时
-          </button>
-        </div>
-      </div>
       <div class="setting-option-row row-spaced">
         <div class="update-copy">
-          <span class="update-label">Windows 专注助手</span>
-          <span class="update-hint">如需更精细的免打扰时段或优先联系人白名单，可前往 Windows 系统设置</span>
+          <span class="update-label">
+            屏蔽 Windows 原生弹窗（免打扰）
+            <span class="dnd-status-pill" :class="{ active: windowsDndMode === 'priority' || windowsDndMode === 'alarms' }">
+              {{ windowsDndMode === 'priority' || windowsDndMode === 'alarms' ? '已开启' : windowsDndMode === 'off' ? '未开启' : '未知' }}
+            </span>
+          </span>
+          <span class="update-hint">Windows 11 仅允许由系统「免打扰」隐藏右下角原生横幅；开启后 FlowIsle 灵动岛仍照常接管通知（Win+N 点击右上角铃铛可一键开关）</span>
         </div>
         <button type="button" class="source-probe-btn" @click="openFocusAssistSettings">
-          打开设置
+          系统设置
         </button>
       </div>
       <span v-if="focusAssistStatus" class="source-status">{{ focusAssistStatus }}</span>
@@ -898,6 +894,27 @@ onUnmounted(() => {
   font-weight: 500;
   line-height: 1.35;
   color: var(--v2-ink);
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dnd-status-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ui-well);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-muted);
+  line-height: 1.35;
+}
+
+.dnd-status-pill.active {
+  background-color: var(--v2-accent-soft);
+  border-color: color-mix(in srgb, var(--v2-accent) 36%, var(--v2-line));
+  color: var(--v2-accent);
 }
 
 .update-hint {

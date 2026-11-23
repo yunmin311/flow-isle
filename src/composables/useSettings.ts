@@ -58,8 +58,6 @@ export interface Settings {
   systemNotificationAllowedApps: string[] // 只镜像模式下允许的来源（应用名或 AUMID）
   systemNotificationKnownSources: string[] // 自动/探针发现的来源，持久保留
   systemNotificationSilentInFocus: boolean // 番茄专注运行中暂停系统和邮件的岛内提示及通知记录
-  suppressWindowsToast: boolean // 屏蔽 Windows 原生右下角系统弹窗（ToastEnabled=0，退出自动恢复）
-  suppressWindowsToastScope: 'always' | 'focus-only' // always=始终屏蔽；focus-only=仅专注时屏蔽
   emailAccounts: EmailAccount[]
   socialReminders: boolean
   emailEnabled: boolean        // 邮件提醒开关
@@ -102,8 +100,6 @@ const DEFAULT_SETTINGS: Settings = {
   systemNotificationAllowedApps: [],
   systemNotificationKnownSources: [],
   systemNotificationSilentInFocus: true,
-  suppressWindowsToast: false,
-  suppressWindowsToastScope: 'always',
   emailAccounts: [],
   socialReminders: true,
   emailEnabled: false,
