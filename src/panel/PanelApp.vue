@@ -38,8 +38,25 @@ interface PanelTransitionMetrics {
   panel_height: number
 }
 
-const { startBridge } = useTimerBridge()
+const { startBridge, running: timerRunning, phase: timerPhase } = useTimerBridge()
 const { settings } = useSettings()
+
+let lastAppliedToastSuppression: boolean | null = null
+watch(
+  [
+    () => Boolean(settings.value.suppressWindowsToast),
+    () => settings.value.suppressWindowsToastScope ?? 'always',
+    timerRunning,
+    timerPhase,
+  ],
+  ([enabled, scope, running, phase]) => {
+    const shouldSuppress = enabled && (scope === 'always' || (running && phase === 'focus'))
+    if (shouldSuppress === lastAppliedToastSuppression) return
+    lastAppliedToastSuppression = shouldSuppress
+    invoke('set_windows_toast_suppression', { suppressed: shouldSuppress }).catch(() => {})
+  },
+  { immediate: true },
+)
 // 面板启动即开始记录番茄通知，避免通知页未打开时漏记
 useNotifications()
 void startScreenshotCollection()

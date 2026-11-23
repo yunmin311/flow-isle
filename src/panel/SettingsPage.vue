@@ -523,10 +523,40 @@ onUnmounted(() => {
           <span class="switch-track"></span>
         </label>
       </div>
+      <div class="update-toggle-row row-spaced">
+        <div class="update-copy">
+          <span class="update-label"><HintTip label="屏蔽 Windows 原生弹窗" text="开启后隐藏 Windows 右下角系统通知横幅，关闭开关或退出 FlowIsle 时自动恢复；开启期间系统通知中心可能暂停接收新 Toast，但邮件与番茄提醒不受影响" /></span>
+        </div>
+        <label class="switch" aria-label="屏蔽 Windows 原生弹窗">
+          <input v-model="settings.suppressWindowsToast" type="checkbox" />
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div v-if="settings.suppressWindowsToast" class="setting-option-row">
+        <span class="update-label">屏蔽范围</span>
+        <div class="mode-toggle">
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: (settings.suppressWindowsToastScope ?? 'always') === 'always' }"
+            @click="settings.suppressWindowsToastScope = 'always'"
+          >
+            始终屏蔽
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: settings.suppressWindowsToastScope === 'focus-only' }"
+            @click="settings.suppressWindowsToastScope = 'focus-only'"
+          >
+            仅专注时
+          </button>
+        </div>
+      </div>
       <div class="setting-option-row row-spaced">
         <div class="update-copy">
           <span class="update-label">Windows 专注助手</span>
-          <span class="update-hint">FlowIsle 只能静默本应用，不能屏蔽其他应用的系统 Toast。系统免打扰由 Windows 设置管理</span>
+          <span class="update-hint">如需更精细的免打扰时段或优先联系人白名单，可前往 Windows 系统设置</span>
         </div>
         <button type="button" class="source-probe-btn" @click="openFocusAssistSettings">
           打开设置
