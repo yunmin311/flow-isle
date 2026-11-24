@@ -32,6 +32,12 @@ export interface NotificationRecord {
   emailAccountAddress?: string
 }
 
+export interface ToastAction {
+  label: string
+  arguments: string
+  activation_type: string
+}
+
 /** Rust 端 system-notification 事件的载荷 */
 export interface SystemNotificationPayload {
   id: number
@@ -40,6 +46,7 @@ export interface SystemNotificationPayload {
   title: string
   body: string
   created_ms: number
+  actions?: ToastAction[]
 }
 
 /** Rust 端 email-notification 事件的载荷 */

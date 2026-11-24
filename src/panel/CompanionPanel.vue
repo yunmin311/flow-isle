@@ -248,6 +248,8 @@ async function collect(event?: MouseEvent) {
               :background-url="selectedCompanion.backgroundUrl"
               :portrait-url="selectedCompanion.portraitUrl"
               :placement="selectedCompanion.placement"
+              :family="selectedCompanion.family"
+              :hopping="petHopping"
               :mode="showScene ? 'scene' : 'detail'"
               :size="216"
             />

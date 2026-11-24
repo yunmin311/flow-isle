@@ -120,11 +120,22 @@ export function openLatestRelease() {
 }
 
 export function useForkUpdate() {
+  void loadCurrentVersion()
+
   const statusText = computed(() => {
     if (checking.value) return '正在检查…'
     if (error.value) return `检查失败：${error.value}`
-    if (!checked.value) return '尚未检查'
-    if (available.value) return `发现新版本 ${latestTag.value}`
+    if (!checked.value) {
+      return currentVersion.value ? `当前 v${currentVersion.value} · 点击检查更新` : '尚未检查'
+    }
+    if (available.value) {
+      return currentVersion.value
+        ? `当前 v${currentVersion.value} · 发现新版本 ${latestTag.value}`
+        : `发现新版本 ${latestTag.value}`
+    }
+    if (currentVersion.value && latestTag.value && latestTag.value.replace(/^v/i, '') !== currentVersion.value) {
+      return `当前 v${currentVersion.value}（远端最新 ${latestTag.value}）`
+    }
     return currentVersion.value ? `已是最新（v${currentVersion.value}）` : '已是最新'
   })
 

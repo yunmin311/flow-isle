@@ -25,7 +25,9 @@ import {
     type EmailNotificationPayload,
     type FocusMissedSummary,
     type SystemNotificationPayload,
+    type ToastAction,
 } from "../composables/useNotifications";
+import type { ScreenshotRecord } from "../composables/useScreenshots";
 import type { TimerStatePayload } from "../composables/useTimerBridge";
 
 const { state, setState, setNotificationVisible } = useIslandState();
@@ -43,6 +45,7 @@ let unlistenPanelMotion: (() => void) | null = null;
 let unlistenRadio: (() => void) | null = null;
 let unlistenNotification: (() => void) | null = null;
 let unlistenSystemNotification: (() => void) | null = null;
+let unlistenScreenshotCaptured: (() => void) | null = null;
 let unlistenTaskReminder: (() => void) | null = null;
 let unlistenEmail: (() => void) | null = null;
 let unlistenEmailHistory: (() => void) | null = null;
@@ -59,13 +62,15 @@ const focusMissedPeekAllowed = ref(false);
 interface SystemPeekItem {
     key: string;
     external: boolean;
-    kind: 'system' | 'email' | 'email-history' | 'task' | 'focus-missed';
+    kind: 'system' | 'email' | 'email-history' | 'task' | 'focus-missed' | 'screenshot';
     app: string;
     aumid?: string;
     provider?: string;
     taskId?: string;
     recordId?: string;
     badgeCount?: number;
+    thumbnail?: string;
+    actions?: ToastAction[];
     title: string;
     body: string;
     receivedAt: number;
@@ -293,8 +298,23 @@ function enqueueSystemPeek(payload: SystemNotificationPayload) {
         kind: 'system',
         app,
         aumid: (payload.aumid ?? '').trim() || undefined,
+        actions: payload.actions?.length ? payload.actions : undefined,
         title,
         body,
+        receivedAt: Date.now(),
+    });
+}
+
+function enqueueScreenshotPeek(record: ScreenshotRecord) {
+    if (!record?.id || !record.thumbnail) return;
+    pushPeekItem({
+        key: `shot-${record.id}`,
+        external: false,
+        kind: 'screenshot',
+        app: '截图',
+        thumbnail: record.thumbnail,
+        title: '截图已收集',
+        body: `${record.width} × ${record.height} · 点击打开截图区`,
         receivedAt: Date.now(),
     });
 }
@@ -409,11 +429,39 @@ async function openNotificationFallback(recordId?: string) {
     }
 }
 
+async function onSystemPeekAction(act: ToastAction) {
+    const item = systemPeek.value;
+    if (!item) return;
+    closeSystemPeek(true);
+    if (act.activation_type === "protocol" && act.arguments) {
+        try {
+            await open(act.arguments);
+            return;
+        } catch {
+            // Fall through to opening source app
+        }
+    }
+    try {
+        await invoke("activate_notification_source", { app: item.app, aumid: item.aumid ?? "" });
+    } catch {
+        await openNotificationFallback(item.key);
+    }
+}
+
 async function onSystemPeekOpen() {
     const item = systemPeek.value;
     if (!item) return;
     const recordId = item.key;
     closeSystemPeek(true);
+
+    if (item.kind === "screenshot") {
+        try {
+            await emitTo("panel", "open-notifications", { openSource: false });
+        } finally {
+            await invoke("show_panel", { focus: true });
+        }
+        return;
+    }
 
     if (item.kind === "focus-missed") {
         try {
@@ -718,6 +766,13 @@ onMounted(async () => {
         },
     );
 
+    unlistenScreenshotCaptured = await listen<ScreenshotRecord>(
+        "screenshot-captured",
+        ({ payload }) => {
+            if (payload) enqueueScreenshotPeek(payload);
+        },
+    );
+
     // 每日任务到点提醒：和系统通知共用同一套 peek 队列
     unlistenTaskReminder = await listen<TaskReminderPayload>(
         "task-reminder",
@@ -756,6 +811,7 @@ onUnmounted(() => {
     unlistenRadio?.();
     unlistenNotification?.();
     unlistenSystemNotification?.();
+    unlistenScreenshotCaptured?.();
     unlistenTaskReminder?.();
     unlistenEmail?.();
     unlistenEmailHistory?.();
@@ -849,6 +905,7 @@ onUnmounted(() => {
                     :data="systemPeek"
                     :scale="settings.islandScale ?? 1"
                     @open="onSystemPeekOpen"
+                    @action="onSystemPeekAction"
                     @hold="onSystemPeekHold"
                     @resume="onSystemPeekResume"
                 />

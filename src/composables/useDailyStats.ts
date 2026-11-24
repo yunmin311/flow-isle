@@ -78,6 +78,7 @@ export function useDailyStats() {
   ensureLoaded()
 
   function recordPomodoro(focusMinutes: number) {
+    const mins = Math.max(0, Math.round(focusMinutes))
     const today = getDateString()
     let stat = getStatByDate(today)
     if (!stat) {
@@ -85,7 +86,20 @@ export function useDailyStats() {
       dailyStats.value.push(stat)
     }
     stat.pomodoros++
-    stat.focusMinutes += focusMinutes
+    stat.focusMinutes += mins
+  }
+
+  /** 记录未满一轮整番茄但已真实专注的分钟数（例如 30 分钟番茄专注了 27 分钟后提前停止） */
+  function recordFocusMinutes(focusMinutes: number) {
+    const mins = Math.floor(focusMinutes)
+    if (mins <= 0) return
+    const today = getDateString()
+    let stat = getStatByDate(today)
+    if (!stat) {
+      stat = { date: today, pomodoros: 0, focusMinutes: 0, tasksCompleted: 0 }
+      dailyStats.value.push(stat)
+    }
+    stat.focusMinutes += mins
   }
 
   function recordTaskCompleted(title?: string) {
@@ -143,7 +157,9 @@ export function useDailyStats() {
   const weekStats = computed(() => {
     const now = new Date()
     const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - now.getDay())
+    // 以周一作为一周起始（符合中文及 ISO-8601 习惯）
+    const diffToMonday = (now.getDay() + 6) % 7
+    weekStart.setDate(now.getDate() - diffToMonday)
     weekStart.setHours(0, 0, 0, 0)
     return getStatsInRange(weekStart, now)
   })
@@ -181,6 +197,7 @@ export function useDailyStats() {
     monthStats,
     allTimeStats,
     recordPomodoro,
+    recordFocusMinutes,
     recordTaskCompleted,
     unrecordTaskCompleted,
     getStatsInRange,

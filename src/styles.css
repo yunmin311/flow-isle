@@ -21,6 +21,8 @@ body,
   padding: 0;
   background: transparent !important;
   background-color: transparent !important;
+  color: var(--v2-ink);
+  font-family: var(--font-ui);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;

@@ -1932,45 +1932,50 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 
-/* Context menu */
+/* Context menu — unified with MemoEditor context menu */
 .context-menu {
   position: fixed;
-  z-index: 1000;
-  min-width: 130px;
-  padding: 4px;
-  border-radius: 10px;
+  z-index: 2000;
+  min-width: 148px;
+  padding: 5px;
+  border-radius: 12px;
   background: var(--v2-popover);
   border: 1px solid var(--v2-line);
-  box-shadow: 0 12px 28px var(--v2-shadow);
+  box-shadow: 0 12px 28px var(--v2-shadow), inset 0 1px 0 var(--v2-specular);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--v2-ink);
+  user-select: none;
 }
 
 .context-menu-item {
   display: block;
   width: 100%;
-  padding: 7px 14px;
-  border-radius: 6px;
+  padding: 7px 11px;
+  border-radius: 7px;
   background: transparent;
   border: none;
-  color: var(--v2-secondary);
-  font-size: 12px;
+  color: var(--v2-ink);
+  font-size: 12.5px;
+  line-height: 1.35;
   cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
+  transition: background 0.14s ease, color 0.14s ease;
+  font-family: var(--font-ui);
   text-align: left;
 }
 
 .context-menu-item:hover {
-  background: var(--ui-well);
+  background: var(--ui-hover);
   color: var(--v2-ink);
 }
 
 .context-menu-item.danger {
-  color: var(--alert-color);
+  color: var(--v2-danger, var(--alert-color));
 }
 
 .context-menu-item.danger:hover {
-  background: color-mix(in srgb, var(--alert-color) 12%, transparent);
-  color: var(--alert-color);
+  background: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 14%, transparent);
+  color: var(--v2-danger, var(--alert-color));
 }
 
 .context-menu-item.flex-item {
@@ -1992,23 +1997,24 @@ onBeforeUnmount(() => {
 .context-sub-menu {
   position: absolute;
   left: 100%;
-  top: -4px;
-  min-width: 130px;
-  padding: 4px;
-  border-radius: 10px;
+  top: -5px;
+  min-width: 144px;
+  padding: 5px;
+  border-radius: 12px;
   background: var(--v2-popover);
   border: 1px solid var(--v2-line);
-  box-shadow: 0 12px 28px var(--v2-shadow);
+  box-shadow: 0 12px 28px var(--v2-shadow), inset 0 1px 0 var(--v2-specular);
+  font-family: var(--font-ui);
   display: none;
-  z-index: 1010;
-  margin-left: 4px;
+  z-index: 2010;
+  margin-left: 5px;
 }
 
 .context-sub-menu.pos-left {
   left: auto;
   right: 100%;
   margin-left: 0;
-  margin-right: 4px;
+  margin-right: 5px;
 }
 
 .context-menu-item-with-submenu:hover .context-sub-menu {
@@ -2017,8 +2023,8 @@ onBeforeUnmount(() => {
 
 .context-menu-divider {
   height: 1px;
-  background: var(--ui-well);
-  margin: 4px 8px;
+  background: var(--v2-line);
+  margin: 5px 6px;
 }
 
 .submenu-arrow {

@@ -58,10 +58,11 @@ const allAchievements = computed(() => [
 const unlockedCount = computed(() => allAchievements.value.filter(a => a.unlockedAt !== null).length)
 
 const formatDuration = (minutes: number) => {
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return mins > 0 ? `${hours}.${Math.round(mins / 6)}h` : `${hours}h`
+  const safe = Math.max(0, Math.round(minutes))
+  if (safe < 60) return `${safe}m`
+  const hours = Math.floor(safe / 60)
+  const mins = safe % 60
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
 }
 
 const monthYear = computed(() => {
@@ -103,10 +104,11 @@ const calendarDays = computed(() => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     const stat = monthStatsMap.get(dateStr)
     const pomodoros = stat?.pomodoros ?? 0
+    const focusMinutes = stat?.focusMinutes ?? 0
     let intensity = 0
-    if (pomodoros >= 5) intensity = 3
-    else if (pomodoros >= 3) intensity = 2
-    else if (pomodoros >= 1) intensity = 1
+    if (pomodoros >= 5 || focusMinutes >= 120) intensity = 3
+    else if (pomodoros >= 3 || focusMinutes >= 50) intensity = 2
+    else if (pomodoros >= 1 || focusMinutes >= 1) intensity = 1
     days.push({ date: dateStr, day: d, intensity, pomodoros, tasks: stat?.tasksCompleted ?? 0 })
   }
 

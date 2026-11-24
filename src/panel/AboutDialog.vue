@@ -15,12 +15,12 @@ const githubUrl = 'https://github.com/yunmin311/flow-isle'
 const upstreamUrl = 'https://github.com/ipfred/focus-island'
 
 const forkChanges = [
-  '刘海停靠 / 完全隐藏 / 点击刘海开面板',
-  '电台导入：直链、M3U/PLS、B 站音频',
-  '直播断流自动重连 + 备用镜像',
-  '通知中心、系统音量与静音',
-  '本地音乐、独立透明度、标语编辑',
-  '已禁用应用内更新（防止被官方版覆盖）',
+  'Liquid Glass × Pixel Craft 视觉语言与像素伴侣互动',
+  '刘海停靠 / 完全隐藏 / 鼠标近距隐避与点击穿透',
+  '专注电台：像素频谱、分段音量、M3U/PLS 与本地音频',
+  'Windows 通知镜像、交互按钮跳转、剪贴板截图收集与提醒',
+  'IMAP 多邮箱实时提醒与 Win11 免打扰状态实时监测',
+  '支持提前结束累计真实专注时长与精准统计修复',
 ]
 
 const versionLabel = computed(() => (appVersion.value ? `v${appVersion.value} · FlowIsle` : 'FlowIsle'))
@@ -31,7 +31,7 @@ onMounted(async () => {
     appVersion.value = await getVersion()
   } catch {
     appName.value = 'FlowIsle'
-    appVersion.value = '1.3.3'
+    appVersion.value = '2.11.0'
   }
 })
 

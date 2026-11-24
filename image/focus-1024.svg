@@ -1,59 +1,78 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" preserveAspectRatio="xMidYMid meet">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <!-- 专注橙红：高亮流光渐变 -->
-    <linearGradient id="brandGrad" x1="100%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#FFA085" />
-      <stop offset="100%" stop-color="#e85d3a" />
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF9F0"/>
+      <stop offset="52%" stop-color="#FBEAD3"/>
+      <stop offset="100%" stop-color="#EED0AC"/>
     </linearGradient>
-
-    <!-- 番茄高光渐变：增加中心硬件/红点的高级立体感 -->
-    <radialGradient id="tomatoGrad" cx="30%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#FFB9A3" />
-      <stop offset="100%" stop-color="#e85d3a" />
+    <radialGradient id="warmGlow" cx="50%" cy="32%" r="62%">
+      <stop offset="0%" stop-color="#FFB870" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#FFB870" stop-opacity="0"/>
     </radialGradient>
-
-    <!-- 柔和底部投影 (参数已适配 1024 尺寸) -->
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="40" stdDeviation="48" flood-color="#000000" flood-opacity="0.3" />
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.72"/>
+      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="pillBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#35241B"/>
+      <stop offset="100%" stop-color="#1E140F"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F69354"/>
+      <stop offset="55%" stop-color="#D45726"/>
+      <stop offset="100%" stop-color="#AD3C16"/>
+    </linearGradient>
+    <filter id="pillShadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="26" stdDeviation="28" flood-color="#5E290E" flood-opacity="0.28"/>
     </filter>
   </defs>
 
-  <!-- 透明画布占位 -->
-  <rect x="0" y="0" width="1024" height="1024" fill="transparent" />
+  <!-- Outer Liquid Glass Squircle -->
+  <rect x="44" y="44" width="936" height="936" rx="224" fill="url(#bg)"/>
+  <rect x="44" y="44" width="936" height="936" rx="224" fill="url(#warmGlow)"/>
+  <!-- Subtle Pixel Dot Grid -->
+  <g fill="#A83E17" opacity="0.09">
+    <rect x="176" y="176" width="14" height="14"/>
+    <rect x="272" y="176" width="14" height="14"/>
+    <rect x="738" y="176" width="14" height="14"/>
+    <rect x="834" y="176" width="14" height="14"/>
+    <rect x="176" y="834" width="14" height="14"/>
+    <rect x="272" y="834" width="14" height="14"/>
+    <rect x="738" y="834" width="14" height="14"/>
+    <rect x="834" y="834" width="14" height="14"/>
+  </g>
+  <!-- Top Glass Specular Rim -->
+  <rect x="52" y="52" width="920" height="920" rx="216" fill="none" stroke="#FFFFFF" stroke-opacity="0.78" stroke-width="10"/>
+  <rect x="44" y="44" width="936" height="936" rx="224" fill="none" stroke="#C58B5B" stroke-opacity="0.35" stroke-width="8"/>
+  <path d="M240 60 H784 C885 60 964 139 964 240 V390 C780 330 244 330 60 390 V240 C60 139 139 60 240 60 Z" fill="url(#sheen)"/>
 
-  <!-- ================= 核心主体：展开的灵动岛 (圆角正方块) ================= -->
-  <!-- 尺寸 760x760，极度方正饱满 -->
-  <rect x="132" y="132" width="760" height="760" rx="180" fill="#141416" filter="url(#shadow)" />
-  
-  <!-- 边缘微光反光 (硬件倒角质感) -->
-  <rect x="132" y="132" width="760" height="760" rx="180" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="4" />
+  <!-- Centered Dynamic Island Capsule -->
+  <g filter="url(#pillShadow)">
+    <rect x="148" y="328" width="728" height="368" rx="184" fill="url(#pillBg)"/>
+    <rect x="156" y="336" width="712" height="352" rx="176" fill="none" stroke="#FFB784" stroke-opacity="0.28" stroke-width="8"/>
+  </g>
 
-  <!-- ================= 核心交互：专注流光进度环 ================= -->
-  <!-- 暗色底轨 (全闭合) -->
-  <rect x="132" y="132" width="760" height="760" rx="180" fill="none" stroke="#26262B" stroke-width="48" />
+  <!-- Crisp Pixel Craft Focus Emblem inside Island (Left: Pixel Sun/Ring, Right: 3 Pixel Progress Bars) -->
+  <g shape-rendering="crispEdges">
+    <!-- Left Pixel Ring (7x7 grid @ 24px cell, centered around x=346, y=512) -->
+    <g fill="url(#accent)">
+      <rect x="298" y="428" width="96" height="28"/>
+      <rect x="270" y="456" width="28" height="28"/>
+      <rect x="394" y="456" width="28" height="28"/>
+      <rect x="256" y="484" width="28" height="56"/>
+      <rect x="408" y="484" width="28" height="56"/>
+      <rect x="270" y="540" width="28" height="28"/>
+      <rect x="394" y="540" width="28" height="28"/>
+      <rect x="298" y="568" width="96" height="28"/>
+    </g>
+    <!-- Center Glowing Pixel Core -->
+    <rect x="328" y="494" width="36" height="36" fill="#FFD199"/>
 
-  <!-- 高亮橙红进度环 (未闭合) -->
-  <path d="M 512 132 
-           L 712 132 
-           A 180 180 0 0 1 892 312 
-           L 892 712 
-           A 180 180 0 0 1 712 892 
-           L 312 892 
-           A 180 180 0 0 1 132 712 
-           L 132 312 
-           A 180 180 0 0 1 312 132" 
-        fill="none" 
-        stroke="url(#brandGrad)" 
-        stroke-width="48" 
-        stroke-linecap="round" />
-
-  <!-- ================= 内部布局：极简几何隐喻 ================= -->
-  <!-- 1. 领航番茄钟 / 硬件传感器 (绝对的视觉中心) -->
-  <circle cx="512" cy="380" r="88" fill="url(#tomatoGrad)" />
-  <circle cx="512" cy="380" r="20" fill="#141416" />
-
-  <!-- 2. 备忘录 / 专注清单骨架 (完美垂直对齐) -->
-  <rect x="292" y="572" width="440" height="48" rx="24" fill="#ffffff" opacity="0.9" />
-  <rect x="392" y="668" width="240" height="48" rx="24" fill="#ffffff" opacity="0.35" />
-
+    <!-- Right Stepped Pixel Progress / Flow Bars -->
+    <rect x="492" y="468" width="236" height="32" fill="#FFF3E2"/>
+    <rect x="492" y="528" width="72" height="28" fill="#F69354"/>
+    <rect x="578" y="528" width="72" height="28" fill="#D45726"/>
+    <rect x="664" y="528" width="64" height="28" fill="#6B4C3B"/>
+  </g>
 </svg>

@@ -83,6 +83,7 @@ const heroStatus = computed(() => {
   if (pendingNotification.value === 'focus-done') return '等待开始休息'
   if (pendingNotification.value === 'break-done') return '休息完成'
   if (activeTaskId.value) return running.value ? '进行中' : '已暂停'
+  if (partialFocusNote.value) return partialFocusNote.value
   return '待开始'
 })
 
@@ -145,6 +146,30 @@ function handleHeroAction(event?: MouseEvent) {
 const newTitle = ref('')
 const quickAddRef = ref<HTMLInputElement | null>(null)
 const heroRef = ref<HTMLElement | null>(null)
+const partialFocusNote = ref('')
+let partialNoteTimer: number | null = null
+
+function onPartialFocusRecorded(event: Event) {
+  const mins = (event as CustomEvent<{ minutes?: number }>).detail?.minutes
+  if (!mins || mins <= 0) return
+  partialFocusNote.value = `已计入本次专注 ${mins} 分钟`
+  if (partialNoteTimer !== null) window.clearTimeout(partialNoteTimer)
+  partialNoteTimer = window.setTimeout(() => {
+    partialFocusNote.value = ''
+    partialNoteTimer = null
+  }, 4000)
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('flowisle:partial-focus-recorded', onPartialFocusRecorded)
+}
+
+onBeforeUnmount(() => {
+  if (partialNoteTimer !== null) window.clearTimeout(partialNoteTimer)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('flowisle:partial-focus-recorded', onPartialFocusRecorded)
+  }
+})
 
 watch(pendingNotification, (next, prev) => {
   if (!prev && (next === 'focus-done' || next === 'break-done')) {

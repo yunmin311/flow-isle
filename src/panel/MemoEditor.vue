@@ -283,8 +283,8 @@ function toggleItalic() {
 
 function setTextColor(color: string) {
   if (color === 'default') {
-    const resolved = getComputedStyle(document.documentElement).getPropertyValue('--v2-ink').trim() || 'inherit'
-    if (resolved !== 'inherit') execCommand('foreColor', resolved)
+    // 清除选中区域的硬编码字色，避免浅色下写入固定深色在深色模式下不可读
+    execCommand('removeFormat')
     currentColor.value = 'inherit'
   } else {
     execCommand('foreColor', color)
@@ -1374,20 +1374,22 @@ function formatUpdateTime(timestamp: number): string {
   border-color: color-mix(in srgb, var(--v2-danger, var(--alert-color)) 48%, transparent);
 }
 
-/* Context Menu */
+/* Context Menu — unified with TodoPage context menu */
 .context-menu {
   position: fixed;
   z-index: 2000;
-  min-width: 180px;
+  min-width: 184px;
   max-width: 240px;
   background: var(--v2-popover);
   border: 1px solid var(--v2-line);
-  border-radius: 10px;
-  padding: 6px 0;
-  box-shadow: 0 12px 28px var(--v2-shadow);
-  font-size: 13px;
+  border-radius: 12px;
+  padding: 5px;
+  box-shadow: 0 12px 28px var(--v2-shadow), inset 0 1px 0 var(--v2-specular);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--v2-ink);
   user-select: none;
-  animation: contextMenuIn 240ms var(--liquid-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  animation: contextMenuIn 200ms var(--liquid-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 @keyframes contextMenuIn {
@@ -1404,33 +1406,34 @@ function formatUpdateTime(timestamp: number): string {
 .context-menu-group {
   display: flex;
   flex-direction: column;
-  padding: 0 6px;
+  padding: 0;
 }
 
 .context-menu-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  padding: 7px 10px;
-  border-radius: 6px;
+  padding: 7px 11px;
+  border-radius: 7px;
   background: transparent;
   border: none;
   color: var(--v2-ink);
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.35;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.14s ease, color 0.14s ease;
   text-align: left;
-  font-family: inherit;
+  font-family: var(--font-ui);
 }
 
 .context-menu-item:hover:not(:disabled) {
-  background: var(--ui-well);
+  background: var(--ui-hover);
   color: var(--v2-ink);
 }
 
 .context-menu-item:active:not(:disabled) {
-  background: var(--ui-hover);
+  background: var(--ui-pressed);
 }
 
 .context-menu-item:disabled {
@@ -1444,7 +1447,7 @@ function formatUpdateTime(timestamp: number): string {
 
 .context-menu-item svg {
   flex-shrink: 0;
-  opacity: 0.7;
+  opacity: 0.72;
 }
 
 .context-menu-item span {
@@ -1453,20 +1456,20 @@ function formatUpdateTime(timestamp: number): string {
 }
 
 .context-menu-shortcut {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--v2-muted);
-  font-family: 'SF Mono', Monaco, monospace;
+  font-family: var(--font-mono);
   background: var(--ui-well);
   padding: 1px 5px;
-  border-radius: 3px;
-  border: 1px solid var(--v2-line);;
+  border-radius: 4px;
+  border: 1px solid var(--v2-line);
   flex-shrink: 0;
   white-space: nowrap;
 }
 
 .context-menu-divider {
   height: 1px;
-  background: var(--ui-well);
-  margin: 6px 8px;
+  background: var(--v2-line);
+  margin: 5px 6px;
 }
 </style>

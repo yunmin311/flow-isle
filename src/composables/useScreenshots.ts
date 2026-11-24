@@ -1,6 +1,6 @@
 import { readonly, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { emitTo, listen } from '@tauri-apps/api/event'
 import { readImage } from '@tauri-apps/plugin-clipboard-manager'
 import { BaseDirectory, exists, mkdir, readTextFile, remove, writeTextFile } from '@tauri-apps/plugin-fs'
 
@@ -63,12 +63,13 @@ async function load() {
 async function capture(state: ClipboardState) {
   if (state.sequence === selfWrittenSequence) return
   if (!enabled.value || !state.has_image) return
-  // Clipboard owners can briefly lock it while publishing a screenshot.
+  // Windows Snipping Tool (Win+Shift+S) often writes clipboard metadata twice in ~150ms,
+  // incrementing sequence mid-capture. Read the latest image as long as has_image is true.
   for (let attempt = 0; attempt < 3; attempt++) {
     let image: Awaited<ReturnType<typeof readImage>> | undefined
     try {
       const before = await invoke<ClipboardState>('clipboard_image_state')
-      if (before.sequence !== state.sequence || !before.has_image) return
+      if (!enabled.value || !before.has_image || before.sequence === selfWrittenSequence) return
       image = await readImage()
       const { width, height } = await image.size()
       if (!width || !height || width * height > 20_000_000) {
@@ -76,8 +77,7 @@ async function capture(state: ClipboardState) {
         return
       }
       const rgba = await image.rgba()
-      const after = await invoke<ClipboardState>('clipboard_image_state')
-      if (!enabled.value || after.sequence !== state.sequence) return
+      if (!enabled.value) return
       const canvas = document.createElement('canvas')
       canvas.width = width; canvas.height = height
       const ctx = canvas.getContext('2d')
@@ -107,10 +107,12 @@ async function capture(state: ClipboardState) {
       records.value = next
       await deleteFiles(evicted)
       error.value = ''
+      // 通知顶部灵动岛展示带缩略图的截图提醒
+      void emitTo('main', 'screenshot-captured', record).catch(() => {})
       return
     } catch {
       if (attempt === 2) error.value = '截图读取或保存失败，请重新复制图片后重试'
-      else await new Promise(resolve => setTimeout(resolve, 200))
+      else await new Promise(resolve => setTimeout(resolve, 220))
     } finally { await image?.close().catch(() => {}) }
   }
 }

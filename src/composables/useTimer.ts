@@ -16,6 +16,32 @@ const activeSubtaskId = ref<string | null>(null)
 const activeSubtaskTitle = ref<string | null>(null)
 let intervalId: ReturnType<typeof setInterval> | null = null
 let phaseEndAtMs: number | null = null
+let accumulatedFocusMs = 0
+let focusSegmentStartMs: number | null = null
+
+function flushRunningFocusSegment() {
+  if (focusSegmentStartMs !== null) {
+    accumulatedFocusMs += Math.max(0, Date.now() - focusSegmentStartMs)
+    focusSegmentStartMs = null
+  }
+}
+
+function getCurrentFocusedSeconds(): number {
+  const liveMs = focusSegmentStartMs !== null ? Math.max(0, Date.now() - focusSegmentStartMs) : 0
+  return Math.floor((accumulatedFocusMs + liveMs) / 1000)
+}
+
+function consumeFocusedSeconds(): number {
+  flushRunningFocusSegment()
+  const secs = Math.floor(accumulatedFocusMs / 1000)
+  accumulatedFocusMs = 0
+  return secs
+}
+
+function resetFocusedAccumulation() {
+  accumulatedFocusMs = 0
+  focusSegmentStartMs = null
+}
 
 function syncRemainingFromEndAt() {
   if (phaseEndAtMs === null) return
@@ -43,13 +69,48 @@ function tick() {
   }
 }
 
-type PhaseCallback = (phase: TimerPhase, taskId: string | null) => void
+export interface FocusSessionSummary {
+  taskId: string | null
+  taskTitle: string | null
+  focusedSeconds: number
+  completed: boolean
+}
+
+type PhaseCallback = (phase: TimerPhase, taskId: string | null, focusedSeconds: number) => void
+type FocusEndedCallback = (summary: FocusSessionSummary) => void
 const onDoneCallbacks: PhaseCallback[] = []
+const onFocusEndedCallbacks: FocusEndedCallback[] = []
+
+function emitFocusEnded(completed: boolean) {
+  if (phase.value !== 'focus') return
+  const focusedSeconds = consumeFocusedSeconds()
+  if (focusedSeconds <= 0 && !completed) return
+  const summary: FocusSessionSummary = {
+    taskId: activeTaskId.value,
+    taskTitle: activeTaskTitle.value,
+    focusedSeconds: completed ? Math.max(focusedSeconds, totalDuration.value) : focusedSeconds,
+    completed,
+  }
+  onFocusEndedCallbacks.forEach(cb => cb(summary))
+}
 
 function onPhaseDone() {
-  onDoneCallbacks.forEach(cb => cb(phase.value, activeTaskId.value))
+  const donePhase = phase.value
+  const doneTaskId = activeTaskId.value
+  const focusedSeconds = donePhase === 'focus'
+    ? Math.max(consumeFocusedSeconds(), totalDuration.value)
+    : 0
+  if (donePhase === 'focus') {
+    onFocusEndedCallbacks.forEach(cb => cb({
+      taskId: doneTaskId,
+      taskTitle: activeTaskTitle.value,
+      focusedSeconds,
+      completed: true,
+    }))
+  }
+  onDoneCallbacks.forEach(cb => cb(donePhase, doneTaskId, focusedSeconds))
   // Don't auto-transition; set pendingNotification and wait for user action
-  pendingNotification.value = phase.value === 'focus' ? 'focus-done' : 'break-done'
+  pendingNotification.value = donePhase === 'focus' ? 'focus-done' : 'break-done'
 }
 
 let durationWatchInstalled = false
@@ -68,16 +129,21 @@ function installDurationWatch() {
         if (!ready) return
         const newDuration = phase.value === 'focus' ? newFocus * 60 : newBreak * 60
         if (!running.value) {
-          totalDuration.value = newDuration
-          remaining.value = newDuration
-          phaseEndAtMs = null
-          return
+          if (!activeTaskId.value) {
+            totalDuration.value = newDuration
+            remaining.value = newDuration
+            phaseEndAtMs = null
+            return
+          }
         }
         if (totalDuration.value !== newDuration) {
-          const ratio = remaining.value / totalDuration.value
+          // 保留已经专注/休息的真实秒数，避免修改时长导致已专注进度跳变
+          const elapsed = phase.value === 'focus'
+            ? getCurrentFocusedSeconds()
+            : Math.max(0, totalDuration.value - remaining.value)
           totalDuration.value = newDuration
-          remaining.value = Math.round(newDuration * ratio)
-          if (phaseEndAtMs !== null) {
+          remaining.value = Math.max(1, newDuration - elapsed)
+          if (running.value && phaseEndAtMs !== null) {
             phaseEndAtMs = Date.now() + remaining.value * 1000
           }
         }
@@ -107,6 +173,13 @@ export function useTimer() {
   }
 
   function start(taskId: string, taskTitle?: string) {
+    // 切换任务前先结算上一轮已专注时长，避免中途切任务丢失专注时间
+    if (phase.value === 'focus' && (running.value || accumulatedFocusMs > 0 || focusSegmentStartMs !== null)) {
+      pause()
+      emitFocusEnded(false)
+    }
+    resetFocusedAccumulation()
+    pendingNotification.value = null
     activeSubtaskId.value = null
     activeSubtaskTitle.value = null
     activeTaskId.value = taskId
@@ -123,6 +196,9 @@ export function useTimer() {
   function resume() {
     if (running.value) return
     running.value = true
+    if (phase.value === 'focus' && focusSegmentStartMs === null) {
+      focusSegmentStartMs = Date.now()
+    }
     phaseEndAtMs = Date.now() + remaining.value * 1000
     startTicking()
   }
@@ -130,6 +206,9 @@ export function useTimer() {
   function pause() {
     if (!running.value) return
     syncRemainingFromEndAt()
+    if (phase.value === 'focus') {
+      flushRunningFocusSegment()
+    }
     running.value = false
     clearInterval(intervalId!)
     intervalId = null
@@ -138,6 +217,7 @@ export function useTimer() {
 
   function skipToBreak() {
     pause()
+    emitFocusEnded(false)
     phase.value = 'break'
     focusStartedAt.value = null
     const breakSecs = settings.value.breakDuration * 60
@@ -156,6 +236,7 @@ export function useTimer() {
 
   function skipBreak() {
     pause()
+    resetFocusedAccumulation()
     phase.value = 'focus'
     focusStartedAt.value = null
     phaseEndAtMs = null
@@ -172,6 +253,7 @@ export function useTimer() {
     pendingNotification.value = null
     if (notif === 'focus-done') {
       // Transition to break
+      resetFocusedAccumulation()
       phase.value = 'break'
       focusStartedAt.value = null
       const breakSecs = settings.value.breakDuration * 60
@@ -182,8 +264,10 @@ export function useTimer() {
       startTicking()
     } else {
       // break-done → start new focus countdown immediately (retain active task)
+      resetFocusedAccumulation()
       phase.value = 'focus'
       focusStartedAt.value = Date.now()
+      focusSegmentStartMs = Date.now()
       const focusSecs = settings.value.focusDuration * 60
       remaining.value = focusSecs
       totalDuration.value = focusSecs
@@ -200,8 +284,10 @@ export function useTimer() {
     pendingNotification.value = null
     if (notif === 'focus-done') {
       // Reset focus countdown, keep working
+      resetFocusedAccumulation()
       phase.value = 'focus'
       focusStartedAt.value = Date.now()
+      focusSegmentStartMs = Date.now()
       const focusSecs = settings.value.focusDuration * 60
       remaining.value = focusSecs
       totalDuration.value = focusSecs
@@ -210,6 +296,7 @@ export function useTimer() {
       startTicking()
     } else {
       // Reset break countdown, keep resting
+      resetFocusedAccumulation()
       phase.value = 'break'
       focusStartedAt.value = null
       const breakSecs = settings.value.breakDuration * 60
@@ -224,6 +311,7 @@ export function useTimer() {
   /** User chose "退出" — return to idle */
   function dismissNotification() {
     pendingNotification.value = null
+    resetFocusedAccumulation()
     phase.value = 'focus'
     focusStartedAt.value = null
     phaseEndAtMs = null
@@ -236,6 +324,8 @@ export function useTimer() {
 
   function abandon() {
     pause()
+    emitFocusEnded(false)
+    resetFocusedAccumulation()
     phase.value = 'focus'
     focusStartedAt.value = null
     phaseEndAtMs = null
@@ -248,6 +338,10 @@ export function useTimer() {
 
   function onPhaseDoneCallback(cb: PhaseCallback) {
     onDoneCallbacks.push(cb)
+  }
+
+  function onFocusEndedCallback(cb: FocusEndedCallback) {
+    onFocusEndedCallbacks.push(cb)
   }
 
   return {
@@ -273,6 +367,7 @@ export function useTimer() {
     extendNotification,
     dismissNotification,
     onPhaseDoneCallback,
+    onFocusEndedCallback,
     setSubtaskContext,
   }
 }

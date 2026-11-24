@@ -20,11 +20,21 @@ pub fn clipboard_image_state() -> ClipboardImageState {
 fn clipboard_image_state_unlocked() -> ClipboardImageState {
     #[cfg(target_os = "windows")]
     unsafe {
-        use windows::Win32::System::DataExchange::{GetClipboardSequenceNumber, IsClipboardFormatAvailable};
+        use std::sync::OnceLock;
+        use windows::core::w;
+        use windows::Win32::System::DataExchange::{
+            GetClipboardSequenceNumber, IsClipboardFormatAvailable, RegisterClipboardFormatW,
+        };
+        static PNG_FORMAT: OnceLock<u32> = OnceLock::new();
+        let png_fmt = *PNG_FORMAT.get_or_init(|| RegisterClipboardFormatW(w!("PNG")));
+        // CF_BITMAP(2), CF_DIB(8), CF_DIBV5(17), plus registered "PNG" format used by Snipping Tool / modern screenshot tools.
+        let has_standard = [2u32, 8, 17]
+            .iter()
+            .any(|format| IsClipboardFormatAvailable(*format).is_ok());
+        let has_png = png_fmt != 0 && IsClipboardFormatAvailable(png_fmt).is_ok();
         ClipboardImageState {
             sequence: GetClipboardSequenceNumber(),
-            // CF_BITMAP, CF_DIB and CF_DIBV5: no clipboard text or image content is read here.
-            has_image: [2, 8, 17].iter().any(|format| IsClipboardFormatAvailable(*format).is_ok()),
+            has_image: has_standard || has_png,
         }
     }
     #[cfg(not(target_os = "windows"))]

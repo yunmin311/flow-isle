@@ -27,7 +27,7 @@ use windows::Win32::System::LibraryLoader::{
 use windows::Win32::System::Threading::WaitForSingleObject;
 use windows::Win32::UI::Shell::{IShellItem, SHCreateItemFromParsingName, SIGDN_NORMALDISPLAY};
 
-use crate::{notification_diagnostic, social_notifications, SystemNotificationEvent};
+use crate::{notification_diagnostic, social_notifications, SystemNotificationEvent, ToastAction};
 
 const SQLITE_OK: c_int = 0;
 const SQLITE_BUSY: c_int = 5;
@@ -316,6 +316,74 @@ fn unescape_xml(input: &str) -> String {
     out
 }
 
+fn extract_xml_attr(tag_attrs: &str, attr_name: &str) -> Option<String> {
+    let bytes = tag_attrs.as_bytes();
+    let name_bytes = attr_name.as_bytes();
+    let mut i = 0;
+    while i + name_bytes.len() < bytes.len() {
+        let starts_boundary = i == 0 || matches!(bytes[i - 1], b' ' | b'\t' | b'\r' | b'\n');
+        if starts_boundary
+            && tag_attrs[i..].len() > name_bytes.len()
+            && tag_attrs[i..i + name_bytes.len()].eq_ignore_ascii_case(attr_name)
+        {
+            let mut j = i + name_bytes.len();
+            while j < bytes.len() && matches!(bytes[j], b' ' | b'\t' | b'\r' | b'\n') {
+                j += 1;
+            }
+            if j < bytes.len() && bytes[j] == b'=' {
+                j += 1;
+                while j < bytes.len() && matches!(bytes[j], b' ' | b'\t' | b'\r' | b'\n') {
+                    j += 1;
+                }
+                if j < bytes.len() && (bytes[j] == b'"' || bytes[j] == b'\'') {
+                    let quote = bytes[j];
+                    let val_start = j + 1;
+                    if let Some(end_rel) = tag_attrs[val_start..].find(quote as char) {
+                        return Some(unescape_xml(&tag_attrs[val_start..val_start + end_rel]));
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+pub(crate) fn parse_toast_actions(xml: &str) -> Vec<ToastAction> {
+    let scope = match (xml.find("<actions"), xml.find("</actions>")) {
+        (Some(start), Some(end)) if end > start => &xml[start..end],
+        _ => return Vec::new(),
+    };
+    let mut actions = Vec::new();
+    let mut cursor = 0;
+    while let Some(rel) = scope[cursor..].find("<action") {
+        let tag_start = cursor + rel;
+        let after_kw = tag_start + 7;
+        let next_byte = scope.as_bytes().get(after_kw).copied();
+        if !matches!(next_byte, Some(b' ') | Some(b'\t') | Some(b'\r') | Some(b'\n') | Some(b'>') | Some(b'/')) {
+            cursor = after_kw;
+            continue;
+        }
+        let Some(gt_rel) = scope[after_kw..].find('>') else { break };
+        let attrs = &scope[after_kw..after_kw + gt_rel];
+        let label = extract_xml_attr(attrs, "content").unwrap_or_default().trim().to_string();
+        let arguments = extract_xml_attr(attrs, "arguments").unwrap_or_default().trim().to_string();
+        let activation_type = extract_xml_attr(attrs, "activationType")
+            .unwrap_or_else(|| "foreground".to_string())
+            .trim()
+            .to_ascii_lowercase();
+        if !label.is_empty() && actions.len() < 3 {
+            actions.push(ToastAction {
+                label,
+                arguments,
+                activation_type,
+            });
+        }
+        cursor = after_kw + gt_rel + 1;
+    }
+    actions
+}
+
 pub(crate) fn parse_toast_xml(xml: &str) -> (String, String) {
     let scope = match (xml.find("<visual"), xml.find("</visual>")) {
         (Some(start), Some(end)) if end > start => &xml[start..end],
@@ -350,6 +418,10 @@ pub(crate) fn parse_toast_xml(xml: &str) -> (String, String) {
     }
 
     if texts.is_empty() {
+        // 某些截图/媒体通知只有 <image src="..."/> 而无 <text>，保留一条简洁标题防止漏显
+        if scope.contains("<image") {
+            return ("截图 / 图片通知".to_string(), "点击打开来源查看".to_string());
+        }
         return (String::new(), String::new());
     }
     let title = texts.remove(0);
@@ -552,6 +624,7 @@ pub(crate) fn try_run_wpn_watcher<R: Runtime>(app: &AppHandle<R>) -> Result<(), 
                         &row.primary_id,
                     );
                     let (title, body) = parse_toast_xml(&row.payload_xml);
+                    let actions = parse_toast_actions(&row.payload_xml);
                     let ev = SystemNotificationEvent {
                         id: row.id,
                         app: app_name,
@@ -559,6 +632,7 @@ pub(crate) fn try_run_wpn_watcher<R: Runtime>(app: &AppHandle<R>) -> Result<(), 
                         title,
                         body,
                         created_ms,
+                        actions,
                     };
                     social_notifications::note_toast(&ev.app);
                     if !(ev.title.is_empty() && ev.body.is_empty() && ev.app.is_empty()) {

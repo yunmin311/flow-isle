@@ -1699,6 +1699,14 @@ fn get_macos_update_health<R: Runtime>(_app: AppHandle<R>) -> Option<MacosUpdate
 // 注意：系统不允许拦截或关闭原生 Toast，这里只是镜像。
 
 #[cfg(target_os = "windows")]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct ToastAction {
+    pub(crate) label: String,
+    pub(crate) arguments: String,
+    pub(crate) activation_type: String,
+}
+
+#[cfg(target_os = "windows")]
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct SystemNotificationEvent {
     id: u32,
@@ -1707,6 +1715,7 @@ pub(crate) struct SystemNotificationEvent {
     title: String,
     body: String,
     created_ms: i64,
+    actions: Vec<ToastAction>,
 }
 
 #[cfg(target_os = "windows")]
@@ -1755,6 +1764,7 @@ fn read_system_notification_event(
         title,
         body,
         created_ms,
+        actions: Vec::new(),
     }
 }
 
@@ -2605,7 +2615,7 @@ pub fn run() {
                         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
                         let _ = social_app.emit("system-notification", SystemNotificationEvent { id: u32::MAX,
                             app: if source == "qq" { "QQ" } else { "微信" }.into(), aumid: format!("flowisle.social.{source}"),
-                            title: "有新提醒".into(), body: "任务栏正在提醒你 · 点击打开应用（不读取聊天内容）".into(), created_ms: now });
+                            title: "有新提醒".into(), body: "任务栏正在提醒你 · 点击打开应用（不读取聊天内容）".into(), created_ms: now, actions: Vec::new() });
                     });
                     if result.is_err() { app_log!("[social] shell listener unavailable"); }
                 });

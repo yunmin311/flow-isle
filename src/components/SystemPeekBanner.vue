@@ -1,21 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ToastAction } from '../composables/useNotifications'
 
 const props = defineProps<{
   data: {
     key: string
-    kind?: 'system' | 'email' | 'email-history' | 'task' | 'focus-missed'
+    kind?: 'system' | 'email' | 'email-history' | 'task' | 'focus-missed' | 'screenshot'
     app: string
     title: string
     body: string
     badgeCount?: number
+    thumbnail?: string
+    actions?: ToastAction[]
   } | null
   scale: number
 }>()
 
-const emit = defineEmits<{ open: []; hold: []; resume: [] }>()
+const emit = defineEmits<{ open: []; action: [action: ToastAction]; hold: []; resume: [] }>()
 
 const openHint = computed(() => {
+  if (props.data?.kind === 'screenshot') return '查看通知中心的截图记录'
   if (props.data?.kind === 'focus-missed') return '查看专注期间错过的通知'
   if (props.data?.kind === 'email-history') return '查看补收邮件'
   if (props.data?.kind === 'email') return '打开邮箱'
@@ -57,7 +61,10 @@ const initial = computed(() => {
       @mouseenter="emit('hold')"
       @mouseleave="emit('resume')"
     >
-      <div class="peek-icon">
+      <div v-if="data.thumbnail" class="peek-thumb-wrap">
+        <img :src="data.thumbnail" alt="截图预览" class="peek-thumb" />
+      </div>
+      <div v-else class="peek-icon">
         <span v-if="initial" class="peek-initial">{{ initial }}</span>
         <svg
           v-else
@@ -78,6 +85,18 @@ const initial = computed(() => {
           <span class="peek-title">{{ title }}</span>
         </div>
         <div class="peek-sub">{{ sub }}</div>
+        <div v-if="data.actions?.length" class="peek-actions" @click.stop>
+          <button
+            v-for="(act, idx) in data.actions.slice(0, 2)"
+            :key="`${act.label}-${idx}`"
+            type="button"
+            class="peek-action-btn"
+            :title="act.activation_type === 'protocol' ? `执行 ${act.label}` : '由来源应用处理，点击切回该应用'"
+            @click.stop="emit('action', act)"
+          >
+            {{ act.label }}
+          </button>
+        </div>
       </div>
       <svg
         class="peek-chevron"
@@ -99,7 +118,7 @@ const initial = computed(() => {
 
 .peek-banner {
   width: calc(392px * var(--peek-scale, 1));
-  height: calc(62px * var(--peek-scale, 1));
+  min-height: calc(62px * var(--peek-scale, 1));
   border-radius: calc(20px * var(--peek-scale, 1));
   background: var(--notif-bg);
   border: 1px solid var(--notif-border);
@@ -107,11 +126,58 @@ const initial = computed(() => {
   display: flex;
   align-items: center;
   gap: calc(10px * var(--peek-scale, 1));
-  padding: 0 calc(14px * var(--peek-scale, 1));
+  padding: calc(8px * var(--peek-scale, 1)) calc(14px * var(--peek-scale, 1));
   pointer-events: auto;
   cursor: pointer;
   contain: layout style paint;
   transition: filter 0.18s ease;
+}
+
+.peek-thumb-wrap {
+  width: calc(46px * var(--peek-scale, 1));
+  height: calc(34px * var(--peek-scale, 1));
+  border-radius: calc(7px * var(--peek-scale, 1));
+  overflow: hidden;
+  border: 1px solid var(--v2-line);
+  background: var(--ui-well);
+  flex-shrink: 0;
+}
+
+.peek-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.peek-actions {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--peek-scale, 1));
+  margin-top: calc(3px * var(--peek-scale, 1));
+}
+
+.peek-action-btn {
+  padding: calc(2px * var(--peek-scale, 1)) calc(8px * var(--peek-scale, 1));
+  border-radius: calc(6px * var(--peek-scale, 1));
+  border: 1px solid var(--v2-line);
+  background: var(--ui-well);
+  color: var(--v2-ink);
+  font-size: calc(10.5px * var(--peek-scale, 1));
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+  max-width: calc(120px * var(--peek-scale, 1));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.peek-action-btn:hover {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: var(--v2-on-accent);
 }
 
 .peek-banner:hover {

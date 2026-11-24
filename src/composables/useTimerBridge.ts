@@ -32,7 +32,7 @@ let bridgeStarted = false
 export function useTimerBridge() {
   const timer = useTimer()
   const { tasks, incrementPomodoro, incrementSubtaskPomodoro, touchTask } = useTasks()
-  const { recordPomodoro } = useDailyStats()
+  const { recordPomodoro, recordFocusMinutes } = useDailyStats()
   const { recordPomodoro: recordAchievementPomodoro, recordEarlyBird, recordNightOwl } = useAchievements()
   const { settings } = useSettings()
   const { selectedId: selectedCompanionId, recordCompanionMinutes, installCompanionSyncResponder } = useCompanion()
@@ -102,18 +102,39 @@ export function useTimerBridge() {
       { immediate: true },
     )
 
-    timer.onPhaseDoneCallback((phase, taskId) => {
+    timer.onFocusEndedCallback(({ taskId, focusedSeconds, completed }) => {
+      // 提前停止 / 跳过进休息 / 切换任务时，只要真实专注满 1 分钟即计入当日专注时长与伙伴陪伴时长
+      if (!completed && focusedSeconds >= 60) {
+        const partialMinutes = Math.floor(focusedSeconds / 60)
+        if (partialMinutes > 0) {
+          recordFocusMinutes(partialMinutes)
+          recordCompanionMinutes(sessionCompanionId ?? selectedCompanionId.value, partialMinutes)
+          sessionCompanionId = null
+          if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('flowisle:partial-focus-recorded', {
+              detail: { minutes: partialMinutes, taskId },
+            }))
+          }
+        }
+      }
+    })
+
+    timer.onPhaseDoneCallback((phase, taskId, focusedSeconds) => {
       if (phase === 'focus') {
         focusSessionActive = false
         const summary = flushFocusMissedSummary(true)
         void emitTo('main', 'focus-missed-ready', summary).catch(() => {})
-      }
-      if (phase === 'focus' && taskId) {
-        incrementPomodoro(taskId)
-        if (timer.activeSubtaskId.value) {
-          incrementSubtaskPomodoro(taskId, timer.activeSubtaskId.value)
+
+        // 完整专注结束：无论是否绑定具体任务，均按实际专注时长计入统计与伙伴陪伴
+        if (taskId && taskId !== 'quick-focus') {
+          incrementPomodoro(taskId)
+          if (timer.activeSubtaskId.value) {
+            incrementSubtaskPomodoro(taskId, timer.activeSubtaskId.value)
+          }
         }
-        const focusMinutes = settings.value.focusDuration
+        const focusMinutes = focusedSeconds >= 60
+          ? Math.max(1, Math.round(focusedSeconds / 60))
+          : settings.value.focusDuration
         recordPomodoro(focusMinutes)
         recordAchievementPomodoro()
         recordCompanionMinutes(sessionCompanionId ?? selectedCompanionId.value, focusMinutes)

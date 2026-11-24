@@ -33,13 +33,61 @@ function isMonochromeColor(raw: string): boolean {
   return Math.max(r, g, b) - Math.min(r, g, b) <= 26
 }
 
+const STRIPPED_STYLE_PROPS = [
+  'background',
+  'background-color',
+  'background-image',
+  'font-family',
+  'font-size',
+  'line-height',
+  'letter-spacing',
+  'word-spacing',
+  'margin',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'padding',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'width',
+  'min-width',
+  'max-width',
+  'height',
+  'min-height',
+  'position',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'z-index',
+  'float',
+  'display',
+  'border',
+  'border-color',
+  'border-width',
+  'border-style',
+  'box-shadow',
+  'text-indent',
+  'white-space',
+]
+
 function cleanInlineStyles(el: HTMLElement) {
+  if (el.tagName === 'FONT') {
+    el.removeAttribute('face')
+    el.removeAttribute('size')
+    const fontColor = el.getAttribute('color')
+    if (fontColor && isMonochromeColor(fontColor)) {
+      el.removeAttribute('color')
+    }
+  }
   const style = el.style
   if (!style || style.length === 0) return
-  style.removeProperty('background')
-  style.removeProperty('background-color')
-  style.removeProperty('background-image')
-  style.removeProperty('font-family')
+  for (const prop of STRIPPED_STYLE_PROPS) {
+    style.removeProperty(prop)
+  }
   if (style.color && isMonochromeColor(style.color)) {
     style.removeProperty('color')
   }
