@@ -13,6 +13,9 @@ interface Particle {
   color: string
   life: number
   maxLife: number
+  delay?: number
+  gravity?: number
+  drag?: number
 }
 
 let overlayCanvas: HTMLCanvasElement | null = null
@@ -85,18 +88,24 @@ function tick(now: number) {
 
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i]
+    if (p.delay && p.delay > 0) {
+      p.delay -= dt
+      continue
+    }
     p.life += dt
     if (p.life >= p.maxLife) {
       particles.splice(i, 1)
       continue
     }
-    p.vx *= Math.pow(0.93, dtNorm)
-    p.vy = p.vy * Math.pow(0.93, dtNorm) + 0.045 * dtNorm
+    const drag = p.drag ?? 0.93
+    const gravity = p.gravity ?? 0.045
+    p.vx *= Math.pow(drag, dtNorm)
+    p.vy = p.vy * Math.pow(drag, dtNorm) + gravity * dtNorm
     p.x += p.vx * dtNorm
     p.y += p.vy * dtNorm
 
     const t = p.life / p.maxLife
-    const alpha = t < 0.18 ? t / 0.18 : Math.max(0, 1 - Math.pow((t - 0.18) / 0.82, 1.5))
+    const alpha = t < 0.14 ? t / 0.14 : Math.max(0, 1 - Math.pow((t - 0.14) / 0.86, 1.35))
     ctx.globalAlpha = alpha
     ctx.fillStyle = p.color
     const px = Math.round(p.x - p.size / 2)
@@ -169,6 +178,64 @@ export function triggerPixelBurstFromEvent(event?: Event | null, tone: SparkTone
   if ('clientX' in event && typeof (event as MouseEvent).clientX === 'number') {
     const me = event as MouseEvent
     if (me.clientX || me.clientY) triggerPixelBurstAt(me.clientX, me.clientY, tone, count)
+  }
+}
+
+/**
+ * 像素消散动画（Pixel Dissolve）：
+ * 模块移除/关闭时，在原元素区域按像素网格撒出主题色像素碎块，自左向右波浪式轻飘消散。
+ */
+export function triggerPixelDissolveAtElement(
+  el: Element | HTMLElement | null | undefined,
+  tone: SparkTone = 'accent',
+) {
+  if (typeof window === 'undefined' || !el || reducedMotion()) return
+  const rect = el.getBoundingClientRect()
+  if (rect.width < 8 || rect.height < 8) return
+  const canvas = ensureCanvas()
+  if (!canvas) return
+  lastBurstAt = performance.now()
+
+  const accent = readCssVar('--v2-accent', '#ad461e')
+  const ink = readCssVar('--v2-ink', '#35291f')
+  const secondary = readCssVar('--v2-secondary', '#776253')
+  const surface = readCssVar('--v2-popover', '#fffaf2')
+  const brk = readCssVar('--v2-break', '#537b51')
+  const palette = tone === 'break'
+    ? [brk, surface, secondary, accent]
+    : [accent, surface, secondary, ink]
+
+  const cols = Math.min(18, Math.max(6, Math.round(rect.width / 18)))
+  const rows = Math.min(6, Math.max(2, Math.round(rect.height / 18)))
+  const stepX = rect.width / cols
+  const stepY = rect.height / rows
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      // 轻度稀疏采样，保留像素空气感不糊成一团
+      if ((r + c) % 2 === 1 && Math.random() < 0.32) continue
+      const x = rect.left + (c + 0.5) * stepX + (Math.random() - 0.5) * 4
+      const y = rect.top + (r + 0.5) * stepY + (Math.random() - 0.5) * 4
+      const isEdge = r === 0 || c === 0 || c === cols - 1
+      particles.push({
+        x,
+        y,
+        vx: (Math.random() - 0.35) * 0.9,
+        vy: -0.55 - Math.random() * 0.95,
+        size: isEdge ? 4 : 3,
+        color: palette[(r * 3 + c) % palette.length],
+        life: 0,
+        maxLife: 340 + Math.random() * 190,
+        delay: (c / Math.max(1, cols - 1)) * 95 + Math.random() * 30,
+        gravity: -0.015,
+        drag: 0.96,
+      })
+    }
+  }
+
+  if (rafId === null) {
+    lastTs = 0
+    rafId = window.requestAnimationFrame(tick)
   }
 }
 

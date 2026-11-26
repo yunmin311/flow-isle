@@ -21,7 +21,7 @@ import { emailInboxUrl, formatEmailSourceTag } from '../utils/emailLinks'
 import EmailReader from './EmailReader.vue'
 import ScreenshotShelf from './ScreenshotShelf.vue'
 import StatNumber from '../components/StatNumber.vue'
-import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
+import { triggerPixelBurstFromEvent, triggerPixelDissolveAtElement } from '../utils/pixelSpark'
 
 const props = defineProps<{ focusRequest?: { recordId?: string; openSource?: boolean; destination?: 'timer'; focusMissed?: boolean } }>()
 const emit = defineEmits<{ back: []; openTask: [taskId: string]; openHome: []; openTodo: [] }>()
@@ -76,28 +76,17 @@ function closeEmail() {
   if (id) void nextTick(() => recordNodes.get(id)?.focus({ preventScroll: true }))
 }
 
-// 所有通知分组默认全部收起；每次点击逐步展开少量条目，避免一次性铺满整页
-const GROUP_PAGE_STEP = 4
+// 每组默认显示前 7 条，每次点击“展开”多显示 10 条（不一次性全部铺开）
+const GROUP_VISIBLE_LIMIT = 7
+const GROUP_EXPAND_STEP = 10
 const groupVisibleCounts = ref<Record<string, number>>({})
 
 function groupVisibleCount(key: string): number {
-  return groupVisibleCounts.value[key] ?? 0
+  return groupVisibleCounts.value[key] ?? GROUP_VISIBLE_LIMIT
 }
 
-function isGroupExpanded(key: string): boolean {
-  return groupVisibleCount(key) > 0
-}
-
-function toggleGroupHeader(key: string) {
-  const cur = groupVisibleCount(key)
-  groupVisibleCounts.value = {
-    ...groupVisibleCounts.value,
-    [key]: cur > 0 ? 0 : GROUP_PAGE_STEP,
-  }
-}
-
-function showMoreInGroup(key: string, total: number) {
-  const next = Math.min(total, groupVisibleCount(key) + GROUP_PAGE_STEP)
+function expandGroupMore(key: string, total: number) {
+  const next = Math.min(total, groupVisibleCount(key) + GROUP_EXPAND_STEP)
   groupVisibleCounts.value = {
     ...groupVisibleCounts.value,
     [key]: next,
@@ -107,17 +96,12 @@ function showMoreInGroup(key: string, total: number) {
 function collapseGroup(key: string) {
   groupVisibleCounts.value = {
     ...groupVisibleCounts.value,
-    [key]: 0,
+    [key]: GROUP_VISIBLE_LIMIT,
   }
 }
 
 function groupVisibleItems(group: { key: string; items: NotificationRecord[] }): NotificationRecord[] {
-  const limit = groupVisibleCount(group.key)
-  return limit > 0 ? group.items.slice(0, limit) : []
-}
-
-function groupUnreadCount(items: NotificationRecord[]): number {
-  return items.filter(item => !item.read).length
+  return group.items.slice(0, groupVisibleCount(group.key))
 }
 
 // 单条通知：点击展开完整标题与正文，展开后可复制
@@ -189,7 +173,7 @@ function focusRecord(record: NotificationRecord) {
   const key = groupKeyForRecord(record)
   const group = notifGroups.value.find(g => g.key === key)
   const idx = group ? group.items.findIndex(item => item.id === record.id) : 0
-  const needed = Math.max(GROUP_PAGE_STEP, idx + 1)
+  const needed = Math.max(GROUP_VISIBLE_LIMIT, idx + 1)
   groupVisibleCounts.value = {
     ...groupVisibleCounts.value,
     [key]: Math.max(groupVisibleCount(key), needed),
@@ -399,7 +383,7 @@ onDeactivated(() => { selectedEmail.value = null })
       </div>
     </div>
     <div class="notif-scroll">
-      <Transition name="module-dismiss">
+      <Transition name="pixel-vanish" @before-leave="el => triggerPixelDissolveAtElement(el, 'accent')">
       <section
         v-if="lastFocusMissed && lastFocusMissed.total > 0"
         ref="focusMissedCardRef"
@@ -412,7 +396,7 @@ onDeactivated(() => { selectedEmail.value = null })
             <span class="focus-missed-badge"><StatNumber :value="lastFocusMissed.total" :size="16" inline /></span>
             <span class="focus-missed-title">{{ focusMissedTitle }}</span>
           </div>
-          <button type="button" class="text-btn focus-missed-close" @click="triggerPixelBurstFromEvent($event, 'accent', 5); clearFocusMissedSummary(); missedSocialError = null">
+          <button type="button" class="text-btn focus-missed-close" @click="clearFocusMissedSummary(); missedSocialError = null">
             知道了
           </button>
         </div>
@@ -434,25 +418,10 @@ onDeactivated(() => { selectedEmail.value = null })
       </Transition>
       <ScreenshotShelf />
       <section v-for="group in notifGroups" :key="group.key" class="notif-group">
-        <button
-          type="button"
-          class="group-head group-head-btn"
-          :class="{ open: isGroupExpanded(group.key) }"
-          :aria-expanded="isGroupExpanded(group.key)"
-          @click="toggleGroupHeader(group.key)"
-        >
-          <span class="group-head-left">
-            <span class="group-chevron" aria-hidden="true">{{ isGroupExpanded(group.key) ? '▾' : '▸' }}</span>
-            <span class="group-title">{{ group.title }}</span>
-            <span class="group-count">{{ group.items.length }}</span>
-            <span v-if="groupUnreadCount(group.items) > 0" class="group-unread-pill">{{ groupUnreadCount(group.items) }} 未读</span>
-          </span>
-          <span class="group-toggle-hint">
-            {{ isGroupExpanded(group.key) ? '收起' : `展开前 ${Math.min(GROUP_PAGE_STEP, group.items.length)} 条` }}
-          </span>
-        </button>
-        <Transition name="group-fold">
-        <div v-if="isGroupExpanded(group.key)" class="notif-group-body">
+        <div class="group-head">
+          <span class="group-title">{{ group.title }}</span>
+          <span class="group-count">{{ group.items.length }}</span>
+        </div>
         <div class="notif-list">
           <div
             v-for="r in groupVisibleItems(group)"
@@ -525,25 +494,24 @@ onDeactivated(() => { selectedEmail.value = null })
             </div>
           </div>
         </div>
-        <div class="group-footer-actions">
+        <div v-if="group.items.length > GROUP_VISIBLE_LIMIT" class="group-footer-actions">
           <button
-            v-if="group.items.length > groupVisibleCount(group.key)"
+            v-if="groupVisibleCount(group.key) < group.items.length"
             type="button"
             class="group-more"
-            @click="showMoreInGroup(group.key, group.items.length)"
+            @click="expandGroupMore(group.key, group.items.length)"
           >
-            再展开 {{ Math.min(GROUP_PAGE_STEP, group.items.length - groupVisibleCount(group.key)) }} 条（剩 {{ group.items.length - groupVisibleCount(group.key) }} 条）
+            展开
           </button>
           <button
+            v-if="groupVisibleCount(group.key) > GROUP_VISIBLE_LIMIT"
             type="button"
             class="group-more subtle"
             @click="collapseGroup(group.key)"
           >
-            收起分组
+            收起
           </button>
         </div>
-        </div>
-        </Transition>
       </section>
       <div v-if="!records.length && !lastFocusMissed" class="empty">还没有通知，完成番茄或收到系统通知后会记录在这里</div>
     </div>
@@ -1125,64 +1093,6 @@ onDeactivated(() => { selectedEmail.value = null })
   color: var(--alert-color);
 }
 
-/* 通知分组可折叠头 & 渐进式展开 */
-.group-head-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--v2-line);
-  background: var(--v2-surface);
-  color: var(--v2-ink);
-  font-family: inherit;
-  cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease;
-}
-
-.group-head-btn:hover {
-  background: var(--ui-hover);
-  border-color: color-mix(in srgb, var(--v2-accent) 28%, var(--v2-line));
-}
-
-.group-head-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.group-chevron {
-  font-size: 11px;
-  color: var(--v2-muted);
-  width: 10px;
-  text-align: center;
-}
-
-.group-unread-pill {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--v2-accent-soft);
-  color: var(--v2-accent);
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.group-toggle-hint {
-  font-size: 10.5px;
-  color: var(--v2-muted);
-  white-space: nowrap;
-}
-
-.notif-group-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
-}
-
 .group-footer-actions {
   display: flex;
   align-items: center;
@@ -1199,47 +1109,25 @@ onDeactivated(() => { selectedEmail.value = null })
   color: var(--v2-muted);
 }
 
-/* 模块消失与分组展开动画 */
-.module-dismiss-enter-active {
-  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1), transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.module-dismiss-leave-active {
+/* 像素消散退场动画（配合 canvas 像素碎块消散） */
+.pixel-vanish-leave-active {
   transition:
-    opacity 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 240ms cubic-bezier(0.4, 0, 0.2, 1),
-    max-height 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    margin 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    padding 260ms cubic-bezier(0.4, 0, 0.2, 1);
+    opacity 150ms steps(3, end),
+    max-height 190ms steps(4, end),
+    margin 190ms steps(4, end),
+    padding 190ms steps(4, end);
   max-height: 260px;
   overflow: hidden;
 }
 
-.module-dismiss-enter-from {
+.pixel-vanish-leave-to {
   opacity: 0;
-  transform: translate3d(0, -6px, 0) scale(0.98);
-}
-
-.module-dismiss-leave-to {
-  opacity: 0;
-  transform: translate3d(0, -8px, 0) scale(0.95);
   max-height: 0;
   margin-top: 0;
   margin-bottom: 0;
   padding-top: 0;
   padding-bottom: 0;
   border-width: 0;
-}
-
-.group-fold-enter-active,
-.group-fold-leave-active {
-  transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1), transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.group-fold-enter-from,
-.group-fold-leave-to {
-  opacity: 0;
-  transform: translate3d(0, -4px, 0);
 }
 
 .empty {

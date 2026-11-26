@@ -2,6 +2,7 @@
 import { onUnmounted, ref } from 'vue'
 import { useScreenshots } from '../composables/useScreenshots'
 import { formatNotifTime } from '../composables/useNotifications'
+import { triggerPixelDissolveAtElement } from '../utils/pixelSpark'
 const { records, enabled, error, setEnabled, copyScreenshot, removeScreenshot, clearScreenshots } = useScreenshots()
 const expanded = ref(false)
 const status = ref('')
@@ -76,7 +77,7 @@ async function clearAll() {
       <label class="capture-toggle"><input class="capture-switch" type="checkbox" :checked="enabled" aria-describedby="screenshot-capture-scope" @change="toggleCollection"><span>自动收集</span></label>
       <span id="screenshot-capture-scope" class="capture-scope">默认开启 · 包含普通图片 · 仅本机保存</span>
     </div>
-    <Transition name="shelf-dismiss">
+    <Transition name="shelf-dismiss" @before-leave="el => triggerPixelDissolveAtElement(el, 'accent')">
     <div v-if="confirmingClear" class="clear-confirmation" role="group" aria-label="确认清空截图">
       <span>移除全部 {{ records.length }} 张截图及本机原图？</span>
       <div class="clear-confirmation-actions">
@@ -85,7 +86,7 @@ async function clearAll() {
       </div>
     </div>
     </Transition>
-    <TransitionGroup v-if="records.length" name="shot-card" tag="div" class="screenshot-grid">
+    <TransitionGroup v-if="records.length" name="shot-card" tag="div" class="screenshot-grid" @before-leave="el => triggerPixelDissolveAtElement(el, 'accent')">
       <article v-for="shot in (expanded ? records : records.slice(0, 2))" :key="shot.id" class="screenshot-card">
         <button class="screenshot-preview" :aria-label="`复制 ${formatNotifTime(shot.time)} 的截图原图`" :disabled="clearing || copying !== null" @click="copy(shot.id)">
           <img :src="shot.thumbnail" alt="截图缩略图" loading="lazy">
@@ -280,29 +281,23 @@ async function clearAll() {
 button:disabled:not(.clear-screenshots) { opacity: .5; cursor: wait; }
 button:focus-visible, .capture-switch:focus-visible { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
 
-.shelf-dismiss-enter-active,
 .shelf-dismiss-leave-active {
-  transition: opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), max-height 220ms ease;
+  transition: opacity 140ms steps(3, end), max-height 180ms steps(4, end);
   max-height: 120px;
   overflow: hidden;
 }
-.shelf-dismiss-enter-from,
 .shelf-dismiss-leave-to {
   opacity: 0;
-  transform: translate3d(0, -6px, 0) scale(0.96);
   max-height: 0;
 }
 
-.shot-card-enter-active,
 .shot-card-leave-active {
-  transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 150ms steps(3, end);
 }
-.shot-card-enter-from,
 .shot-card-leave-to {
   opacity: 0;
-  transform: scale(0.9);
 }
 .shot-card-move {
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 </style>

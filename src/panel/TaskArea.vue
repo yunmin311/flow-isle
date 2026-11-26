@@ -10,7 +10,7 @@ import { getCategoryColor } from '../composables/useMemos'
 import PixelTime from '../components/PixelTime.vue'
 import StatNumber from '../components/StatNumber.vue'
 import CompanionEmote, { type CompanionEmoteKind } from '../components/CompanionEmote.vue'
-import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement } from '../utils/pixelSpark'
+import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement, triggerPixelDissolveAtElement } from '../utils/pixelSpark'
 
 const emit = defineEmits<{
   close: []
@@ -413,9 +413,12 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
           </div>
         </div>
 
-        <div v-if="recentTasks.length === 0 && !quickActive" class="focus-empty">
-          <span class="focus-empty-text">暂无核心任务 · 在下方输入后按 Shift+Enter 直接开专注</span>
-        </div>
+        <Transition name="pixel-vanish" @before-leave="el => triggerPixelDissolveAtElement(el, 'accent')">
+          <div v-if="recentTasks.length === 0 && !quickActive" class="focus-empty">
+            <span class="focus-empty-pip" aria-hidden="true"></span>
+            <span class="focus-empty-text">暂无核心任务 · 下方输入后按 <kbd class="focus-kbd">Shift+Enter</kbd> 直接开专注</span>
+          </div>
+        </Transition>
 
         <div
           v-for="task in recentTasks"
@@ -868,13 +871,57 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
 }
 
 .focus-empty {
-  padding: 10px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px dashed color-mix(in srgb, var(--v2-line) 85%, transparent);
+}
+
+.focus-empty-pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--v2-muted);
+  opacity: 0.55;
+  flex-shrink: 0;
 }
 
 .focus-empty-text {
-  font-size: 11px;
-  color: var(--v2-muted);
+  font-size: 11.5px;
+  color: var(--v2-secondary);
   line-height: 1.5;
+}
+
+.focus-kbd {
+  display: inline-block;
+  padding: 0 5px;
+  margin: 0 1px;
+  border-radius: 4px;
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  box-shadow: var(--pixel-keycap);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--v2-ink);
+  vertical-align: baseline;
+}
+
+.pixel-vanish-leave-active {
+  transition: opacity 150ms steps(3, end), max-height 180ms steps(4, end), padding 180ms steps(4, end);
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.pixel-vanish-leave-to {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
 }
 
 .focus-task-item {
