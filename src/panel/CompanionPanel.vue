@@ -1008,7 +1008,8 @@ button:focus-visible, summary:focus-visible {
 }
 
 .companion-chooser {
-  width: 384px;
+  width: min(384px, calc(100% - 24px));
+  height: min(520px, calc(100% - 24px));
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -1063,8 +1064,10 @@ button:focus-visible, summary:focus-visible {
 }
 
 .chooser-content {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 4px 12px 12px;
   overscroll-behavior: contain;
 }
