@@ -31,6 +31,7 @@ const saveTimeout = ref<number | null>(null)
 const showDeleteConfirm = ref(false)
 const showColorPicker = ref(false)
 const showContextMenu = ref(false)
+const lightboxImageSrc = ref<string | null>(null)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const contextMenuRef = ref<HTMLDivElement | null>(null)
 const hasSelection = ref(false)
@@ -312,9 +313,17 @@ function insertCheckbox() {
   onContentChange()
 }
 
-// Handle checkbox clicks via event delegation
+// Handle checkbox clicks and image lightbox zoom via event delegation
 function onEditorClick(e: MouseEvent) {
   const target = e.target as HTMLElement
+  if (target.tagName === 'IMG') {
+    const src = (target as HTMLImageElement).getAttribute('src')
+    if (src) {
+      e.preventDefault()
+      lightboxImageSrc.value = src
+      return
+    }
+  }
   if (target.classList.contains('memo-checkbox')) {
     // Toggle the checked attribute for styling
     const checkbox = target as HTMLInputElement
@@ -460,11 +469,12 @@ function cancelDelete() {
   showDeleteConfirm.value = false
 }
 
-// Check if current editor content is empty
+// Check if current editor content is empty (preserve image-only memos!)
 function isContentEmpty(): boolean {
   const hasTitle = localTitle.value.trim().length > 0
+  const hasImage = /<img\b/i.test(localContent.value)
   const hasContent = localContent.value.replace(/<[^>]+>/g, '').trim().length > 0
-  return !hasTitle && !hasContent
+  return !hasTitle && !hasContent && !hasImage
 }
 
 // Back handler
@@ -834,6 +844,31 @@ function formatUpdateTime(timestamp: number): string {
       style="display: none"
       @change="handleImageSelected"
     />
+
+    <!-- Image Lightbox Modal -->
+    <Transition name="lightbox-fade">
+      <div
+        v-if="lightboxImageSrc"
+        class="image-lightbox-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label="图片大图预览"
+        @click="lightboxImageSrc = null"
+      >
+        <div class="image-lightbox-shell" @click.stop>
+          <button
+            type="button"
+            class="image-lightbox-close"
+            title="关闭预览"
+            aria-label="关闭预览"
+            @click="lightboxImageSrc = null"
+          >
+            ✕
+          </button>
+          <img :src="lightboxImageSrc" alt="备忘录图片大图" class="image-lightbox-img" @click="lightboxImageSrc = null" />
+        </div>
+      </div>
+    </Transition>
 
     <!-- Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="delete-dialog-overlay" @click="cancelDelete">
@@ -1296,6 +1331,78 @@ function formatUpdateTime(timestamp: number): string {
 
 .editor-content :deep(a:hover) {
   text-decoration: underline;
+}
+
+.editor-content :deep(img) {
+  cursor: zoom-in;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.editor-content :deep(img:hover) {
+  transform: scale(1.01);
+  box-shadow: 0 6px 18px var(--v2-shadow);
+}
+
+.image-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  border-radius: 22px;
+  overflow: clip;
+  background: color-mix(in srgb, #000 72%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.image-lightbox-shell {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-lightbox-img {
+  max-width: 100%;
+  max-height: 520px;
+  border-radius: 12px;
+  border: 1px solid var(--v2-line);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  object-fit: contain;
+  cursor: zoom-out;
+  display: block;
+}
+
+.image-lightbox-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--v2-line);
+  background: var(--v2-popover);
+  color: var(--v2-ink);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.lightbox-fade-enter-active,
+.lightbox-fade-leave-active {
+  transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1), transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lightbox-fade-enter-from,
+.lightbox-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
 }
 
 /* Delete Confirmation Dialog */

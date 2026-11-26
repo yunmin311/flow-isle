@@ -68,12 +68,12 @@ export interface Settings {
 }
 
 export const presetThemes: ThemePreset[] = [
-  { id: 'classic', name: '经典橙红', focusColor: '#b34127', breakColor: '#537b51', idleColor: '#4a8fd4', alertColor: '#e8a23a' },
-  { id: 'ocean', name: '海洋蓝绿', focusColor: '#176b86', breakColor: '#2f7a63', idleColor: '#6b8eb2', alertColor: '#c77d22' },
-  { id: 'lavender', name: '薰衣草紫', focusColor: '#79509e', breakColor: '#6f7f5a', idleColor: '#7c8ba1', alertColor: '#c98a20' },
-  { id: 'forest', name: '森林深绿', focusColor: '#3f7043', breakColor: '#3f7043', idleColor: '#8e9aaf', alertColor: '#b46e20' },
-  { id: 'cyber', name: '赛博朋克', focusColor: '#a8357c', breakColor: '#2f7a6a', idleColor: '#a29bfe', alertColor: '#b8791e' },
-  { id: 'liquid', name: 'Liquid Focus', focusColor: '#ad461e', breakColor: '#537b51', idleColor: '#776253', alertColor: '#c96a32' },
+  { id: 'liquid', name: '静纸 Paper', focusColor: '#a4583a', breakColor: '#5f7d5c', idleColor: '#6b625a', alertColor: '#b9772f' },
+  { id: 'classic', name: '石墨 Graphite', focusColor: '#2f3a48', breakColor: '#4e7d6a', idleColor: '#5f656e', alertColor: '#b07a2e' },
+  { id: 'ocean', name: '深潜 Tide', focusColor: '#2c6b76', breakColor: '#4f8069', idleColor: '#55696e', alertColor: '#b87d33' },
+  { id: 'lavender', name: '暮雾 Dusk', focusColor: '#685a86', breakColor: '#627d61', idleColor: '#665f70', alertColor: '#b57e34' },
+  { id: 'forest', name: '苔原 Moss', focusColor: '#4b6a46', breakColor: '#4b6a46', idleColor: '#5e6858', alertColor: '#b07a30' },
+  { id: 'cyber', name: '夜航 Indigo', focusColor: '#45508e', breakColor: '#4e7d70', idleColor: '#5d6178', alertColor: '#b47b33' },
 ]
 
 const SETTINGS_FILE = 'focus-island/settings.json'

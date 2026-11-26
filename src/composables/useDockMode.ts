@@ -62,14 +62,14 @@ export function useDockMode() {
         if ((input.over || input.clicked) && state.value === 'alert') {
           window.dispatchEvent(new MouseEvent('mousemove'))
         }
-        if (notificationVisible.value) {
-          if (dockExpanded.value) dockExpanded.value = false
-          return
-        }
-        // 点击刘海/胶囊打开面板（可在设置中关闭）；即使处于 idle alert 也不吞掉第一下点击
-        if (input.clicked && !panelVisible.value && settings.value.notchClickOpensPanel) {
+        // 点击刘海/胶囊本体打开面板：即使当前有通知横幅弹出，点在胶囊本体（非横幅）上也必须响应
+        if (input.clicked && !input.over_peek && !panelVisible.value && settings.value.notchClickOpensPanel) {
           if (dockExpanded.value) dockExpanded.value = false
           void invoke('toggle_panel')
+          return
+        }
+        if (notificationVisible.value) {
+          if (dockExpanded.value) dockExpanded.value = false
           return
         }
         if (forceExpanded.value) {

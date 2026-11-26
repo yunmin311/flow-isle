@@ -149,21 +149,52 @@ const FAMILY_WHISPERS: Record<'cat' | 'dog' | 'fox', string[]> = {
   fox: ['竖起耳朵听着呢', '尾巴轻轻扫过', '陪你守着这一轮'],
 }
 
+const SECRET_COMBO_WHISPERS: Record<'cat' | 'dog' | 'fox', string> = {
+  cat: '✦ 呼噜声开到最大啦 · 今天也要温柔对待自己',
+  dog: '✦ 转了三圈决定把今天的好运分你一半！',
+  fox: '✦ 偷偷藏了一颗像素星星送给你',
+}
+
+let rapidPetCombo = 0
+let rapidPetTimer: number | null = null
+
 function petCompanion(event?: MouseEvent) {
   petCount += 1
-  const pool = FAMILY_WHISPERS[selectedCompanion.value.family]
-  petWhisper.value = pool[petCount % pool.length]
+  rapidPetCombo += 1
+  if (rapidPetTimer !== null) window.clearTimeout(rapidPetTimer)
+  rapidPetTimer = window.setTimeout(() => {
+    rapidPetCombo = 0
+    rapidPetTimer = null
+  }, 3000)
+
+  const fam = selectedCompanion.value.family
+  const hour = new Date().getHours()
+  if (rapidPetCombo >= 5) {
+    // 连续轻拍 5 次彩蛋
+    rapidPetCombo = 0
+    petWhisper.value = SECRET_COMBO_WHISPERS[fam]
+    triggerPixelBurstFromEvent(event, 'gold', 14)
+  } else if ((hour >= 23 || hour < 5) && petCount % 3 === 0) {
+    // 深夜守夜彩蛋
+    petWhisper.value = '✦ 夜深了，星光和我都陪着你，别忘了早点休息'
+    triggerPixelBurstFromEvent(event, 'gold', 9)
+  } else {
+    const pool = FAMILY_WHISPERS[fam]
+    petWhisper.value = pool[petCount % pool.length]
+    triggerPixelBurstFromEvent(event, 'gold', 7)
+  }
+
   petHopping.value = true
-  triggerPixelBurstFromEvent(event, 'gold', 7)
   if (petHopTimer !== null) window.clearTimeout(petHopTimer)
   if (petWhisperTimer !== null) window.clearTimeout(petWhisperTimer)
-  petHopTimer = window.setTimeout(() => { petHopping.value = false }, 360)
-  petWhisperTimer = window.setTimeout(() => { petWhisper.value = null }, 2100)
+  petHopTimer = window.setTimeout(() => { petHopping.value = false }, 460)
+  petWhisperTimer = window.setTimeout(() => { petWhisper.value = null }, 2600)
 }
 
 onBeforeUnmount(() => {
   if (petHopTimer !== null) window.clearTimeout(petHopTimer)
   if (petWhisperTimer !== null) window.clearTimeout(petWhisperTimer)
+  if (rapidPetTimer !== null) window.clearTimeout(rapidPetTimer)
 })
 
 watch(activeId, () => {

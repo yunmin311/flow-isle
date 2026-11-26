@@ -54,12 +54,33 @@ function formatTime(timestamp: number): string {
   return `${month}-${day}`
 }
 
-// Extract plain text preview from HTML content
+// Extract image URLs from HTML content (for list thumbnails)
+function getPreviewImages(content: string, maxCount: number = 3): string[] {
+  const urls: string[] = []
+  const re = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(content)) !== null && urls.length < maxCount) {
+    if (match[1]) urls.push(match[1])
+  }
+  return urls
+}
+
+function countImages(content: string): number {
+  const matches = content.match(/<img\b/gi)
+  return matches ? matches.length : 0
+}
+
+// Extract plain text preview from HTML content (never show "无内容" when images exist)
 function getContentPreview(content: string, maxLength: number = 40): string {
-  const plainText = content.replace(/<[^>]+>/g, '').trim()
-  if (plainText.length === 0) return '无内容'
-  if (plainText.length <= maxLength) return plainText
-  return plainText.slice(0, maxLength) + '...'
+  const plainText = content.replace(/<[^>]+>/g, '').replace(/\u200B/g, '').trim()
+  const imgCount = countImages(content)
+  if (plainText.length === 0) {
+    if (imgCount === 1) return '[图片]'
+    if (imgCount > 1) return `[${imgCount} 张图片]`
+    return '无内容'
+  }
+  const snippet = plainText.length <= maxLength ? plainText : plainText.slice(0, maxLength) + '...'
+  return imgCount > 0 ? `[图片] ${snippet}` : snippet
 }
 
 // Cache plain-text content for search (avoid repeated regex on every keystroke)
@@ -281,6 +302,16 @@ function handleCloseCategoryDialog() {
             <span class="memo-item-time">{{ formatTime(memo.updatedAt) }}</span>
           </div>
           <div class="memo-item-preview">{{ getContentPreview(memo.content) }}</div>
+          <div v-if="getPreviewImages(memo.content).length" class="memo-thumb-strip">
+            <img
+              v-for="(imgSrc, idx) in getPreviewImages(memo.content)"
+              :key="`${memo.id}-thumb-${idx}`"
+              :src="imgSrc"
+              alt="备忘录图片缩略图"
+              class="memo-thumb"
+              loading="lazy"
+            />
+          </div>
         </div>
 
         <!-- Empty State -->
@@ -762,5 +793,22 @@ function handleCloseCategoryDialog() {
 .confirm-btn:hover {
   background: rgba(248, 113, 113, 0.25);
   border-color: rgba(248, 113, 113, 0.5);
+}
+
+.memo-thumb-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.memo-thumb {
+  width: 48px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--v2-line);
+  background: var(--ui-well);
+  display: block;
 }
 </style>

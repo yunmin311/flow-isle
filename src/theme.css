@@ -1,251 +1,274 @@
-/* FlowIsle V2 · Liquid Focus 主题 token
-   六套主题完整映射 ink / secondary / surface / shell / glow / line / accent / on-accent。
-   所有组件消费语义变量，保留每套主题自身的冷暖色相，不再被全局中性灰覆写。 */
+/* FlowIsle V2 · 主题 token（v2.11 重新设计）
+   理念：专注时在，需要时隐，从不打扰 —— 低饱和底色、单一克制强调色、深色分层清晰。
+   六套：静纸 / 石墨 / 深潜 / 暮雾 / 苔原 / 夜航。所有组件只消费语义变量。 */
 
 :root {
-  --v2-ink: #35291f;
-  --v2-secondary: #776253;
-  --v2-muted: #7f6b5a;
-  --v2-surface: #fffaf0e6;
-  --v2-shell: #fff5e5;
-  --v2-glow: #ffc98050;
-  --v2-line: #74533133;
-  --v2-accent: #ad461e;
-  --v2-on-accent: #fff9ee;
-  --v2-popover: #fffaf2;
-  --v2-shadow: #5f351520;
-  --v2-break: #537b51;
-  --v2-idle: #776253;
-  --v2-alert: #c96a32;
-  --v2-danger: #b84237;
+  --v2-ink: #2a2521;
+  --v2-secondary: #6b625a;
+  --v2-muted: #857c73;
+  --v2-surface: #fffdf9e6;
+  --v2-shell: #f5f1ea;
+  --v2-glow: #e6c4a03d;
+  --v2-line: #3a2e2224;
+  --v2-accent: #a4583a;
+  --v2-on-accent: #fffaf5;
+  --v2-popover: #fdfbf7;
+  --v2-shadow: #3a2a1a1a;
+  --v2-break: #5f7d5c;
+  --v2-idle: #6b625a;
+  --v2-alert: #b9772f;
+  --v2-danger: #b4473b;
   --font-ui: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, monospace;
   color-scheme: light;
 }
 
-:root[data-theme-id="classic"] {
-  --v2-ink: #37271f;
-  --v2-secondary: #795a4e;
-  --v2-muted: #7b5d51;
-  --v2-surface: #fff7f0e6;
-  --v2-shell: #fff0e0;
-  --v2-glow: #f3935d50;
-  --v2-line: #9a513b33;
-  --v2-accent: #b34127;
-  --v2-on-accent: #fffaf5;
-  --v2-popover: #fff8f2;
-  --v2-shadow: #6a2f161e;
-  --v2-break: #537b51;
-  --v2-idle: #4a8fd4;
-  --v2-alert: #e8a23a;
-}
-
-:root[data-theme-id="ocean"] {
-  --v2-ink: #173e49;
-  --v2-secondary: #4f6e77;
-  --v2-muted: #58757d;
-  --v2-surface: #f0fbfbe6;
-  --v2-shell: #e2f6f5;
-  --v2-glow: #7bced24d;
-  --v2-line: #39778433;
-  --v2-accent: #176b86;
-  --v2-on-accent: #f6ffff;
-  --v2-popover: #f4fcfc;
-  --v2-shadow: #163d481e;
-  --v2-break: #2f7a63;
-  --v2-idle: #4f6e77;
-  --v2-alert: #c77d22;
-}
-
-:root[data-theme-id="lavender"] {
-  --v2-ink: #403249;
-  --v2-secondary: #756481;
-  --v2-muted: #7a6986;
-  --v2-surface: #fbf6ffe6;
-  --v2-shell: #f0e7fa;
-  --v2-glow: #bf9de550;
-  --v2-line: #8662a033;
-  --v2-accent: #79509e;
-  --v2-on-accent: #fffbff;
-  --v2-popover: #fcf8ff;
-  --v2-shadow: #4b2d601e;
-  --v2-break: #5d7a56;
-  --v2-idle: #756481;
-  --v2-alert: #c98a20;
-}
-
-:root[data-theme-id="forest"] {
-  --v2-ink: #273e2b;
-  --v2-secondary: #5d745e;
-  --v2-muted: #627862;
-  --v2-surface: #f5fbefe6;
-  --v2-shell: #eaf2de;
-  --v2-glow: #9bc48050;
-  --v2-line: #5e805033;
-  --v2-accent: #3f7043;
-  --v2-on-accent: #fafff3;
-  --v2-popover: #f8fdf2;
-  --v2-shadow: #29452b1e;
-  --v2-break: #3f7043;
-  --v2-idle: #5d745e;
-  --v2-alert: #b46e20;
-}
-
-:root[data-theme-id="cyber"] {
-  --v2-ink: #482c47;
-  --v2-secondary: #7e5d7a;
-  --v2-muted: #82627e;
-  --v2-surface: #fff4fde6;
-  --v2-shell: #f9e6f3;
-  --v2-glow: #ee9fc950;
-  --v2-line: #a25e9533;
-  --v2-accent: #a8357c;
-  --v2-on-accent: #fffaff;
-  --v2-popover: #fff7fd;
-  --v2-shadow: #5c1f4b1e;
-  --v2-break: #2f7a6a;
-  --v2-idle: #7e5d7a;
-  --v2-alert: #b8791e;
-}
-
+/* 静纸 Paper · 浅色 */
 :root[data-theme-id="liquid"] {
-  --v2-ink: #35291f;
-  --v2-secondary: #776253;
-  --v2-muted: #7f6b5a;
-  --v2-surface: #fffaf0e6;
-  --v2-shell: #fff5e5;
-  --v2-glow: #ffc98050;
-  --v2-line: #74533133;
-  --v2-accent: #ad461e;
-  --v2-on-accent: #fff9ee;
-  --v2-popover: #fffaf2;
-  --v2-shadow: #5f351520;
-  --v2-break: #537b51;
-  --v2-idle: #776253;
-  --v2-alert: #c96a32;
+  --v2-ink: #2a2521;
+  --v2-secondary: #6b625a;
+  --v2-muted: #857c73;
+  --v2-surface: #fffdf9e6;
+  --v2-shell: #f5f1ea;
+  --v2-glow: #e6c4a03d;
+  --v2-line: #3a2e2224;
+  --v2-accent: #a4583a;
+  --v2-on-accent: #fffaf5;
+  --v2-popover: #fdfbf7;
+  --v2-shadow: #3a2a1a1a;
+  --v2-break: #5f7d5c;
+  --v2-idle: #6b625a;
+  --v2-alert: #b9772f;
+  --v2-danger: #b4473b;
+}
+
+/* 石墨 Graphite · 浅色 */
+:root[data-theme-id="classic"] {
+  --v2-ink: #23262b;
+  --v2-secondary: #5f656e;
+  --v2-muted: #80868f;
+  --v2-surface: #fcfcfde6;
+  --v2-shell: #f1f2f4;
+  --v2-glow: #b9c2ce3d;
+  --v2-line: #23262b1f;
+  --v2-accent: #2f3a48;
+  --v2-on-accent: #f7f9fb;
+  --v2-popover: #fafbfc;
+  --v2-shadow: #1a20281a;
+  --v2-break: #4e7d6a;
+  --v2-idle: #5f656e;
+  --v2-alert: #b07a2e;
+  --v2-danger: #b04a45;
+}
+
+/* 深潜 Tide · 浅色 */
+:root[data-theme-id="ocean"] {
+  --v2-ink: #1e3136;
+  --v2-secondary: #55696e;
+  --v2-muted: #77898d;
+  --v2-surface: #fafdfde6;
+  --v2-shell: #edf3f3;
+  --v2-glow: #9ccbd03d;
+  --v2-line: #1e313620;
+  --v2-accent: #2c6b76;
+  --v2-on-accent: #f4fbfc;
+  --v2-popover: #f8fcfc;
+  --v2-shadow: #10303a1a;
+  --v2-break: #4f8069;
+  --v2-idle: #55696e;
+  --v2-alert: #b87d33;
+  --v2-danger: #b04c46;
+}
+
+/* 暮雾 Dusk · 浅色 */
+:root[data-theme-id="lavender"] {
+  --v2-ink: #2c2733;
+  --v2-secondary: #665f70;
+  --v2-muted: #878091;
+  --v2-surface: #fdfcfee6;
+  --v2-shell: #f2f0f5;
+  --v2-glow: #c9bcdd3d;
+  --v2-line: #2c273320;
+  --v2-accent: #685a86;
+  --v2-on-accent: #fbf9fe;
+  --v2-popover: #fbfafd;
+  --v2-shadow: #241c301a;
+  --v2-break: #627d61;
+  --v2-idle: #665f70;
+  --v2-alert: #b57e34;
+  --v2-danger: #ae4a4e;
+}
+
+/* 苔原 Moss · 浅色 */
+:root[data-theme-id="forest"] {
+  --v2-ink: #252c24;
+  --v2-secondary: #5e6858;
+  --v2-muted: #80897a;
+  --v2-surface: #fcfdfae6;
+  --v2-shell: #eff2ea;
+  --v2-glow: #b8cba43d;
+  --v2-line: #252c2420;
+  --v2-accent: #4b6a46;
+  --v2-on-accent: #f7fbf4;
+  --v2-popover: #fafcf7;
+  --v2-shadow: #1c281a1a;
+  --v2-break: #4b6a46;
+  --v2-idle: #5e6858;
+  --v2-alert: #b07a30;
+  --v2-danger: #a94b42;
+}
+
+/* 夜航 Indigo · 浅色 */
+:root[data-theme-id="cyber"] {
+  --v2-ink: #232638;
+  --v2-secondary: #5d6178;
+  --v2-muted: #7f8398;
+  --v2-surface: #fcfcfee6;
+  --v2-shell: #eff0f6;
+  --v2-glow: #b4bce23d;
+  --v2-line: #23263820;
+  --v2-accent: #45508e;
+  --v2-on-accent: #f7f8fe;
+  --v2-popover: #fafafe;
+  --v2-shadow: #1a1e361a;
+  --v2-break: #4e7d70;
+  --v2-idle: #5d6178;
+  --v2-alert: #b47b33;
+  --v2-danger: #ad4a55;
 }
 
 :root[data-color-mode="dark"] {
-  --v2-ink: #faf1e6;
-  --v2-secondary: #cbb9a8;
-  --v2-muted: #9e8c7b;
-  --v2-surface: #261f1be8;
-  --v2-shell: #1a1512;
-  --v2-glow: #e07b392e;
-  --v2-line: #f5d8b826;
-  --v2-accent: #f39c64;
-  --v2-on-accent: #24130a;
-  --v2-popover: #2d241f;
-  --v2-shadow: #00000078;
-  --v2-break: #8ec98c;
-  --v2-idle: #cbb9a8;
-  --v2-alert: #f5be74;
-  --v2-danger: #f58279;
+  --v2-ink: #f2ece4;
+  --v2-secondary: #bdb3a8;
+  --v2-muted: #8e847a;
+  --v2-surface: #221e1be8;
+  --v2-shell: #171513;
+  --v2-glow: #c47a4a26;
+  --v2-line: #f2e6d81f;
+  --v2-accent: #e0a07e;
+  --v2-on-accent: #241510;
+  --v2-popover: #2a2522;
+  --v2-shadow: #00000080;
+  --v2-break: #9cc39a;
+  --v2-idle: #bdb3a8;
+  --v2-alert: #e8b872;
+  --v2-danger: #ee8a80;
   color-scheme: dark;
 }
 
-:root[data-theme-id="classic"][data-color-mode="dark"] {
-  --v2-ink: #fceee6;
-  --v2-secondary: #cbb2a4;
-  --v2-muted: #9e877a;
-  --v2-surface: #271d19e8;
-  --v2-shell: #1b1411;
-  --v2-glow: #e16b332e;
-  --v2-line: #f2be9a26;
-  --v2-accent: #f4956b;
-  --v2-on-accent: #26120b;
-  --v2-popover: #2f231e;
-  --v2-shadow: #00000078;
-  --v2-break: #8ec98c;
-  --v2-idle: #93bfe6;
-  --v2-alert: #f5be74;
-}
-
-:root[data-theme-id="ocean"][data-color-mode="dark"] {
-  --v2-ink: #e8f7f8;
-  --v2-secondary: #9ec2cb;
-  --v2-muted: #7699a3;
-  --v2-surface: #152b31e8;
-  --v2-shell: #0e1e23;
-  --v2-glow: #46a8c02e;
-  --v2-line: #8fd0e226;
-  --v2-accent: #6ed0e6;
-  --v2-on-accent: #0b242c;
-  --v2-popover: #1a343b;
-  --v2-shadow: #00000078;
-  --v2-break: #7fd4b8;
-  --v2-idle: #9ec2cb;
-  --v2-alert: #f5c378;
-}
-
-:root[data-theme-id="lavender"][data-color-mode="dark"] {
-  --v2-ink: #f3ecff;
-  --v2-secondary: #c0add8;
-  --v2-muted: #9582ad;
-  --v2-surface: #251e32e8;
-  --v2-shell: #181322;
-  --v2-glow: #aa79d62e;
-  --v2-line: #c9a8e626;
-  --v2-accent: #caa2ff;
-  --v2-on-accent: #221433;
-  --v2-popover: #2d253d;
-  --v2-shadow: #00000078;
-  --v2-break: #a8cb90;
-  --v2-idle: #c0add8;
-  --v2-alert: #f5c774;
-}
-
-:root[data-theme-id="forest"][data-color-mode="dark"] {
-  --v2-ink: #edf6e2;
-  --v2-secondary: #b0c5a1;
-  --v2-muted: #869b78;
-  --v2-surface: #1d2c20e8;
-  --v2-shell: #131e15;
-  --v2-glow: #78a8562e;
-  --v2-line: #afd09026;
-  --v2-accent: #9ed17a;
-  --v2-on-accent: #162612;
-  --v2-popover: #243628;
-  --v2-shadow: #00000078;
-  --v2-break: #9ed17a;
-  --v2-idle: #b0c5a1;
-  --v2-alert: #f5b978;
-}
-
-:root[data-theme-id="cyber"][data-color-mode="dark"] {
-  --v2-ink: #fdecf6;
-  --v2-secondary: #d4aac9;
-  --v2-muted: #a67d9c;
-  --v2-surface: #291b2ce8;
-  --v2-shell: #1b111e;
-  --v2-glow: #e96aaa2e;
-  --v2-line: #e2a2d826;
-  --v2-accent: #f88ac6;
-  --v2-on-accent: #2d0e20;
-  --v2-popover: #322136;
-  --v2-shadow: #00000078;
-  --v2-break: #7fe0c0;
-  --v2-idle: #d4aac9;
-  --v2-alert: #f5d28a;
-}
-
+/* 静纸 Paper · 深色 */
 :root[data-theme-id="liquid"][data-color-mode="dark"] {
-  --v2-ink: #faf1e6;
-  --v2-secondary: #cbb9a8;
-  --v2-muted: #9e8c7b;
-  --v2-surface: #261f1be8;
-  --v2-shell: #1a1512;
-  --v2-glow: #e07b392e;
-  --v2-line: #f5d8b826;
-  --v2-accent: #f39c64;
-  --v2-on-accent: #24130a;
-  --v2-popover: #2d241f;
-  --v2-shadow: #00000078;
-  --v2-break: #8ec98c;
-  --v2-idle: #cbb9a8;
-  --v2-alert: #f5be74;
+  --v2-ink: #f2ece4;
+  --v2-secondary: #bdb3a8;
+  --v2-muted: #8e847a;
+  --v2-surface: #221e1be8;
+  --v2-shell: #171513;
+  --v2-glow: #c47a4a26;
+  --v2-line: #f2e6d81f;
+  --v2-accent: #e0a07e;
+  --v2-on-accent: #241510;
+  --v2-popover: #2a2522;
+  --v2-shadow: #00000080;
+  --v2-break: #9cc39a;
+  --v2-idle: #bdb3a8;
+  --v2-alert: #e8b872;
+  --v2-danger: #ee8a80;
 }
 
+/* 石墨 Graphite · 深色 */
+:root[data-theme-id="classic"][data-color-mode="dark"] {
+  --v2-ink: #eceef1;
+  --v2-secondary: #aeb4bc;
+  --v2-muted: #7f858e;
+  --v2-surface: #1c1f23e8;
+  --v2-shell: #131518;
+  --v2-glow: #7a889a24;
+  --v2-line: #e6eaf01c;
+  --v2-accent: #c9d3df;
+  --v2-on-accent: #161a1f;
+  --v2-popover: #23272c;
+  --v2-shadow: #00000080;
+  --v2-break: #8fc4ae;
+  --v2-idle: #aeb4bc;
+  --v2-alert: #e2b66e;
+  --v2-danger: #ec8b85;
+}
+
+/* 深潜 Tide · 深色 */
+:root[data-theme-id="ocean"][data-color-mode="dark"] {
+  --v2-ink: #e4f0f1;
+  --v2-secondary: #a3b9bc;
+  --v2-muted: #73898c;
+  --v2-surface: #16252ae8;
+  --v2-shell: #0e1a1d;
+  --v2-glow: #3f8c9a26;
+  --v2-line: #cfe8ec1c;
+  --v2-accent: #86c3cc;
+  --v2-on-accent: #0d2227;
+  --v2-popover: #1c2d32;
+  --v2-shadow: #00000080;
+  --v2-break: #8cc7ae;
+  --v2-idle: #a3b9bc;
+  --v2-alert: #e3b571;
+  --v2-danger: #ec8d86;
+}
+
+/* 暮雾 Dusk · 深色 */
+:root[data-theme-id="lavender"][data-color-mode="dark"] {
+  --v2-ink: #eeeaf3;
+  --v2-secondary: #b5aec0;
+  --v2-muted: #857e91;
+  --v2-surface: #1f1c26e8;
+  --v2-shell: #15131b;
+  --v2-glow: #7e6aa626;
+  --v2-line: #e4dcf01c;
+  --v2-accent: #bfaedd;
+  --v2-on-accent: #1e1729;
+  --v2-popover: #26222f;
+  --v2-shadow: #00000080;
+  --v2-break: #a5c5a1;
+  --v2-idle: #b5aec0;
+  --v2-alert: #e3b771;
+  --v2-danger: #ea8c90;
+}
+
+/* 苔原 Moss · 深色 */
+:root[data-theme-id="forest"][data-color-mode="dark"] {
+  --v2-ink: #e8eee3;
+  --v2-secondary: #aebaa6;
+  --v2-muted: #7d8977;
+  --v2-surface: #1b221ae8;
+  --v2-shell: #121711;
+  --v2-glow: #6c904f26;
+  --v2-line: #dce8d21c;
+  --v2-accent: #a6c795;
+  --v2-on-accent: #142011;
+  --v2-popover: #222a20;
+  --v2-shadow: #00000080;
+  --v2-break: #a6c795;
+  --v2-idle: #aebaa6;
+  --v2-alert: #e1b26c;
+  --v2-danger: #e88a82;
+}
+
+/* 夜航 Indigo · 深色 */
+:root[data-theme-id="cyber"][data-color-mode="dark"] {
+  --v2-ink: #e9ebf6;
+  --v2-secondary: #adb1c8;
+  --v2-muted: #7d8199;
+  --v2-surface: #1a1c2ae8;
+  --v2-shell: #11131d;
+  --v2-glow: #5864b026;
+  --v2-line: #dce0f51c;
+  --v2-accent: #a9b3ec;
+  --v2-on-accent: #151933;
+  --v2-popover: #212435;
+  --v2-shadow: #00000080;
+  --v2-break: #8cc5b6;
+  --v2-idle: #adb1c8;
+  --v2-alert: #e2b672;
+  --v2-danger: #ec8c95;
+}
 /* 语义别名：组件与样式共用同一组值 */
 :root,
 :root[data-theme-id] {
@@ -266,8 +289,8 @@
   --ui-popover: var(--v2-popover);
   --ui-shadow-soft: var(--v2-shadow);
   --ui-shadow-deep: var(--v2-shadow);
-  --ui-success: #4f805d;
-  --ui-danger: #b84237;
+  --ui-success: var(--v2-break);
+  --ui-danger: var(--v2-danger);
 
   --v2-accent-soft: color-mix(in srgb, var(--v2-accent) 12%, transparent);
   --v2-elevated: var(--v2-surface);

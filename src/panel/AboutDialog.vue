@@ -4,11 +4,31 @@ import { open } from '@tauri-apps/plugin-shell'
 import { getName, getVersion } from '@tauri-apps/api/app'
 import thirdPartyNotices from '../../THIRD_PARTY_NOTICES.md?raw'
 import appIcon from '../../src-tauri/icons/128x128.png'
+import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 
 const emit = defineEmits<{ close: [] }>()
 
 const appName = ref('FlowIsle')
 const appVersion = ref('')
+const logoTapCount = ref(0)
+const easterEggUnlocked = ref(false)
+let logoTapResetTimer: number | null = null
+
+function onLogoTap(event: MouseEvent) {
+  logoTapCount.value += 1
+  if (logoTapResetTimer !== null) window.clearTimeout(logoTapResetTimer)
+  if (logoTapCount.value >= 5) {
+    easterEggUnlocked.value = true
+    logoTapCount.value = 0
+    triggerPixelBurstFromEvent(event, 'gold', 14)
+    return
+  }
+  triggerPixelBurstFromEvent(event, 'accent', 4)
+  logoTapResetTimer = window.setTimeout(() => {
+    logoTapCount.value = 0
+    logoTapResetTimer = null
+  }, 2400)
+}
 
 // FlowIsle：指向自己的仓库，并标注原版来源
 const githubUrl = 'https://github.com/yunmin311/flow-isle'
@@ -57,10 +77,16 @@ function onBackdropClick(event: MouseEvent) {
 <template>
   <div class="dialog-backdrop" @click="onBackdropClick">
     <div class="dialog-container" @click.stop>
-      <!-- 应用图标 -->
-      <div class="app-icon-wrapper">
+      <!-- 应用图标（连点 5 次触发隐藏彩蛋） -->
+      <button type="button" class="app-icon-wrapper" title="FlowIsle" @click="onLogoTap">
         <img :src="appIcon" :alt="appName" class="app-icon" />
-      </div>
+      </button>
+
+      <Transition name="egg-pop">
+        <div v-if="easterEggUnlocked" class="easter-egg-banner" role="status">
+          ✦ 发现彩蛋：愿你常保不被打扰的心流 ✦
+        </div>
+      </Transition>
 
       <!-- 应用名称和版本 -->
       <div class="app-info">
@@ -153,9 +179,40 @@ function onBackdropClick(event: MouseEvent) {
 .app-icon-wrapper {
   width: 72px;
   height: 72px;
+  padding: 0;
+  border: none;
+  background: transparent;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  transition: transform 140ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.app-icon-wrapper:active {
+  transform: scale(0.93);
+}
+
+.easter-egg-banner {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--v2-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 32%, var(--v2-line));
+  color: var(--v2-accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.egg-pop-enter-active,
+.egg-pop-leave-active {
+  transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.egg-pop-enter-from,
+.egg-pop-leave-to {
+  opacity: 0;
+  transform: translate3d(0, -4px, 0) scale(0.92);
 }
 
 .app-icon {
