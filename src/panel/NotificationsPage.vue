@@ -76,10 +76,22 @@ function closeEmail() {
   if (id) void nextTick(() => recordNodes.get(id)?.focus({ preventScroll: true }))
 }
 
-// 每组默认显示前 7 条，每次点击“展开”多显示 10 条（不一次性全部铺开）
+// 每组默认显示前 7 条，每次点击“展开”多显示 10 条；点击分组小标题可完全折叠/展开整组
 const GROUP_VISIBLE_LIMIT = 7
 const GROUP_EXPAND_STEP = 10
 const groupVisibleCounts = ref<Record<string, number>>({})
+const collapsedGroups = ref<Record<string, boolean>>({})
+
+function isGroupCollapsed(key: string): boolean {
+  return Boolean(collapsedGroups.value[key])
+}
+
+function toggleGroupCollapsed(key: string) {
+  collapsedGroups.value = {
+    ...collapsedGroups.value,
+    [key]: !collapsedGroups.value[key],
+  }
+}
 
 function groupVisibleCount(key: string): number {
   return groupVisibleCounts.value[key] ?? GROUP_VISIBLE_LIMIT
@@ -171,6 +183,7 @@ function groupKeyForRecord(record: NotificationRecord): string {
 
 function focusRecord(record: NotificationRecord) {
   const key = groupKeyForRecord(record)
+  collapsedGroups.value = { ...collapsedGroups.value, [key]: false }
   const group = notifGroups.value.find(g => g.key === key)
   const idx = group ? group.items.findIndex(item => item.id === record.id) : 0
   const needed = Math.max(GROUP_VISIBLE_LIMIT, idx + 1)
@@ -418,10 +431,22 @@ onDeactivated(() => { selectedEmail.value = null })
       </Transition>
       <ScreenshotShelf />
       <section v-for="group in notifGroups" :key="group.key" class="notif-group">
-        <div class="group-head">
+        <div
+          class="group-head group-head-toggle"
+          :class="{ collapsed: isGroupCollapsed(group.key) }"
+          role="button"
+          tabindex="0"
+          :aria-expanded="!isGroupCollapsed(group.key)"
+          :title="isGroupCollapsed(group.key) ? '点击展开该分组' : '点击折叠该分组'"
+          @click="toggleGroupCollapsed(group.key)"
+          @keydown.enter.prevent="toggleGroupCollapsed(group.key)"
+          @keydown.space.prevent="toggleGroupCollapsed(group.key)"
+        >
           <span class="group-title">{{ group.title }}</span>
           <span class="group-count">{{ group.items.length }}</span>
+          <span v-if="isGroupCollapsed(group.key)" class="group-collapsed-tag">已折叠</span>
         </div>
+        <template v-if="!isGroupCollapsed(group.key)">
         <div class="notif-list">
           <div
             v-for="r in groupVisibleItems(group)"
@@ -512,6 +537,7 @@ onDeactivated(() => { selectedEmail.value = null })
             收起
           </button>
         </div>
+        </template>
       </section>
       <div v-if="!records.length && !lastFocusMissed" class="empty">还没有通知，完成番茄或收到系统通知后会记录在这里</div>
     </div>
@@ -1093,6 +1119,29 @@ onDeactivated(() => { selectedEmail.value = null })
   color: var(--alert-color);
 }
 
+.group-head-toggle {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background-color 140ms ease, opacity 140ms ease;
+}
+
+.group-head-toggle:hover {
+  background: var(--ui-hover);
+}
+
+.group-head-toggle.collapsed {
+  opacity: 0.78;
+}
+
+.group-collapsed-tag {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--v2-muted);
+}
+
 .group-footer-actions {
   display: flex;
   align-items: center;
@@ -1100,12 +1149,16 @@ onDeactivated(() => { selectedEmail.value = null })
 }
 
 .group-footer-actions .group-more {
-  flex: 1;
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
 }
 
-.group-more.subtle {
+.group-footer-actions .group-more.subtle {
+  width: auto;
   flex: 0 0 auto;
-  padding-inline: 12px;
+  padding-inline: 16px;
   color: var(--v2-muted);
 }
 

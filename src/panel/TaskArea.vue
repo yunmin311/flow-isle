@@ -420,6 +420,12 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
           </div>
         </Transition>
 
+        <TransitionGroup
+          name="pixel-vanish"
+          tag="div"
+          class="focus-task-list"
+          @before-leave="el => triggerPixelDissolveAtElement(el, 'break')"
+        >
         <div
           v-for="task in recentTasks"
           :key="task.id"
@@ -487,6 +493,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
             </template>
           </div>
         </div>
+        </TransitionGroup>
       </div>
     </div>
 
@@ -922,6 +929,16 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   padding-top: 0;
   padding-bottom: 0;
   border-width: 0;
+}
+
+.focus-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.focus-task-list:empty {
+  display: none;
 }
 
 .focus-task-item {
