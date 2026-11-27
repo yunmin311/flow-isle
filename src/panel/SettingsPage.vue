@@ -81,18 +81,42 @@ async function probeNotificationSources() {
 }
 
 const focusAssistStatus = ref('')
-const windowsDndMode = ref<'off' | 'priority' | 'alarms' | 'unknown'>('unknown')
+const windowsDndMode = ref<'off' | 'priority' | 'alarms' | 'toasts-off' | 'unknown'>('unknown')
+const dndRefreshing = ref(false)
 
-async function refreshWindowsDndMode() {
+const dndStatusLabel = computed(() => {
+  if (windowsDndMode.value === 'priority' || windowsDndMode.value === 'alarms') return '已开启请勿打扰'
+  if (windowsDndMode.value === 'toasts-off') return '系统通知总开关已关'
+  if (windowsDndMode.value === 'off') return '未开启'
+  return '未知'
+})
+
+const dndGuideText = computed(() => {
+  if (windowsDndMode.value === 'priority' || windowsDndMode.value === 'alarms') {
+    return '最佳状态：Windows 右下角原生横幅已隐藏，应用通知仍正常进入通知中心并由 FlowIsle 灵动岛接管。'
+  }
+  if (windowsDndMode.value === 'toasts-off') {
+    return '检测到 Windows「通知」总开关已关闭，系统会停止向 FlowIsle 下发应用通知。请在系统设置中先打开最顶部的「通知」，再打开下方的「请勿打扰」。'
+  }
+  return '受 Windows 11 系统权限限制，应用无法直接改写「请勿打扰」。请在系统设置中保持顶部「通知」开启、并打开「请勿打扰」（或按 Win+N 点右上角铃铛/月亮图标），即可屏蔽右下角弹窗并由灵动岛接管。'
+})
+
+async function refreshWindowsDndMode(manual = false) {
+  if (manual) dndRefreshing.value = true
   try {
     const mode = await invoke<string>('get_windows_dnd_mode')
-    if (mode === 'off' || mode === 'priority' || mode === 'alarms') {
+    if (mode === 'off' || mode === 'priority' || mode === 'alarms' || mode === 'toasts-off') {
       windowsDndMode.value = mode
     } else {
       windowsDndMode.value = 'unknown'
     }
+    if (manual) {
+      focusAssistStatus.value = `状态已更新：${dndStatusLabel.value}`
+    }
   } catch {
     windowsDndMode.value = 'unknown'
+  } finally {
+    if (manual) dndRefreshing.value = false
   }
 }
 
@@ -100,30 +124,62 @@ async function openFocusAssistSettings() {
   focusAssistStatus.value = ''
   try {
     await invoke('open_focus_assist_settings')
-    focusAssistStatus.value = '已打开 Windows 通知与免打扰设置'
+    focusAssistStatus.value = '已打开 Windows 通知设置，切换后此页会自动同步状态'
   } catch (e) {
     focusAssistStatus.value = typeof e === 'string' ? e : '无法打开 Windows 通知设置'
   }
 }
 
 let focusListenerBound = false
+let pageActive = false
+let dndPollTimer: ReturnType<typeof setInterval> | null = null
+
+function onWindowFocusRefreshDnd() {
+  void refreshWindowsDndMode(false)
+}
+
+function syncDndLivePolling() {
+  const shouldPoll = pageActive && settingsTab.value === 'notifications'
+  if (shouldPoll) {
+    if (dndPollTimer === null) {
+      dndPollTimer = setInterval(() => {
+        void refreshWindowsDndMode(false)
+      }, 2000)
+    }
+  } else if (dndPollTimer !== null) {
+    clearInterval(dndPollTimer)
+    dndPollTimer = null
+  }
+}
+
+watch(settingsTab, (tab) => {
+  if (tab === 'notifications') void refreshWindowsDndMode(false)
+  syncDndLivePolling()
+})
+
 function bindFocusListener() {
-  if (focusListenerBound) return
-  window.addEventListener('focus', refreshWindowsDndMode)
-  focusListenerBound = true
+  pageActive = true
+  if (!focusListenerBound) {
+    window.addEventListener('focus', onWindowFocusRefreshDnd)
+    focusListenerBound = true
+  }
+  syncDndLivePolling()
 }
 function unbindFocusListener() {
-  if (!focusListenerBound) return
-  window.removeEventListener('focus', refreshWindowsDndMode)
-  focusListenerBound = false
+  pageActive = false
+  if (focusListenerBound) {
+    window.removeEventListener('focus', onWindowFocusRefreshDnd)
+    focusListenerBound = false
+  }
+  syncDndLivePolling()
 }
 
 onMounted(() => {
-  void refreshWindowsDndMode()
+  void refreshWindowsDndMode(false)
   bindFocusListener()
 })
 onActivated(() => {
-  void refreshWindowsDndMode()
+  void refreshWindowsDndMode(false)
   bindFocusListener()
 })
 onDeactivated(() => { unbindFocusListener() })
@@ -560,19 +616,30 @@ onUnmounted(() => {
           <span class="switch-track"></span>
         </label>
       </div>
-      <div class="setting-option-row row-spaced">
-        <div class="update-copy">
+      <div class="dnd-card row-spaced" :class="{ warning: windowsDndMode === 'toasts-off', active: windowsDndMode === 'priority' || windowsDndMode === 'alarms' }">
+        <div class="dnd-card-head">
           <span class="update-label">
-            屏蔽 Windows 原生弹窗（免打扰）
-            <span class="dnd-status-pill" :class="{ active: windowsDndMode === 'priority' || windowsDndMode === 'alarms' }">
-              {{ windowsDndMode === 'priority' || windowsDndMode === 'alarms' ? '已开启' : windowsDndMode === 'off' ? '未开启' : '未知' }}
+            屏蔽 Windows 原生弹窗
+            <span
+              class="dnd-status-pill"
+              :class="{
+                active: windowsDndMode === 'priority' || windowsDndMode === 'alarms',
+                warning: windowsDndMode === 'toasts-off',
+              }"
+            >
+              {{ dndStatusLabel }}
             </span>
           </span>
-          <span class="update-hint">Windows 11 仅允许由系统「免打扰」隐藏右下角原生横幅；开启后 FlowIsle 灵动岛仍照常接管通知（Win+N 点击右上角铃铛可一键开关）</span>
+          <div class="dnd-actions">
+            <button type="button" class="source-probe-btn" :disabled="dndRefreshing" @click="refreshWindowsDndMode(true)">
+              {{ dndRefreshing ? '检测中…' : '刷新' }}
+            </button>
+            <button type="button" class="source-probe-btn" @click="openFocusAssistSettings">
+              系统设置
+            </button>
+          </div>
         </div>
-        <button type="button" class="source-probe-btn" @click="openFocusAssistSettings">
-          系统设置
-        </button>
+        <span class="update-hint">{{ dndGuideText }}</span>
       </div>
       <span v-if="focusAssistStatus" class="source-status">{{ focusAssistStatus }}</span>
     </div>
@@ -916,21 +983,59 @@ onUnmounted(() => {
   gap: 6px;
 }
 
+.dnd-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: var(--ui-well);
+  border: 1px solid var(--v2-line);
+}
+
+.dnd-card.active {
+  border-color: color-mix(in srgb, var(--v2-break) 36%, var(--v2-line));
+}
+
+.dnd-card.warning {
+  border-color: color-mix(in srgb, var(--v2-alert) 48%, var(--v2-line));
+}
+
+.dnd-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dnd-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
 .dnd-status-pill {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 4px;
-  background: var(--ui-well);
+  background: var(--v2-surface);
   border: 1px solid var(--v2-line);
   color: var(--v2-muted);
   line-height: 1.35;
 }
 
 .dnd-status-pill.active {
-  background-color: var(--v2-accent-soft);
-  border-color: color-mix(in srgb, var(--v2-accent) 36%, var(--v2-line));
-  color: var(--v2-accent);
+  background-color: color-mix(in srgb, var(--v2-break) 14%, transparent);
+  border-color: color-mix(in srgb, var(--v2-break) 38%, var(--v2-line));
+  color: var(--v2-break);
+}
+
+.dnd-status-pill.warning {
+  background-color: color-mix(in srgb, var(--v2-alert) 15%, transparent);
+  border-color: color-mix(in srgb, var(--v2-alert) 44%, var(--v2-line));
+  color: var(--v2-alert);
 }
 
 .update-hint {

@@ -2394,24 +2394,102 @@ fn open_focus_assist_settings() -> Result<(), String> {
     }
 }
 
-/// 读取 Windows 11 原生「免打扰」状态（只读 WinRT API，不修改受保护系统状态）。
+/// 读取 Windows 11/10 原生通知与「请勿打扰」状态（只读，不修改受保护系统设置）。
+/// 返回值：
+/// - `"toasts-off"`: Windows「通知」总开关（PushNotifications\ToastEnabled）被关闭，系统将停止下发应用通知
+/// - `"priority"` / `"alarms"`: 已开启「请勿打扰 / 专注助手」，右下角横幅隐藏且通知中心仍照常收信
+/// - `"off"`: 通知总开关正常，但未开启「请勿打扰」
+/// - `"unknown"`: 无法读取
 #[cfg(target_os = "windows")]
 #[tauri::command]
 fn get_windows_dnd_mode() -> Result<String, String> {
+    use windows::core::w;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
     use windows::UI::Notifications::{ToastNotificationManager, ToastNotificationMode};
 
-    let manager = ToastNotificationManager::GetDefault()
-        .map_err(|e| format!("无法读取 Windows 通知状态: {e}"))?;
-    let mode = manager
-        .NotificationMode()
-        .map_err(|e| format!("无法读取免打扰模式: {e}"))?;
-    let label = match mode {
-        ToastNotificationMode::Unrestricted => "off",
-        ToastNotificationMode::PriorityOnly => "priority",
-        ToastNotificationMode::AlarmsOnly => "alarms",
-        _ => "unknown",
+    // 1) 先检查 Windows「通知」总开关（PushNotifications\ToastEnabled）
+    let mut toast_enabled: u32 = 1;
+    let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
+    let reg_status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\PushNotifications"),
+            w!("ToastEnabled"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut toast_enabled as *mut u32 as *mut core::ffi::c_void),
+            Some(&mut data_size),
+        )
     };
-    Ok(label.to_owned())
+    if reg_status.is_ok() && toast_enabled == 0 {
+        return Ok("toasts-off".to_owned());
+    }
+
+    // 2) 通过 WinRT ToastNotificationManager 读取原生免打扰模式
+    let winrt_mode = ToastNotificationManager::GetDefault()
+        .and_then(|m| m.NotificationMode())
+        .ok();
+    match winrt_mode {
+        Some(ToastNotificationMode::PriorityOnly) => return Ok("priority".to_owned()),
+        Some(ToastNotificationMode::AlarmsOnly) => return Ok("alarms".to_owned()),
+        _ => {}
+    }
+
+    // 3) 兜底查询 WNF_SHEL_QUIETHOURS_ACTIVE_PROFILE_CHANGED（兼容部分未打包 Win32 环境）
+    if let Some(wnf_mode) = query_wnf_quiet_hours_mode() {
+        return Ok(wnf_mode.to_owned());
+    }
+
+    match winrt_mode {
+        Some(ToastNotificationMode::Unrestricted) => Ok("off".to_owned()),
+        _ => Ok("unknown".to_owned()),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn query_wnf_quiet_hours_mode() -> Option<&'static str> {
+    use windows::core::s;
+    use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
+
+    type ZwQueryWnfStateDataFn = unsafe extern "system" fn(
+        state_name: *const u64,
+        type_id: *const core::ffi::c_void,
+        explicit_scope: *const core::ffi::c_void,
+        change_stamp: *mut u32,
+        buffer: *mut u8,
+        buffer_size: *mut u32,
+    ) -> i32;
+
+    let ntdll = unsafe { GetModuleHandleA(s!("ntdll.dll")).ok()? };
+    let proc = unsafe { GetProcAddress(ntdll, s!("ZwQueryWnfStateData"))? };
+    let func: ZwQueryWnfStateDataFn = unsafe { std::mem::transmute(proc) };
+
+    const WNF_SHEL_QUIETHOURS_ACTIVE_PROFILE_CHANGED: u64 = 0x0d83_063e_a3bf_1c75;
+    let state_name = WNF_SHEL_QUIETHOURS_ACTIVE_PROFILE_CHANGED;
+    let mut change_stamp: u32 = 0;
+    let mut buf = [0u8; 16];
+    let mut buf_size: u32 = buf.len() as u32;
+
+    let status = unsafe {
+        func(
+            &state_name,
+            std::ptr::null(),
+            std::ptr::null(),
+            &mut change_stamp,
+            buf.as_mut_ptr(),
+            &mut buf_size,
+        )
+    };
+    if status != 0 || buf_size < 4 {
+        return None;
+    }
+    let profile = i32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+    match profile {
+        0 => Some("off"),
+        1 => Some("priority"),
+        2 => Some("alarms"),
+        _ => None,
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
