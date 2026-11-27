@@ -106,12 +106,28 @@ async function openFocusAssistSettings() {
   }
 }
 
+let focusListenerBound = false
+function bindFocusListener() {
+  if (focusListenerBound) return
+  window.addEventListener('focus', refreshWindowsDndMode)
+  focusListenerBound = true
+}
+function unbindFocusListener() {
+  if (!focusListenerBound) return
+  window.removeEventListener('focus', refreshWindowsDndMode)
+  focusListenerBound = false
+}
+
 onMounted(() => {
   void refreshWindowsDndMode()
-  window.addEventListener('focus', refreshWindowsDndMode)
+  bindFocusListener()
 })
-onActivated(() => { void refreshWindowsDndMode() })
-onUnmounted(() => { window.removeEventListener('focus', refreshWindowsDndMode) })
+onActivated(() => {
+  void refreshWindowsDndMode()
+  bindFocusListener()
+})
+onDeactivated(() => { unbindFocusListener() })
+onUnmounted(() => { unbindFocusListener() })
 
 function isSourceMuted(source: string): boolean {
   const list = settings.value.systemNotificationMutedApps ?? []

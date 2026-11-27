@@ -79,37 +79,43 @@ async function capture(state: ClipboardState) {
       const rgba = await image.rgba()
       if (!enabled.value) return
       const canvas = document.createElement('canvas')
-      canvas.width = width; canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new Error('Canvas unavailable')
-      ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0)
-      const original = canvas.toDataURL('image/png')
-      if (original.length > 16 * 1024 * 1024) {
-        error.value = '图片编码后超过 16 MB，未收集'
-        return
-      }
-      const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(original))
-      const id = Array.from(new Uint8Array(hash), n => n.toString(16).padStart(2, '0')).join('')
-      await prune()
-      if (records.value.some(r => r.id === id)) return // Includes copying our own saved image.
       const thumb = document.createElement('canvas')
-      const scale = Math.min(1, 320 / width, 180 / height)
-      thumb.width = Math.max(1, Math.round(width * scale))
-      thumb.height = Math.max(1, Math.round(height * scale))
-      thumb.getContext('2d')!.drawImage(canvas, 0, 0, thumb.width, thumb.height)
-      if (!enabled.value) return
-      const record = { id, time: Date.now(), width, height, thumbnail: thumb.toDataURL('image/png') }
-      await mkdir(DIR, { ...options, recursive: true })
-      await writeTextFile(`${DIR}/${id}.json`, JSON.stringify(original), options)
-      const next = [record, ...records.value].slice(0, MAX_ITEMS)
-      try { await persist(next) } catch (reason) { await deleteFiles([record]); throw reason }
-      const evicted = records.value.filter(r => !next.includes(r))
-      records.value = next
-      await deleteFiles(evicted)
-      error.value = ''
-      // 通知顶部灵动岛展示带缩略图的截图提醒
-      void emitTo('main', 'screenshot-captured', record).catch(() => {})
-      return
+      try {
+        canvas.width = width; canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) throw new Error('Canvas unavailable')
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0)
+        const original = canvas.toDataURL('image/png')
+        if (original.length > 16 * 1024 * 1024) {
+          error.value = '图片编码后超过 16 MB，未收集'
+          return
+        }
+        const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(original))
+        const id = Array.from(new Uint8Array(hash), n => n.toString(16).padStart(2, '0')).join('')
+        await prune()
+        if (records.value.some(r => r.id === id)) return // Includes copying our own saved image.
+        const scale = Math.min(1, 320 / width, 180 / height)
+        thumb.width = Math.max(1, Math.round(width * scale))
+        thumb.height = Math.max(1, Math.round(height * scale))
+        thumb.getContext('2d')!.drawImage(canvas, 0, 0, thumb.width, thumb.height)
+        if (!enabled.value) return
+        const record = { id, time: Date.now(), width, height, thumbnail: thumb.toDataURL('image/png') }
+        await mkdir(DIR, { ...options, recursive: true })
+        await writeTextFile(`${DIR}/${id}.json`, JSON.stringify(original), options)
+        const next = [record, ...records.value].slice(0, MAX_ITEMS)
+        try { await persist(next) } catch (reason) { await deleteFiles([record]); throw reason }
+        const evicted = records.value.filter(r => !next.includes(r))
+        records.value = next
+        await deleteFiles(evicted)
+        error.value = ''
+        // 通知顶部灵动岛展示带缩略图的截图提醒
+        void emitTo('main', 'screenshot-captured', record).catch(() => {})
+        return
+      } finally {
+        // 立即归零大分辨率 Canvas，释放 4K 截图占用的临时 GPU/RAM 缓冲
+        canvas.width = 0; canvas.height = 0
+        thumb.width = 0; thumb.height = 0
+      }
     } catch {
       if (attempt === 2) error.value = '截图读取或保存失败，请重新复制图片后重试'
       else await new Promise(resolve => setTimeout(resolve, 220))

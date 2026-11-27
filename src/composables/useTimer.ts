@@ -172,7 +172,7 @@ export function useTimer() {
     activeSubtaskTitle.value = subtaskTitle
   }
 
-  function start(taskId: string, taskTitle?: string) {
+  function start(taskId: string, taskTitle?: string, subtask?: { id: string; title: string } | null) {
     // 切换任务前先结算上一轮已专注时长，避免中途切任务丢失专注时间
     if (phase.value === 'focus' && (running.value || accumulatedFocusMs > 0 || focusSegmentStartMs !== null)) {
       pause()
@@ -180,8 +180,8 @@ export function useTimer() {
     }
     resetFocusedAccumulation()
     pendingNotification.value = null
-    activeSubtaskId.value = null
-    activeSubtaskTitle.value = null
+    activeSubtaskId.value = subtask?.id ?? null
+    activeSubtaskTitle.value = subtask?.title ?? null
     activeTaskId.value = taskId
     activeTaskTitle.value = taskTitle ?? null
     phase.value = 'focus'
@@ -277,29 +277,32 @@ export function useTimer() {
     }
   }
 
-  /** User chose "继续专注" / "再休息会儿" — reset current phase countdown */
-  function extendNotification() {
+  /** User chose "继续专注" / "+5m" / "再休息会儿" */
+  function extendNotification(customMinutes?: number) {
     const notif = pendingNotification.value
     if (!notif) return
     pendingNotification.value = null
+    const overrideSecs = typeof customMinutes === 'number' && Number.isFinite(customMinutes) && customMinutes > 0
+      ? Math.round(customMinutes * 60)
+      : null
     if (notif === 'focus-done') {
-      // Reset focus countdown, keep working
+      // Extend focus countdown (e.g. +5m) or start another full focus round
       resetFocusedAccumulation()
       phase.value = 'focus'
       focusStartedAt.value = Date.now()
       focusSegmentStartMs = Date.now()
-      const focusSecs = settings.value.focusDuration * 60
+      const focusSecs = overrideSecs ?? settings.value.focusDuration * 60
       remaining.value = focusSecs
       totalDuration.value = focusSecs
       running.value = true
       phaseEndAtMs = Date.now() + focusSecs * 1000
       startTicking()
     } else {
-      // Reset break countdown, keep resting
+      // Extend break countdown or start another full break round
       resetFocusedAccumulation()
       phase.value = 'break'
       focusStartedAt.value = null
-      const breakSecs = settings.value.breakDuration * 60
+      const breakSecs = overrideSecs ?? settings.value.breakDuration * 60
       remaining.value = breakSecs
       totalDuration.value = breakSecs
       running.value = true

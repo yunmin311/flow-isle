@@ -48,14 +48,18 @@ export function useDockMode() {
     return 'var(--idle-color)'
   })
 
+  let pollInFlight = false
+
   function ensurePolling() {
     if (pollTimer !== null) return
     pollTimer = setInterval(async () => {
+      if (pollInFlight) return
       if (!interactiveMode.value) {
         peekHover.value = false
         if (dockExpanded.value) dockExpanded.value = false
         return
       }
+      pollInFlight = true
       try {
         const input = await invoke<{ over: boolean; clicked: boolean; over_peek: boolean }>('poll_island_input', { pad: 2 })
         peekHover.value = input.over_peek
@@ -93,6 +97,8 @@ export function useDockMode() {
         }
       } catch {
         // command unavailable; ignore
+      } finally {
+        pollInFlight = false
       }
     }, 120)
   }
@@ -108,7 +114,7 @@ export function useDockMode() {
     }
   }
 
-  // Start/stop polling based on whether the island is interactive (resident or dock)
+  // Start/stop polling and register side-effect watchers once (singleton)
   if (!watchInstalled) {
     watchInstalled = true
     watch(
@@ -122,10 +128,30 @@ export function useDockMode() {
       },
       { immediate: true }
     )
+
+    // 舞台默认点击穿透；只有鼠标真正悬停在通知横幅上时才接收点击，
+    // 避免 500×160 的整块舞台挡住横幅周围的桌面。
+    // 面板打开时必须继续穿透，否则舞台顶部会盖住面板的核心专注区按钮。
+    watchEffect(() => {
+      if (hiddenMode.value) return
+      void invoke('set_click_through', { ignore: !peekHover.value || panelVisible.value })
+    })
+
+    // 岛本身点击穿透，点击由钩子记录；钩子同时吞掉落在岛矩形内的左键。
+    // 面板打开后岛仍然可见，捕获必须继续开着，否则点岛又会穿透到后面的应用。
+    watchEffect(() => {
+      void invoke('set_island_click_capture', {
+        enabled: interactiveMode.value,
+      })
+    })
+
+    // 完全隐藏模式：灵动岛窗口整体隐藏（面板仍可通过快捷键/托盘打开）
+    watchEffect(() => {
+      void invoke('set_island_visible', { visible: !hiddenMode.value })
+    })
   }
 
-  // Track panel visibility: poll the source of truth each tick (events can be missed),
-  // keep the event listener for instant updates.
+  // Track panel visibility: event listener for instant updates, with initial sync.
   if (!panelListenerInstalled) {
     panelListenerInstalled = true
     invoke<boolean>('is_panel_visible').then((v) => { panelVisible.value = v }).catch(() => {})
@@ -134,32 +160,6 @@ export function useDockMode() {
       else if (payload === 'close') panelVisible.value = false
     }).catch(() => {})
   }
-
-  watchEffect(() => {
-    if (!dockMode.value) return
-    invoke<boolean>('is_panel_visible').then((v) => { panelVisible.value = v }).catch(() => {})
-  })
-
-  // 舞台默认点击穿透；只有鼠标真正悬停在通知横幅上时才接收点击，
-  // 避免 500×160 的整块舞台挡住横幅周围的桌面。
-  // 面板打开时必须继续穿透，否则舞台顶部会盖住面板的核心专注区按钮。
-  watchEffect(() => {
-    if (hiddenMode.value) return
-    void invoke('set_click_through', { ignore: !peekHover.value || panelVisible.value })
-  })
-
-  // 岛本身点击穿透，点击由钩子记录；钩子同时吞掉落在岛矩形内的左键。
-  // 面板打开后岛仍然可见，捕获必须继续开着，否则点岛又会穿透到后面的应用。
-  watchEffect(() => {
-    void invoke('set_island_click_capture', {
-      enabled: interactiveMode.value,
-    })
-  })
-
-  // 完全隐藏模式：灵动岛窗口整体隐藏（面板仍可通过快捷键/托盘打开）
-  watchEffect(() => {
-    void invoke('set_island_visible', { visible: !hiddenMode.value })
-  })
 
   return {
     dockMode,

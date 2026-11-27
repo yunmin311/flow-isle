@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch, nextTick, defineAsyncComponent } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -10,22 +10,22 @@ import { useNotifications } from '../composables/useNotifications'
 import { startScreenshotCollection } from '../composables/useScreenshots'
 import { useTaskReminders } from '../composables/useTaskReminders'
 import { useTasks } from '../composables/useTasks'
-import { useTaskGroups } from '../composables/useTaskGroups'
-import { useMemos } from '../composables/useMemos'
 import { useDailyStats } from '../composables/useDailyStats'
 import { useAchievements } from '../composables/useAchievements'
 import { useRadio } from '../composables/useRadio'
 import { useCompanion } from '../composables/useCompanion'
 import { installGlobalPixelSpark } from '../utils/pixelSpark'
-import TodoPage from './TodoPage.vue'
 import TaskArea from './TaskArea.vue'
-import TaskDetailPage from './TaskDetailPage.vue'
-import SettingsPage from './SettingsPage.vue'
-import MemoPage from './MemoPage.vue'
-import StatsPage from './StatsPage.vue'
-import RadioPage from './RadioPage.vue'
-import NotificationsPage from './NotificationsPage.vue'
 import PanelTitleBar from './PanelTitleBar.vue'
+
+// 非首屏重页面按需异步加载，降低面板启动期 V8 堆内存与解析耗时
+const TodoPage = defineAsyncComponent(() => import('./TodoPage.vue'))
+const TaskDetailPage = defineAsyncComponent(() => import('./TaskDetailPage.vue'))
+const SettingsPage = defineAsyncComponent(() => import('./SettingsPage.vue'))
+const MemoPage = defineAsyncComponent(() => import('./MemoPage.vue'))
+const StatsPage = defineAsyncComponent(() => import('./StatsPage.vue'))
+const RadioPage = defineAsyncComponent(() => import('./RadioPage.vue'))
+const NotificationsPage = defineAsyncComponent(() => import('./NotificationsPage.vue'))
 
 interface PanelTransitionMetrics {
   island_x: number
@@ -58,8 +58,6 @@ function clearDocumentSelection() {
 }
 
 function prewarmPanelData() {
-  useTaskGroups()
-  useMemos()
   useDailyStats()
   useAchievements()
   useCompanion()
@@ -254,8 +252,6 @@ const panelAnimState = ref<'hidden' | 'steady' | 'opening-ready' | 'opening' | '
 const panelSettling = ref(false)
 let settleTimer: number | null = null
 
-let unlistenResize: (() => void) | null = null
-let unlistenMove: (() => void) | null = null
 let unlistenTransition: (() => void) | null = null
 let unlistenOpenNotifications: (() => void) | null = null
 let unlistenOpenTask: (() => void) | null = null
@@ -426,15 +422,6 @@ onMounted(async () => {
     // ignore if not supported or denied
   }
 
-  // 面板位置在打开时已确定，窗口移动/尺寸变化不再自动 reposition：
-  // 每次移动都会在 DWM 旧位置留下半透明残影（看起来像背后还有一块 UI）。
-  unlistenResize = await getCurrentWindow().onResized(() => {
-    // 固定尺寸面板，不需要跟随
-  })
-  unlistenMove = await getCurrentWindow().onMoved(() => {
-    // 固定位置面板，不需要跟随
-  })
-
   unlistenTransition = await listen<string>('panel-window-transition', event => {
     void onWindowTransition(String(event.payload ?? ''))
   })
@@ -448,8 +435,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onPanelKeydown)
   clearCloseFallback()
   if (uninstallPixelSpark) uninstallPixelSpark()
-  if (unlistenResize) unlistenResize()
-  if (unlistenMove) unlistenMove()
   if (unlistenTransition) unlistenTransition()
   if (unlistenOpenNotifications) unlistenOpenNotifications()
   if (unlistenOpenTask) unlistenOpenTask()
@@ -494,7 +479,7 @@ async function closeWindow() {
         @close="closeWindow"
       />
       <div ref="panelContent" class="panel-body" tabindex="-1">
-        <KeepAlive :include="cachedPanelViews">
+        <KeepAlive :include="cachedPanelViews" :max="3">
           <TaskArea v-if="currentView === 'tasks'" category="today" @close="closeWindow" @open-companion="openCompanionPanel" />
           <TodoPage v-else-if="currentView === 'todo'" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; navigateTo('taskDetail') }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
           <TaskDetailPage v-else-if="currentView === 'taskDetail'" :task-id="taskIdForDetail" @back="navigateTo('todo')" />

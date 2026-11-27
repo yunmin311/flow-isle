@@ -663,26 +663,36 @@ onMounted(async () => {
     invoke("set_click_through", { ignore: true });
 
     // 空闲检测喂食：岛窗口是点击穿透的收不到输入，
-    // 用 Rust 光标轮询探测系统级活动，派发合成事件重置 useIdle
+    // 用 Rust 光标轮询探测系统级活动，派发合成事件重置 useIdle（5 分钟阈值，1s 采样足够且省 IPC）
+    let activityInFlight = false;
     activityTimer = setInterval(async () => {
+        if (activityInFlight) return;
+        activityInFlight = true;
         try {
             if (await invoke<boolean>("cursor_active")) {
                 window.dispatchEvent(new MouseEvent("mousemove"));
             }
         } catch {
             // ignore
+        } finally {
+            activityInFlight = false;
         }
-    }, 400);
+    }, 1000);
 
     // 面板可见状态以 Rust 为准兜底同步，避免漏掉 close 事件后永久吞掉 peek。
+    let panelStateInFlight = false;
     panelStateTimer = setInterval(async () => {
+        if (panelStateInFlight) return;
+        panelStateInFlight = true;
         try {
             const visible = await invoke<boolean>("is_panel_visible");
             if (panelOpen.value !== visible) panelOpen.value = visible;
         } catch {
             // ignore
+        } finally {
+            panelStateInFlight = false;
         }
-    }, 1500);
+    }, 3000);
 
     await nextTick();
     reportLayout();

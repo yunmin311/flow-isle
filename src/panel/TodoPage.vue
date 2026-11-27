@@ -355,8 +355,7 @@ function handleStartSubtask(task: Task, subtaskId: string) {
   const sub = task.subtasks.find(s => s.id === subtaskId)
   if (sub) {
     touchTask(task.id)
-    setSubtaskContext(sub.id, sub.title)
-    start(task.id, `${task.title} — ${sub.title}`)
+    start(task.id, `${task.title} — ${sub.title}`, { id: sub.id, title: sub.title })
   }
 }
 

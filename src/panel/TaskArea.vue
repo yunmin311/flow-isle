@@ -345,7 +345,7 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
             </svg>
             <span>开始休息</span>
           </button>
-          <button class="quiet-action" @click="extendNotification()">+5m</button>
+          <button class="quiet-action" @click="extendNotification(5)">+5m</button>
           <button class="quiet-action" @click="dismissNotification()">结束</button>
         </template>
         <template v-else-if="pendingNotification === 'break-done'">

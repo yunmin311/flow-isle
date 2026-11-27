@@ -120,6 +120,11 @@ function tick(now: number) {
     rafId = null
     lastTs = 0
     ctx.clearRect(0, 0, w, h)
+    // 空闲时彻底释放全屏 Canvas GPU 纹理缓冲，避免常驻显存/运存占用
+    canvas.width = 0
+    canvas.height = 0
+    canvas.remove()
+    overlayCanvas = null
   }
 }
 

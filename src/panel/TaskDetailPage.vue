@@ -147,8 +147,7 @@ function handleToggleSubtask(subtaskId: string, completed: boolean, event?: Mous
 
 function handleStartSubtask(subtaskId: string, subtaskTitle: string, event?: MouseEvent) {
   if (!task.value) return
-  setSubtaskContext(subtaskId, subtaskTitle)
-  start(task.value.id, `${task.value.title} — ${subtaskTitle}`)
+  start(task.value.id, `${task.value.title} — ${subtaskTitle}`, { id: subtaskId, title: subtaskTitle })
   triggerPixelBurstFromEvent(event, 'accent', 7)
 }
 

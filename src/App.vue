@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import Island from './components/Island.vue'
-import PanelApp from './panel/PanelApp.vue'
+
+// 按窗口按需加载：灵动岛(main) 绝不加载面板(panel) 的 7 个重页面与全部依赖，显著降低 WebView2 内存占用
+const Island = defineAsyncComponent(() => import('./components/Island.vue'))
+const PanelApp = defineAsyncComponent(() => import('./panel/PanelApp.vue'))
 
 function detectSyncWindowLabel(): string | null {
   const internals = (window as unknown as {
