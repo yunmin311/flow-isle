@@ -34,7 +34,17 @@ export interface ApprovedAction {
   url: string
 }
 
-export type CompanionBackgroundCategory = 'indoor' | 'outdoor' | 'night'
+export type CompanionBackgroundCategory = 'indoor' | 'outdoor' | 'night' | 'premium'
+
+export type CompanionBackgroundEffect =
+  | 'none'
+  | 'stars'
+  | 'fireflies'
+  | 'petals'
+  | 'rain'
+  | 'bubbles'
+  | 'steam'
+  | 'sparkle'
 
 export interface CompanionBackgroundItem {
   id: string
@@ -42,8 +52,11 @@ export interface CompanionBackgroundItem {
   category: CompanionBackgroundCategory
   cost: number
   url: string
-  ownerAnimalId: string
+  ownerAnimalId: string | null
   ownerAnimalName: string
+  premium?: boolean
+  effect: CompanionBackgroundEffect
+  effectLabel?: string
 }
 
 export interface CompanionRecord {
@@ -96,6 +109,10 @@ const backgroundSprites = import.meta.glob<string>('../assets/companions/backgro
   eager: true,
   import: 'default',
 })
+const premiumSprites = import.meta.glob<string>('../assets/companions/premium/*.png', {
+  eager: true,
+  import: 'default',
+})
 const portraitSprites = import.meta.glob<string>('../assets/companions/portraits/*.png', {
   eager: true,
   import: 'default',
@@ -136,43 +153,90 @@ export const approvedCompanionActions: ApprovedAction[] = catalog.actions.map((i
   url: assetByKey(actionSprites, `${item.key}.png`),
 }))
 
-const BACKGROUND_META: Record<string, { name: string; category: CompanionBackgroundCategory; cost: number }> = {
+const BACKGROUND_META: Record<string, { name: string; category: Exclude<CompanionBackgroundCategory, 'premium'>; cost: number; effect?: CompanionBackgroundEffect; effectLabel?: string }> = {
   'cat-orange': { name: '阳光窗台', category: 'indoor', cost: 30 },
   'cat-calico': { name: '小花房', category: 'indoor', cost: 40 },
   'cat-tuxedo': { name: '静谧书店', category: 'indoor', cost: 45 },
-  'cat-silver': { name: '雨天窗边', category: 'indoor', cost: 45 },
+  'cat-silver': { name: '雨天窗边', category: 'indoor', cost: 45, effect: 'rain', effectLabel: '细雨' },
   'cat-ragdoll': { name: '云朵卧室', category: 'indoor', cost: 50 },
-  'cat-siamese': { name: '午后茶歇', category: 'indoor', cost: 40 },
-  'cat-black': { name: '月光阁楼', category: 'night', cost: 60 },
-  'cat-white': { name: '樱花信笺', category: 'outdoor', cost: 60 },
+  'cat-siamese': { name: '午后茶歇', category: 'indoor', cost: 40, effect: 'steam', effectLabel: '茶雾' },
+  'cat-black': { name: '月光阁楼', category: 'night', cost: 60, effect: 'stars', effectLabel: '星光' },
+  'cat-white': { name: '樱花信笺', category: 'outdoor', cost: 60, effect: 'petals', effectLabel: '落樱' },
   'dog-shiba': { name: '秋日林道', category: 'outdoor', cost: 40 },
   'dog-corgi': { name: '草坪邮局', category: 'outdoor', cost: 45 },
   'dog-golden': { name: '湖畔栈桥', category: 'outdoor', cost: 50 },
   'dog-collie': { name: '牧场木栏', category: 'outdoor', cost: 40 },
-  'dog-husky': { name: '初雪松林', category: 'outdoor', cost: 60 },
-  'dog-bichon': { name: '暖香面包房', category: 'indoor', cost: 50 },
+  'dog-husky': { name: '初雪松林', category: 'outdoor', cost: 60, effect: 'sparkle', effectLabel: '微雪' },
+  'dog-bichon': { name: '暖香面包房', category: 'indoor', cost: 50, effect: 'steam', effectLabel: '暖雾' },
   'dog-dachshund': { name: '午后庭院', category: 'outdoor', cost: 40 },
-  'dog-dalmatian': { name: '微风海湾', category: 'outdoor', cost: 60 },
-  'fox-red': { name: '枫林小径', category: 'outdoor', cost: 50 },
-  'fox-arctic': { name: '极光小屋', category: 'night', cost: 90 },
-  'fox-fennec': { name: '星夜沙丘', category: 'night', cost: 75 },
-  'fox-silver': { name: '月亮湖畔', category: 'night', cost: 75 },
-  'fox-cross': { name: '苔藓森林', category: 'outdoor', cost: 50 },
-  'fox-sand': { name: '风车花田', category: 'outdoor', cost: 60 },
+  'dog-dalmatian': { name: '微风海湾', category: 'outdoor', cost: 60, effect: 'bubbles', effectLabel: '海风' },
+  'fox-red': { name: '枫林小径', category: 'outdoor', cost: 50, effect: 'petals', effectLabel: '落叶' },
+  'fox-arctic': { name: '极光小屋', category: 'night', cost: 90, effect: 'stars', effectLabel: '极光星' },
+  'fox-fennec': { name: '星夜沙丘', category: 'night', cost: 75, effect: 'stars', effectLabel: '星夜' },
+  'fox-silver': { name: '月亮湖畔', category: 'night', cost: 75, effect: 'stars', effectLabel: '月华' },
+  'fox-cross': { name: '苔藓森林', category: 'outdoor', cost: 50, effect: 'fireflies', effectLabel: '萤火' },
+  'fox-sand': { name: '风车花田', category: 'outdoor', cost: 60, effect: 'petals', effectLabel: '微风' },
 }
 
-export const companionBackgrounds: CompanionBackgroundItem[] = companionAnimals.map((animal) => {
-  const meta = BACKGROUND_META[animal.id] ?? { name: animal.name, category: 'outdoor' as const, cost: 45 }
-  return {
-    id: animal.id,
-    name: meta.name,
-    category: meta.category,
-    cost: meta.cost,
-    url: animal.backgroundUrl,
-    ownerAnimalId: animal.id,
-    ownerAnimalName: animal.name,
-  }
-})
+const PREMIUM_BACKGROUND_SPECS: Array<{
+  id: string
+  file: string
+  name: string
+  cost: number
+  effect: CompanionBackgroundEffect
+  effectLabel: string
+}> = [
+  { id: 'motif-star', file: 'motif-star.png', name: '星际信号', cost: 120, effect: 'stars', effectLabel: '流星闪烁' },
+  { id: 'motif-camp', file: 'motif-camp.png', name: '篝火营地', cost: 100, effect: 'fireflies', effectLabel: '营火萤光' },
+  { id: 'motif-night', file: 'motif-night.png', name: '月夜梦境', cost: 110, effect: 'stars', effectLabel: '月夜星芒' },
+  { id: 'motif-crystal', file: 'motif-crystal.png', name: '晶石收藏', cost: 120, effect: 'sparkle', effectLabel: '晶石微尘' },
+  { id: 'motif-sea', file: 'motif-sea.png', name: '海底来信', cost: 110, effect: 'bubbles', effectLabel: '海蓝气泡' },
+  { id: 'motif-island', file: 'motif-island.png', name: '海岸灯塔', cost: 90, effect: 'bubbles', effectLabel: '海风微光' },
+  { id: 'motif-weather', file: 'motif-weather.png', name: '雨后天气', cost: 90, effect: 'rain', effectLabel: '晴雨虹光' },
+  { id: 'motif-flower', file: 'motif-flower.png', name: '花事慢开', cost: 90, effect: 'petals', effectLabel: '花瓣轻飘' },
+  { id: 'motif-sprout', file: 'motif-sprout.png', name: '森林幼苗', cost: 80, effect: 'fireflies', effectLabel: '林间萤点' },
+  { id: 'motif-mountain', file: 'motif-mountain.png', name: '山野旅程', cost: 90, effect: 'sparkle', effectLabel: '山风微雪' },
+  { id: 'motif-coffee', file: 'motif-coffee.png', name: '咖啡手账', cost: 80, effect: 'steam', effectLabel: '咖啡热气' },
+  { id: 'motif-tea', file: 'motif-tea.png', name: '茶室清欢', cost: 80, effect: 'steam', effectLabel: '竹影茶雾' },
+  { id: 'motif-tomato', file: 'motif-tomato.png', name: '番茄温室', cost: 60, effect: 'sparkle', effectLabel: '温室日光' },
+  { id: 'motif-post', file: 'motif-post.png', name: '信笺邮局', cost: 70, effect: 'petals', effectLabel: '微风信笺' },
+  { id: 'motif-game', file: 'motif-game.png', name: '复古存档', cost: 100, effect: 'sparkle', effectLabel: '像素星光' },
+  { id: 'motif-paper', file: 'motif-paper.png', name: '纸船远行', cost: 80, effect: 'bubbles', effectLabel: '涟漪微光' },
+  { id: 'motif-cat', file: 'motif-cat.png', name: '猫舍小窗', cost: 70, effect: 'steam', effectLabel: '暖阳微尘' },
+  { id: 'motif-rabbit', file: 'motif-rabbit.png', name: '兔兔花园', cost: 70, effect: 'petals', effectLabel: '花园落瓣' },
+]
+
+export const companionPremiumBackgrounds: CompanionBackgroundItem[] = PREMIUM_BACKGROUND_SPECS.map((spec) => ({
+  id: spec.id,
+  name: spec.name,
+  category: 'premium',
+  cost: spec.cost,
+  url: assetByKey(premiumSprites, spec.file),
+  ownerAnimalId: null,
+  ownerAnimalName: '高级动态背景',
+  premium: true,
+  effect: spec.effect,
+  effectLabel: spec.effectLabel,
+}))
+
+export const companionBackgrounds: CompanionBackgroundItem[] = [
+  ...companionAnimals.map((animal) => {
+    const meta = BACKGROUND_META[animal.id] ?? { name: animal.name, category: 'outdoor' as const, cost: 45 }
+    return {
+      id: animal.id,
+      name: meta.name,
+      category: meta.category as CompanionBackgroundCategory,
+      cost: meta.cost,
+      url: animal.backgroundUrl,
+      ownerAnimalId: animal.id,
+      ownerAnimalName: animal.name,
+      premium: false,
+      effect: meta.effect ?? 'none',
+      effectLabel: meta.effectLabel,
+    }
+  }),
+  ...companionPremiumBackgrounds,
+]
 
 const DEFAULT_COMPANION_ID = companionAnimals[0]?.id ?? 'cat-orange'
 

@@ -9,9 +9,11 @@ import {
   collectCompanionPicture,
   companionAnimals,
   companionBackgrounds,
+  companionPremiumBackgrounds,
   companionDisplayName,
   companionRecord,
   effectiveBackgroundId,
+  effectiveBackgroundItem,
   effectiveBackgroundName,
   effectiveBackgroundUrl,
   equipBackground,
@@ -28,15 +30,6 @@ import {
   type CompanionBackgroundItem,
 } from '../composables/useCompanion'
 
-interface LegacyMotif {
-  id: string
-  name: string
-  family: 'other'
-  image: string
-  scene: string
-  detail: string
-}
-
 const { availableFocusPoints } = useCompanion()
 
 const companionExpanded = ref(false)
@@ -44,8 +37,6 @@ const showScene = ref(true)
 const chooser = ref<HTMLDialogElement | null>(null)
 const chooserTrigger = ref<HTMLButtonElement | null>(null)
 const family = ref<'all' | 'cat' | 'dog' | 'fox' | 'other'>('all')
-const legacyMotifs = ref<LegacyMotif[]>([])
-const loadingLegacy = ref(false)
 
 // 背景兑换与搭配面板
 const bgDialogOpen = ref(false)
@@ -57,6 +48,7 @@ let bgFeedbackTimer: number | null = null
 
 const bgCategories = [
   { id: 'all', label: '全部场景' },
+  { id: 'premium', label: '✦ 高级动态' },
   { id: 'indoor', label: '暖室室内' },
   { id: 'outdoor', label: '自然户外' },
   { id: 'night', label: '星夜氛围' },
@@ -68,11 +60,13 @@ const visibleBackgrounds = computed(() =>
     : companionBackgrounds.filter(b => b.category === bgCategory.value),
 )
 
+const currentBgItem = computed(() => effectiveBackgroundItem(activeId.value))
 const currentBgId = computed(() => effectiveBackgroundId(activeId.value))
 const currentBgName = computed(() => effectiveBackgroundName(activeId.value))
 const hasCustomBg = computed(() => currentBgId.value !== activeId.value)
 
-async function openBgDialog() {
+async function openBgDialog(initialCategory?: 'all' | CompanionBackgroundCategory) {
+  if (initialCategory) bgCategory.value = initialCategory
   bgDialogOpen.value = true
   bgFeedback.value = null
   await nextTick()
@@ -132,23 +126,8 @@ const families = [
   { id: 'cat', label: '猫咪' },
   { id: 'dog', label: '狗狗' },
   { id: 'fox', label: '狐狸' },
-  { id: 'other', label: '其他图案' },
+  { id: 'other', label: '高级背景' },
 ] as const
-
-async function ensureLegacyLoaded() {
-  if (legacyMotifs.value.length || loadingLegacy.value) return
-  loadingLegacy.value = true
-  try {
-    const mod = await import('../data/companionLegacyMotifs.json')
-    legacyMotifs.value = mod.default as LegacyMotif[]
-  } finally {
-    loadingLegacy.value = false
-  }
-}
-
-watch(family, (value) => {
-  if (value === 'other') void ensureLegacyLoaded()
-})
 
 async function openChooser() {
   companionExpanded.value = true
@@ -374,6 +353,8 @@ async function collect(event?: MouseEvent) {
               :placement="selectedCompanion.placement"
               :family="selectedCompanion.family"
               :hopping="petHopping"
+              :effect="currentBgItem.effect"
+              :stage-tier="stage.tier"
               :mode="showScene ? 'scene' : 'detail'"
               :size="216"
             />
@@ -392,9 +373,9 @@ async function collect(event?: MouseEvent) {
             class="text-button bg-wardrobe-btn"
             :aria-expanded="bgDialogOpen"
             aria-haspopup="dialog"
-            @click="openBgDialog"
+            @click="openBgDialog()"
           >
-            更换背景 · {{ currentBgName }}
+            {{ currentBgItem.premium ? '✦ ' : '' }}更换背景 · {{ currentBgName }}
           </button>
         </div>
       </div>
@@ -490,18 +471,40 @@ async function collect(event?: MouseEvent) {
               <span class="companion-check" aria-hidden="true">{{ activeId === animal.id ? '✓' : '' }}</span>
             </button>
           </div>
-          <div v-else class="companion-grid" role="group" aria-label="经典桌面图案参考">
-            <p v-if="loadingLegacy" class="legacy-hint">加载经典图案中…</p>
-            <div v-for="motif in legacyMotifs" :key="motif.id" class="companion-option legacy-card">
-              <img :src="motif.scene" :alt="motif.name" width="72" height="72" />
-              <span class="option-name">{{ motif.name }}</span>
-              <span class="option-mins">经典纪念图</span>
-            </div>
+          <div v-else class="companion-grid" role="group" aria-label="高级动态背景">
+            <button
+              v-for="bg in companionPremiumBackgrounds"
+              :key="bg.id"
+              type="button"
+              class="companion-option bg-option"
+              :class="{
+                'is-locked': !isBackgroundUnlockedFor(activeId, bg.id),
+                'can-afford': !isBackgroundUnlockedFor(activeId, bg.id) && availableFocusPoints >= bg.cost,
+              }"
+              :aria-pressed="currentBgId === bg.id"
+              @click="handleSelectBackground(bg, $event)"
+            >
+              <div class="bg-thumb-wrap">
+                <img :src="bg.url" :alt="bg.name" width="72" height="72" class="bg-thumb-img" />
+                <span v-if="isBackgroundUnlockedFor(activeId, bg.id)" class="bg-tag owned">✦ 动态</span>
+                <span v-else class="bg-tag cost">✦ {{ bg.cost }}</span>
+              </div>
+              <span class="option-name bg-option-name">{{ bg.name }}</span>
+              <span class="option-mins">
+                {{ currentBgId === bg.id ? '正在使用' : isBackgroundUnlockedFor(activeId, bg.id) ? `${bg.effectLabel} · 点击换上` : `${bg.effectLabel} · 需 ${bg.cost} 星光` }}
+              </span>
+              <span class="companion-check" aria-hidden="true">{{ currentBgId === bg.id ? '✓' : '' }}</span>
+            </button>
           </div>
         </div>
         <p class="chooser-note">
-          {{ selectedCompanion.name }} · 已选中<br />
-          专注中更换，本轮仍记给开始时的伙伴
+          <template v-if="family === 'other'">
+            {{ bgFeedback || `当前可用 ✦ ${availableFocusPoints} 星光 · 点击高级动态背景可为「${displayName}」兑换或立即替换` }}
+          </template>
+          <template v-else>
+            {{ selectedCompanion.name }} · 已选中<br />
+            专注中更换，本轮仍记给开始时的伙伴
+          </template>
         </p>
       </template>
     </dialog>
@@ -556,7 +559,7 @@ async function collect(event?: MouseEvent) {
               <div class="bg-thumb-wrap">
                 <img :src="bg.url" :alt="bg.name" width="72" height="72" class="bg-thumb-img" />
                 <span v-if="bg.id === activeId" class="bg-tag default">默认</span>
-                <span v-else-if="isBackgroundUnlockedFor(activeId, bg.id)" class="bg-tag owned">已拥有</span>
+                <span v-else-if="isBackgroundUnlockedFor(activeId, bg.id)" class="bg-tag owned">{{ bg.premium ? '✦ 动态' : '已拥有' }}</span>
                 <span v-else class="bg-tag cost">✦ {{ bg.cost }}</span>
               </div>
               <span class="option-name bg-option-name">{{ bg.name }}</span>
@@ -565,10 +568,10 @@ async function collect(event?: MouseEvent) {
                   currentBgId === bg.id
                     ? '正在使用'
                     : isBackgroundUnlockedFor(activeId, bg.id)
-                      ? '点击替换'
+                      ? (bg.effectLabel ? `${bg.effectLabel} · 替换` : '点击替换')
                       : availableFocusPoints >= bg.cost
-                        ? '点击兑换'
-                        : `需 ${bg.cost} 分`
+                        ? (bg.effectLabel ? `${bg.effectLabel} · 兑换` : '点击兑换')
+                        : `${bg.effectLabel ? bg.effectLabel + ' · ' : ''}需 ${bg.cost} 分`
                 }}
               </span>
               <span class="companion-check" aria-hidden="true">{{ currentBgId === bg.id ? '✓' : '' }}</span>
@@ -640,6 +643,7 @@ async function collect(event?: MouseEvent) {
           :background-url="effectiveBackgroundUrl(viewed)"
           :portrait-url="viewed.portraitUrl"
           :placement="viewed.placement"
+          :effect="effectiveBackgroundItem(viewed.id).effect"
           mode="scene"
           :size="216"
         />
