@@ -19,140 +19,66 @@ withDefaults(defineProps<{ name: PixelIconName; size?: 12 | 16 }>(), {
     class="px-icon"
     :width="size"
     :height="size"
-    :viewBox="size === 12 ? '0 0 12 12' : '0 0 16 16'"
-    fill="currentColor"
-    shape-rendering="crispEdges"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.65"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
     aria-hidden="true"
   >
-    <!-- 16×16 Gear -->
-    <template v-if="name === 'gear' && size === 16">
-      <rect x="7" y="1" width="2" height="2" /><rect x="7" y="13" width="2" height="2" />
-      <rect x="1" y="7" width="2" height="2" /><rect x="13" y="7" width="2" height="2" />
-      <rect x="3" y="3" width="2" height="2" /><rect x="11" y="3" width="2" height="2" />
-      <rect x="3" y="11" width="2" height="2" /><rect x="11" y="11" width="2" height="2" />
-      <rect x="5" y="3" width="6" height="2" /><rect x="5" y="11" width="6" height="2" />
-      <rect x="3" y="5" width="2" height="6" /><rect x="11" y="5" width="2" height="6" />
-      <rect x="7" y="7" width="2" height="2" />
-    </template>
-    <!-- 12×12 Gear -->
-    <template v-else-if="name === 'gear'">
-      <rect x="5" y="1" width="2" height="1" /><rect x="5" y="10" width="2" height="1" />
-      <rect x="1" y="5" width="1" height="2" /><rect x="10" y="5" width="1" height="2" />
-      <rect x="2" y="2" width="2" height="2" /><rect x="8" y="2" width="2" height="2" />
-      <rect x="2" y="8" width="2" height="2" /><rect x="8" y="8" width="2" height="2" />
-      <rect x="4" y="2" width="4" height="2" /><rect x="4" y="8" width="4" height="2" />
-      <rect x="2" y="4" width="2" height="4" /><rect x="8" y="4" width="2" height="4" />
-      <rect x="5" y="5" width="2" height="2" />
+    <!-- Gear -->
+    <template v-if="name === 'gear'">
+      <circle cx="8" cy="8" r="2.6" />
+      <path d="M8 1.75v1.6M8 12.65v1.6M1.75 8h1.6M12.65 8h1.6M3.58 3.58l1.13 1.13M11.29 11.29l1.13 1.13M12.42 3.58l-1.13 1.13M4.71 11.29l-1.13 1.13" />
     </template>
 
-    <!-- 16×16 Trash -->
-    <template v-else-if="name === 'trash' && size === 16">
-      <rect x="6" y="2" width="4" height="1" />
-      <rect x="3" y="4" width="10" height="2" />
-      <rect x="4" y="6" width="1" height="8" /><rect x="11" y="6" width="1" height="8" />
-      <rect x="5" y="13" width="6" height="1" />
-      <rect x="6" y="7" width="1" height="5" /><rect x="9" y="7" width="1" height="5" />
-    </template>
-    <!-- 12×12 Trash -->
+    <!-- Trash -->
     <template v-else-if="name === 'trash'">
-      <rect x="4" y="1" width="4" height="1" />
-      <rect x="2" y="3" width="8" height="1" />
-      <rect x="3" y="4" width="1" height="7" /><rect x="8" y="4" width="1" height="7" />
-      <rect x="4" y="10" width="4" height="1" />
-      <rect x="5" y="5" width="2" height="4" opacity="0.65" />
+      <path d="M2.5 4.25h11M6 4.25V2.5h4v1.75M4.25 4.25v8.75a1 1 0 0 0 1 1h5.5a1 1 0 0 0 1-1V4.25M6.75 7v4.25M9.25 7v4.25" />
     </template>
 
-    <!-- 16×16 Search -->
-    <template v-else-if="name === 'search' && size === 16">
-      <rect x="5" y="2" width="4" height="2" /><rect x="5" y="9" width="4" height="2" />
-      <rect x="3" y="4" width="2" height="5" /><rect x="9" y="4" width="2" height="5" />
-      <rect x="10" y="10" width="2" height="2" /><rect x="12" y="12" width="2" height="2" />
-    </template>
-    <!-- 12×12 Search -->
+    <!-- Search -->
     <template v-else-if="name === 'search'">
-      <rect x="3" y="1" width="4" height="1" /><rect x="3" y="7" width="4" height="1" />
-      <rect x="1" y="3" width="1" height="4" /><rect x="7" y="3" width="1" height="4" />
-      <rect x="2" y="2" width="1" height="1" /><rect x="7" y="2" width="1" height="1" />
-      <rect x="2" y="7" width="1" height="1" /><rect x="7" y="7" width="1" height="1" />
-      <rect x="8" y="8" width="2" height="2" /><rect x="10" y="10" width="1" height="1" />
+      <circle cx="7" cy="7" r="4.25" />
+      <path d="M10.4 10.4L13.75 13.75" />
     </template>
 
-    <!-- 12×12 Calendar -->
-    <template v-else-if="name === 'calendar' && size === 12">
-      <rect x="3" y="1" width="1" height="2" /><rect x="8" y="1" width="1" height="2" />
-      <rect x="1" y="2" width="10" height="2" />
-      <rect x="1" y="4" width="1" height="7" /><rect x="10" y="4" width="1" height="7" />
-      <rect x="2" y="10" width="8" height="1" />
-      <rect x="3" y="6" width="2" height="2" /><rect x="7" y="6" width="2" height="2" />
-    </template>
-    <!-- 16×16 Calendar -->
+    <!-- Calendar -->
     <template v-else-if="name === 'calendar'">
-      <rect x="4" y="2" width="2" height="2" /><rect x="10" y="2" width="2" height="2" />
-      <rect x="2" y="4" width="12" height="2" />
-      <rect x="2" y="6" width="2" height="8" /><rect x="12" y="6" width="2" height="8" />
-      <rect x="4" y="12" width="8" height="2" />
-      <rect x="5" y="8" width="2" height="2" /><rect x="9" y="8" width="2" height="2" />
+      <rect x="2.25" y="3.25" width="11.5" height="10.5" rx="1.5" />
+      <path d="M5.25 1.75v2.5M10.75 1.75v2.5M2.25 6.75h11.5" />
+      <rect x="5" y="9.25" width="1.5" height="1.5" fill="currentColor" stroke="none" />
+      <rect x="9.5" y="9.25" width="1.5" height="1.5" fill="currentColor" stroke="none" />
     </template>
 
-    <!-- 12×12 Repeat -->
-    <template v-else-if="name === 'repeat' && size === 12">
-      <rect x="2" y="3" width="7" height="1" /><rect x="7" y="1" width="1" height="2" /><rect x="8" y="2" width="2" height="2" />
-      <rect x="1" y="4" width="1" height="3" />
-      <rect x="3" y="8" width="7" height="1" /><rect x="4" y="9" width="1" height="2" /><rect x="2" y="8" width="2" height="2" />
-      <rect x="10" y="5" width="1" height="3" />
-    </template>
-    <!-- 16×16 Repeat -->
+    <!-- Repeat -->
     <template v-else-if="name === 'repeat'">
-      <rect x="3" y="4" width="9" height="2" /><rect x="10" y="2" width="2" height="6" />
-      <rect x="2" y="6" width="2" height="4" />
-      <rect x="4" y="10" width="9" height="2" /><rect x="4" y="8" width="2" height="6" />
-      <rect x="12" y="6" width="2" height="4" />
+      <path d="M2.5 7.5V5.25a1.5 1.5 0 0 1 1.5-1.5h8.75M10.5 1.75l2.25 2-2.25 2" />
+      <path d="M13.5 8.5v2.25a1.5 1.5 0 0 1-1.5 1.5H3.25M5.5 14.25l-2.25-2 2.25-2" />
     </template>
 
-    <!-- 12×12 Folder -->
-    <template v-else-if="name === 'folder' && size === 12">
-      <rect x="1" y="2" width="4" height="2" />
-      <rect x="1" y="4" width="10" height="6" />
-      <rect x="3" y="6" width="6" height="1" opacity="0.35" />
-    </template>
-    <!-- 16×16 Folder -->
+    <!-- Folder -->
     <template v-else-if="name === 'folder'">
-      <rect x="2" y="3" width="5" height="2" />
-      <rect x="2" y="5" width="12" height="8" />
-      <rect x="4" y="7" width="8" height="1" opacity="0.35" />
+      <path d="M2.25 4a1.25 1.25 0 0 1 1.25-1.25h3l1.5 1.5h4.5a1.25 1.25 0 0 1 1.25 1.25v6.5a1.25 1.25 0 0 1-1.25 1.25h-9a1.25 1.25 0 0 1-1.25-1.25V4z" />
     </template>
 
-    <!-- 12×12 Chevron Down -->
-    <template v-else-if="name === 'chevron-down' && size === 12">
-      <rect x="2" y="4" width="2" height="1" /><rect x="8" y="4" width="2" height="1" />
-      <rect x="3" y="5" width="2" height="1" /><rect x="7" y="5" width="2" height="1" />
-      <rect x="4" y="6" width="4" height="1" /><rect x="5" y="7" width="2" height="1" />
-    </template>
-    <!-- 16×16 Chevron Down -->
+    <!-- Chevron Down -->
     <template v-else-if="name === 'chevron-down'">
-      <rect x="3" y="5" width="2" height="2" /><rect x="11" y="5" width="2" height="2" />
-      <rect x="5" y="7" width="2" height="2" /><rect x="9" y="7" width="2" height="2" />
-      <rect x="7" y="9" width="2" height="2" />
+      <path d="M4 6.25l4 4 4-4" />
     </template>
 
-    <!-- 12×12 Plus -->
-    <template v-else-if="name === 'plus' && size === 12">
-      <rect x="5" y="2" width="2" height="8" />
-      <rect x="2" y="5" width="8" height="2" />
-    </template>
-    <!-- 16×16 Plus -->
+    <!-- Plus -->
     <template v-else-if="name === 'plus'">
-      <rect x="7" y="3" width="2" height="10" />
-      <rect x="3" y="7" width="10" height="2" />
+      <path d="M8 3v10M3 8h10" />
     </template>
   </svg>
 </template>
 
 <style scoped>
 .px-icon {
-  display: block;
+  display: inline-block;
+  vertical-align: middle;
   flex-shrink: 0;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 </style>

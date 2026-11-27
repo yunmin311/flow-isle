@@ -340,6 +340,12 @@ async function toggleMute() {
   }
 }
 
+function handleClearAll() {
+  const items = Array.from(document.querySelectorAll('.notif-scroll .notif-item')).slice(0, 4) as HTMLElement[]
+  for (const el of items) triggerPixelDissolveAtElement(el, 'accent')
+  clearAll()
+}
+
 onMounted(() => {
   refreshVolume()
   pruneExpiredRecords()
@@ -357,15 +363,14 @@ onDeactivated(() => { selectedEmail.value = null })
         <span class="volume-pixel-pip" :class="{ muted: sysMuted || sysVolume === 0 }" aria-hidden="true"></span>
         <span class="volume-label">音量</span>
         <button class="mute-btn" :class="{ active: sysMuted }" @click="triggerPixelBurstFromEvent($event, 'accent', 4); toggleMute()" :title="sysMuted ? '取消静音' : '静音'">
-          <svg v-if="sysMuted || sysVolume === 0" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-            <rect x="1" y="6" width="3" height="4" /><rect x="4" y="5" width="2" height="6" /><rect x="6" y="3" width="2" height="10" />
-            <rect x="10" y="5" width="2" height="2" /><rect x="14" y="5" width="2" height="2" />
-            <rect x="12" y="7" width="2" height="2" />
-            <rect x="10" y="9" width="2" height="2" /><rect x="14" y="9" width="2" height="2" />
+          <svg v-if="sysMuted || sysVolume === 0" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+            <path d="M2.25 6h2.75l3.25-2.75v9.5L5 10H2.25V6z" />
+            <path d="M11 6l3 4M14 6l-3 4" />
           </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-            <rect x="1" y="6" width="3" height="4" /><rect x="4" y="5" width="2" height="6" /><rect x="6" y="3" width="2" height="10" />
-            <rect x="10" y="6" width="2" height="4" /><rect v-if="sysVolume > 45" x="13" y="4" width="2" height="8" />
+          <svg v-else width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+            <path d="M2.25 6h2.75l3.25-2.75v9.5L5 10H2.25V6z" />
+            <path d="M11 6.25a2.6 2.6 0 0 1 0 3.5" />
+            <path v-if="sysVolume > 45" d="M13 4.25a5.2 5.2 0 0 1 0 7.5" />
           </svg>
         </button>
         <input
@@ -392,7 +397,7 @@ onDeactivated(() => { selectedEmail.value = null })
       <span ref="pageHeading" class="section-title" tabindex="-1">通知记录</span>
       <div class="record-tools">
         <button v-if="unreadCount" class="text-btn" @click="markAllRead">全部已读 ({{ unreadCount }})</button>
-        <button v-if="records.length" class="text-btn" @click="clearAll">清空</button>
+        <button v-if="records.length" class="text-btn" @click="handleClearAll">清空</button>
       </div>
     </div>
     <div class="notif-scroll">

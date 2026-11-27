@@ -4,13 +4,8 @@ defineEmits<{ click: [] }>()
 
 <template>
   <button class="page-back-btn" type="button" aria-label="返回" @click="$emit('click')">
-    <svg viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-      <rect x="7" y="2" width="1" height="2" />
-      <rect x="6" y="3" width="1" height="2" />
-      <rect x="5" y="4" width="1" height="4" />
-      <rect x="4" y="5" width="1" height="2" />
-      <rect x="6" y="7" width="1" height="2" />
-      <rect x="7" y="8" width="1" height="2" />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+      <polyline points="9.75 3.5 5.25 8 9.75 12.5" />
     </svg>
   </button>
 </template>
@@ -44,8 +39,7 @@ defineEmits<{ click: [] }>()
 }
 
 .page-back-btn svg {
-  width: 12px;
-  height: 12px;
-  image-rendering: pixelated;
+  width: 13px;
+  height: 13px;
 }
 </style>

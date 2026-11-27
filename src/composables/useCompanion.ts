@@ -2,6 +2,7 @@ import { computed, readonly, ref, watch } from 'vue'
 import { emit, listen } from '@tauri-apps/api/event'
 import { BaseDirectory, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import catalog from '../data/companionCatalog.json'
+import { useDailyStats } from './useDailyStats'
 
 export const ALBUM_MINUTES = 120
 export const COMPANION_FILE = 'focus-island/companions.json'
@@ -33,6 +34,18 @@ export interface ApprovedAction {
   url: string
 }
 
+export type CompanionBackgroundCategory = 'indoor' | 'outdoor' | 'night'
+
+export interface CompanionBackgroundItem {
+  id: string
+  name: string
+  category: CompanionBackgroundCategory
+  cost: number
+  url: string
+  ownerAnimalId: string
+  ownerAnimalName: string
+}
+
 export interface CompanionRecord {
   minutes: number
   collectedAt: number | null
@@ -42,6 +55,9 @@ export interface CompanionRecord {
 export interface CompanionSyncPayload {
   selectedId: string
   records: Record<string, CompanionRecord>
+  unlockedBackgrounds?: string[]
+  spentBackgroundPoints?: number
+  selectedBackgrounds?: Record<string, string>
 }
 
 export type CompanionReactionKind = 'mail' | 'notif' | 'task-done' | 'done'
@@ -120,10 +136,51 @@ export const approvedCompanionActions: ApprovedAction[] = catalog.actions.map((i
   url: assetByKey(actionSprites, `${item.key}.png`),
 }))
 
+const BACKGROUND_META: Record<string, { name: string; category: CompanionBackgroundCategory; cost: number }> = {
+  'cat-orange': { name: '阳光窗台', category: 'indoor', cost: 30 },
+  'cat-calico': { name: '小花房', category: 'indoor', cost: 40 },
+  'cat-tuxedo': { name: '静谧书店', category: 'indoor', cost: 45 },
+  'cat-silver': { name: '雨天窗边', category: 'indoor', cost: 45 },
+  'cat-ragdoll': { name: '云朵卧室', category: 'indoor', cost: 50 },
+  'cat-siamese': { name: '午后茶歇', category: 'indoor', cost: 40 },
+  'cat-black': { name: '月光阁楼', category: 'night', cost: 60 },
+  'cat-white': { name: '樱花信笺', category: 'outdoor', cost: 60 },
+  'dog-shiba': { name: '秋日林道', category: 'outdoor', cost: 40 },
+  'dog-corgi': { name: '草坪邮局', category: 'outdoor', cost: 45 },
+  'dog-golden': { name: '湖畔栈桥', category: 'outdoor', cost: 50 },
+  'dog-collie': { name: '牧场木栏', category: 'outdoor', cost: 40 },
+  'dog-husky': { name: '初雪松林', category: 'outdoor', cost: 60 },
+  'dog-bichon': { name: '暖香面包房', category: 'indoor', cost: 50 },
+  'dog-dachshund': { name: '午后庭院', category: 'outdoor', cost: 40 },
+  'dog-dalmatian': { name: '微风海湾', category: 'outdoor', cost: 60 },
+  'fox-red': { name: '枫林小径', category: 'outdoor', cost: 50 },
+  'fox-arctic': { name: '极光小屋', category: 'night', cost: 90 },
+  'fox-fennec': { name: '星夜沙丘', category: 'night', cost: 75 },
+  'fox-silver': { name: '月亮湖畔', category: 'night', cost: 75 },
+  'fox-cross': { name: '苔藓森林', category: 'outdoor', cost: 50 },
+  'fox-sand': { name: '风车花田', category: 'outdoor', cost: 60 },
+}
+
+export const companionBackgrounds: CompanionBackgroundItem[] = companionAnimals.map((animal) => {
+  const meta = BACKGROUND_META[animal.id] ?? { name: animal.name, category: 'outdoor' as const, cost: 45 }
+  return {
+    id: animal.id,
+    name: meta.name,
+    category: meta.category,
+    cost: meta.cost,
+    url: animal.backgroundUrl,
+    ownerAnimalId: animal.id,
+    ownerAnimalName: animal.name,
+  }
+})
+
 const DEFAULT_COMPANION_ID = companionAnimals[0]?.id ?? 'cat-orange'
 
 const selectedId = ref<string>(DEFAULT_COMPANION_ID)
 const companionRecords = ref<Record<string, CompanionRecord>>({})
+const unlockedBackgrounds = ref<string[]>([])
+const spentBackgroundPoints = ref<number>(0)
+const selectedBackgrounds = ref<Record<string, string>>({})
 const loaded = ref(false)
 const statsSection = ref<'stats' | 'companions'>('stats')
 
@@ -216,6 +273,33 @@ function normalizeRecords(raw: unknown): Record<string, CompanionRecord> {
   return clean
 }
 
+function normalizeUnlockedBackgrounds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const valid = new Set(companionBackgrounds.map(b => b.id))
+  const unique: string[] = []
+  for (const id of raw) {
+    if (typeof id === 'string' && valid.has(id) && !unique.includes(id)) unique.push(id)
+  }
+  return unique
+}
+
+function normalizeSelectedBackgrounds(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {}
+  const validAnimals = new Set(companionAnimals.map(a => a.id))
+  const validBgs = new Set(companionBackgrounds.map(b => b.id))
+  const clean: Record<string, string> = {}
+  for (const [animalId, bgId] of Object.entries(raw as Record<string, unknown>)) {
+    if (validAnimals.has(animalId) && typeof bgId === 'string' && validBgs.has(bgId) && bgId !== animalId) {
+      clean[animalId] = bgId
+    }
+  }
+  return clean
+}
+
+function normalizeSpentPoints(raw: unknown): number {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
+}
+
 async function loadFromDisk() {
   try {
     const raw = await readTextFile(COMPANION_FILE, { baseDir: BaseDirectory.AppData })
@@ -223,22 +307,34 @@ async function loadFromDisk() {
     suppressEmit = true
     selectedId.value = normalizeCompanionId(parsed.selectedId)
     companionRecords.value = normalizeRecords(parsed.records)
+    unlockedBackgrounds.value = normalizeUnlockedBackgrounds(parsed.unlockedBackgrounds)
+    spentBackgroundPoints.value = normalizeSpentPoints(parsed.spentBackgroundPoints)
+    selectedBackgrounds.value = normalizeSelectedBackgrounds(parsed.selectedBackgrounds)
   } catch {
     selectedId.value = DEFAULT_COMPANION_ID
     companionRecords.value = {}
+    unlockedBackgrounds.value = []
+    spentBackgroundPoints.value = 0
+    selectedBackgrounds.value = {}
   } finally {
     suppressEmit = false
     loaded.value = true
   }
 }
 
-function saveToDisk() {
-  if (!loaded.value) return
-  const payload: CompanionSyncPayload = {
+function buildSyncPayload(): CompanionSyncPayload {
+  return {
     selectedId: selectedId.value,
     records: companionRecords.value,
+    unlockedBackgrounds: unlockedBackgrounds.value,
+    spentBackgroundPoints: spentBackgroundPoints.value,
+    selectedBackgrounds: selectedBackgrounds.value,
   }
-  const snapshot = JSON.stringify(payload)
+}
+
+function saveToDisk() {
+  if (!loaded.value) return
+  const snapshot = JSON.stringify(buildSyncPayload())
   pendingSave = pendingSave.then(async () => {
     try {
       await mkdir('focus-island', { baseDir: BaseDirectory.AppData, recursive: true })
@@ -250,15 +346,11 @@ function saveToDisk() {
 }
 
 function broadcastState() {
-  const payload: CompanionSyncPayload = {
-    selectedId: selectedId.value,
-    records: companionRecords.value,
-  }
-  emit('companion-state-update', payload).catch(() => {})
+  emit('companion-state-update', buildSyncPayload()).catch(() => {})
 }
 
 watch(
-  [selectedId, companionRecords],
+  [selectedId, companionRecords, unlockedBackgrounds, spentBackgroundPoints, selectedBackgrounds],
   () => {
     if (suppressEmit) {
       suppressEmit = false
@@ -364,6 +456,65 @@ export function companionDisplayName(animal: CompanionAnimal): string {
   return custom || animal.name
 }
 
+export const totalCompanionMinutes = computed(() =>
+  Object.values(companionRecords.value).reduce((sum, rec) => sum + Math.floor(rec.minutes || 0), 0),
+)
+
+export function isBackgroundUnlockedFor(animalId: string, bgId: string): boolean {
+  return bgId === animalId || unlockedBackgrounds.value.includes(bgId)
+}
+
+export function effectiveBackgroundId(animalId: string): string {
+  const chosen = selectedBackgrounds.value[animalId]
+  if (chosen && isBackgroundUnlockedFor(animalId, chosen)) return chosen
+  return animalId
+}
+
+export function effectiveBackgroundItem(animalId: string): CompanionBackgroundItem {
+  const bgId = effectiveBackgroundId(animalId)
+  return companionBackgrounds.find(b => b.id === bgId)
+    ?? companionBackgrounds.find(b => b.id === animalId)
+    ?? companionBackgrounds[0]
+}
+
+export function effectiveBackgroundUrl(animal: CompanionAnimal): string {
+  return effectiveBackgroundItem(animal.id)?.url || animal.backgroundUrl
+}
+
+export function effectiveBackgroundName(animalId: string): string {
+  return effectiveBackgroundItem(animalId)?.name ?? ''
+}
+
+export function equipBackground(animalId: string, bgId: string): boolean {
+  if (!companionAnimals.some(a => a.id === animalId)) return false
+  if (!isBackgroundUnlockedFor(animalId, bgId)) return false
+  const next = { ...selectedBackgrounds.value }
+  if (bgId === animalId) {
+    delete next[animalId]
+  } else {
+    next[animalId] = bgId
+  }
+  selectedBackgrounds.value = next
+  return true
+}
+
+export function resetBackground(animalId: string) {
+  if (!(animalId in selectedBackgrounds.value)) return
+  const next = { ...selectedBackgrounds.value }
+  delete next[animalId]
+  selectedBackgrounds.value = next
+}
+
+export function redeemBackground(bgId: string, availablePoints: number): boolean {
+  const item = companionBackgrounds.find(b => b.id === bgId)
+  if (!item) return false
+  if (unlockedBackgrounds.value.includes(bgId)) return true
+  if (availablePoints < item.cost) return false
+  unlockedBackgrounds.value = [...unlockedBackgrounds.value, bgId]
+  spentBackgroundPoints.value += item.cost
+  return true
+}
+
 /** Deterministic zero-polling mood selector (xiaotang-daozai pattern using FlowIsle assets). */
 export function resolveIslandCompanionSprite(
   animal: CompanionAnimal,
@@ -398,6 +549,15 @@ export function applyExternalCompanionState(payload: Partial<CompanionSyncPayloa
   suppressEmit = true
   selectedId.value = normalizeCompanionId(payload.selectedId)
   companionRecords.value = normalizeRecords(payload.records)
+  if (payload.unlockedBackgrounds !== undefined) {
+    unlockedBackgrounds.value = normalizeUnlockedBackgrounds(payload.unlockedBackgrounds)
+  }
+  if (payload.spentBackgroundPoints !== undefined) {
+    spentBackgroundPoints.value = normalizeSpentPoints(payload.spentBackgroundPoints)
+  }
+  if (payload.selectedBackgrounds !== undefined) {
+    selectedBackgrounds.value = normalizeSelectedBackgrounds(payload.selectedBackgrounds)
+  }
   loaded.value = true
 }
 
@@ -419,14 +579,27 @@ export const selectedBadges = computed<Record<string, string>>(
 
 export function useCompanion() {
   if (!loaded.value) loadingPromise ??= loadFromDisk()
+  const { allTimeStats } = useDailyStats()
+  const totalFocusPoints = computed(() =>
+    Math.max(Math.floor(allTimeStats.value.focusMinutes || 0), totalCompanionMinutes.value),
+  )
+  const availableFocusPoints = computed(() =>
+    Math.max(0, totalFocusPoints.value - spentBackgroundPoints.value),
+  )
   return {
     animals: companionAnimals,
+    backgrounds: companionBackgrounds,
     actions: approvedCompanionActions,
     selectedId: readonly(selectedId),
     selectedCompanion,
     selectedBadges,
     activeReaction: readonly(activeReaction),
     records: readonly(companionRecords),
+    unlockedBackgrounds: readonly(unlockedBackgrounds),
+    selectedBackgrounds: readonly(selectedBackgrounds),
+    spentBackgroundPoints: readonly(spentBackgroundPoints),
+    totalFocusPoints,
+    availableFocusPoints,
     statsSection,
     loaded: readonly(loaded),
     companionRecord,
@@ -436,6 +609,14 @@ export function useCompanion() {
     collectCompanionPicture,
     setCompanionNickname,
     companionDisplayName,
+    isBackgroundUnlockedFor,
+    effectiveBackgroundId,
+    effectiveBackgroundItem,
+    effectiveBackgroundUrl,
+    effectiveBackgroundName,
+    equipBackground,
+    resetBackground,
+    redeemBackground,
     triggerCompanionReaction,
     installCompanionReactionListener,
     applyExternalCompanionState,

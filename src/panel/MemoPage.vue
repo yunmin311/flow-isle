@@ -7,7 +7,7 @@ import MemoCategoryDropdown from './MemoCategoryDropdown.vue'
 import MemoCategoryTag from './MemoCategoryTag.vue'
 import BackButton from './BackButton.vue'
 import PixelIcon from '../components/PixelIcon.vue'
-import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
+import { triggerPixelBurstFromEvent, triggerPixelDissolveAtElement } from '../utils/pixelSpark'
 
 const props = defineProps<{ searchQuery?: string }>()
 const emit = defineEmits<{
@@ -174,6 +174,8 @@ function handleDeleteMemo(memo: Memo, event: Event) {
 
 function confirmDeleteMemo() {
   if (pendingDeleteMemoId.value) {
+    const card = document.querySelector(`.memo-item[data-memo-id="${CSS.escape(pendingDeleteMemoId.value)}"]`) as HTMLElement | null
+    if (card) triggerPixelDissolveAtElement(card, 'accent')
     deleteMemo(pendingDeleteMemoId.value)
   }
   showDeleteConfirm.value = false
@@ -219,10 +221,7 @@ function handleCloseCategoryDialog() {
           </button>
           <!-- 新建 -->
           <button class="header-new-btn" @click="handleNewMemo" title="新建备忘录">
-            <svg width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="4" y="1" width="1" height="7" />
-              <rect x="1" y="4" width="7" height="1" />
-            </svg>
+            <PixelIcon name="plus" :size="12" />
             <span>新建</span>
           </button>
         </div>
@@ -233,6 +232,7 @@ function handleCloseCategoryDialog() {
         <div
           v-for="memo in displayMemos"
           :key="memo.id"
+          :data-memo-id="memo.id"
           class="memo-item"
           :class="{ 'is-pinned': memo.isPinned }"
           @click="handleEditMemo(memo)"
@@ -252,37 +252,28 @@ function handleCloseCategoryDialog() {
                   class="px-pin-star"
                   width="12"
                   height="12"
-                  viewBox="0 0 11 11"
+                  viewBox="0 0 16 16"
                   fill="currentColor"
-                  shape-rendering="crispEdges"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-linejoin="miter"
                   aria-hidden="true"
                 >
-                  <rect x="5" y="1" width="1" height="1" />
-                  <rect x="4" y="2" width="3" height="2" />
-                  <rect x="1" y="4" width="9" height="1" />
-                  <rect x="2" y="5" width="7" height="1" />
-                  <rect x="3" y="6" width="5" height="2" />
-                  <rect x="2" y="8" width="3" height="1" /><rect x="6" y="8" width="3" height="1" />
-                  <rect x="2" y="9" width="1" height="1" /><rect x="8" y="9" width="1" height="1" />
+                  <polygon points="8 1.75 9.9 5.65 14.2 6.25 11.1 9.25 11.85 13.5 8 11.45 4.15 13.5 4.9 9.25 1.8 6.25 6.1 5.65" />
                 </svg>
                 <svg
                   v-else
                   class="px-pin-star"
                   width="12"
                   height="12"
-                  viewBox="0 0 11 11"
-                  fill="currentColor"
-                  shape-rendering="crispEdges"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="miter"
                   aria-hidden="true"
                 >
-                  <rect x="5" y="1" width="1" height="1" />
-                  <rect x="4" y="2" width="1" height="2" /><rect x="6" y="2" width="1" height="2" />
-                  <rect x="1" y="4" width="3" height="1" /><rect x="7" y="4" width="3" height="1" />
-                  <rect x="1" y="5" width="1" height="1" /><rect x="9" y="5" width="1" height="1" />
-                  <rect x="2" y="6" width="1" height="1" /><rect x="8" y="6" width="1" height="1" />
-                  <rect x="2" y="7" width="1" height="3" /><rect x="8" y="7" width="1" height="3" />
-                  <rect x="4" y="7" width="3" height="1" />
-                  <rect x="3" y="8" width="1" height="1" /><rect x="7" y="8" width="1" height="1" />
+                  <polygon points="8 1.75 9.9 5.65 14.2 6.25 11.1 9.25 11.85 13.5 8 11.45 4.15 13.5 4.9 9.25 1.8 6.25 6.1 5.65" />
                 </svg>
               </button>
               <button
@@ -311,10 +302,7 @@ function handleCloseCategoryDialog() {
           <div v-else class="empty-icon"></div>
           <div class="empty-text">{{ searchQuery ? '没有匹配的备忘录' : '还没有备忘录' }}</div>
           <button v-if="!searchQuery" class="empty-action-btn" @click="handleNewMemo">
-            <svg width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="4" y="1" width="1" height="7" />
-              <rect x="1" y="4" width="7" height="1" />
-            </svg>
+            <PixelIcon name="plus" :size="12" />
             新建一条
           </button>
         </div>

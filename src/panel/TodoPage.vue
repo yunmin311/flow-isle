@@ -9,7 +9,7 @@ import CalendarDatePicker from './CalendarDatePicker.vue'
 import RepeatPicker from './RepeatPicker.vue'
 import PixelIcon from '../components/PixelIcon.vue'
 import StatNumber from '../components/StatNumber.vue'
-import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement } from '../utils/pixelSpark'
+import { triggerPixelBurstFromEvent, triggerPixelBurstAtElement, triggerPixelDissolveAtElement } from '../utils/pixelSpark'
 import { triggerCompanionReaction } from '../composables/useCompanion'
 
 const props = defineProps<{ initialTab?: string; searchQuery?: string }>()
@@ -192,9 +192,23 @@ function toggleSelectAll() {
   }
 }
 
+function dissolveTasksById(ids: string[], tone: 'accent' | 'break' = 'accent') {
+  // 最多同时对前 4 张可见卡片触发像素消散，兼顾视觉反馈与内存占用
+  let triggered = 0
+  for (const id of ids) {
+    if (triggered >= 4) break
+    const card = document.querySelector(`.task-card[data-task-id="${CSS.escape(id)}"]`) as HTMLElement | null
+    if (card) {
+      triggerPixelDissolveAtElement(card, tone)
+      triggered += 1
+    }
+  }
+}
+
 function deleteSelected() {
   if (selectedIds.value.size === 0) return
   const ids = [...selectedIds.value]
+  dissolveTasksById(ids, 'accent')
   for (const id of ids) deleteTask(id)
   selectedIds.value = new Set()
   selectionMode.value = false
@@ -203,6 +217,7 @@ function deleteSelected() {
 function restoreSelected() {
   if (selectedIds.value.size === 0) return
   const ids = [...selectedIds.value]
+  dissolveTasksById(ids, 'break')
   for (const id of ids) toggleComplete(id)
   selectedIds.value = new Set()
   selectionMode.value = false
@@ -212,6 +227,7 @@ function deleteOlderThan7d() {
   const cutoff = Date.now() - 7 * 86400000
   const ids = completedTasks.value.filter(t => t.updatedAt < cutoff).map(t => t.id)
   if (ids.length === 0) return
+  dissolveTasksById(ids, 'accent')
   for (const id of ids) deleteTask(id)
   selectedIds.value = new Set()
   selectionMode.value = false
@@ -220,6 +236,7 @@ function deleteOlderThan7d() {
 function deleteAllCompleted() {
   const ids = completedTasks.value.map(t => t.id)
   if (ids.length === 0) return
+  dissolveTasksById(ids, 'accent')
   for (const id of ids) deleteTask(id)
   selectedIds.value = new Set()
   selectionMode.value = false
@@ -348,6 +365,9 @@ function handleToggleComplete(taskId: string, event?: MouseEvent) {
   const wasDone = targetTask ? isTaskDoneOnDate(targetTask, todayString.value) : false
   if (activeTaskId.value === taskId) {
     abandon()
+  }
+  if (!wasDone) {
+    dissolveTasksById([taskId], 'break')
   }
   toggleComplete(taskId)
   if (!wasDone) {
@@ -495,6 +515,7 @@ function contextSetDate(dateStr: string) {
 
 function contextDelete() {
   if (!contextMenu.value) return
+  dissolveTasksById([contextMenu.value.taskId], 'accent')
   deleteTask(contextMenu.value.taskId)
   closeContextMenu()
 }
@@ -835,6 +856,7 @@ onBeforeUnmount(() => {
         </div>
         <div
           class="task-card"
+          :data-task-id="task.id"
           :class="{
             'is-running': activeTaskId === task.id,
             'is-completed': task.completed,
@@ -852,14 +874,14 @@ onBeforeUnmount(() => {
               @click.stop="toggleOneSelected(task.id)"
               :title="selectedIds.has(task.id) ? '取消选择' : '选择'"
             >
-              <svg v-if="selectedIds.has(task.id)" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
+              <svg v-if="selectedIds.has(task.id)" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="square" stroke-linejoin="miter"><polyline points="3 8.5 6.5 12 13 4.5"/></svg>
             </button>
             <button
               class="task-checkbox"
               :class="{ checked: isDoneToday(task) }"
               @click="handleToggleComplete(task.id, $event)"
             >
-              <svg v-if="isDoneToday(task)" width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
+              <svg v-if="isDoneToday(task)" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="square" stroke-linejoin="miter"><polyline points="3 8.5 6.5 12 13 4.5"/></svg>
             </button>
 
             <span class="task-title" :class="{ 'line-through': task.completed || isDoneToday(task) }" @click="emit('viewDetail', task.id)">{{ task.title }}</span>
@@ -875,10 +897,10 @@ onBeforeUnmount(() => {
                   <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8v14.4L19.5 12z"/></svg>
                 </button>
                 <button class="timer-btn done-btn" @click.stop="handleDoneTimer($event)" title="完成">
-                  <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="2"/><rect x="2" y="5" width="1" height="2"/><rect x="3" y="6" width="1" height="2"/><rect x="4" y="5" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="3" width="1" height="2"/><rect x="7" y="2" width="1" height="2"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" stroke-linejoin="miter"><polyline points="3 8.5 6.5 12 13 4.5"/></svg>
                 </button>
                 <button class="timer-btn stop-btn" @click.stop="abandon()" title="停止">
-                  <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges"><rect x="2" y="2" width="5" height="5"/></svg>
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg>
                 </button>
               </div>
             </div>
@@ -1131,15 +1153,16 @@ onBeforeUnmount(() => {
 }
 
 .inline-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px 6px;
+  gap: 4px;
+  padding: 5px 7px;
   background: none;
   border: none;
-  border-right: 1px solid var(--v2-line);;
+  border-right: 1px solid var(--v2-line);
   color: var(--v2-muted);
-  font-size: 10.5px;
+  font-size: 11px;
+  line-height: 1;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.15s;
@@ -1154,7 +1177,8 @@ onBeforeUnmount(() => {
 }
 
 .chip-label {
-  max-width: 42px;
+  max-width: 48px;
+  line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
 }

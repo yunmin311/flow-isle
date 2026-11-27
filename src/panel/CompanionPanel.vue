@@ -8,13 +8,24 @@ import {
   approvedCompanionActions,
   collectCompanionPicture,
   companionAnimals,
+  companionBackgrounds,
   companionDisplayName,
   companionRecord,
+  effectiveBackgroundId,
+  effectiveBackgroundName,
+  effectiveBackgroundUrl,
+  equipBackground,
   getCompanionStage,
+  isBackgroundUnlockedFor,
+  redeemBackground,
+  resetBackground,
   selectCompanion,
   selectedCompanion,
   setCompanionNickname,
+  useCompanion,
   type CompanionAnimal,
+  type CompanionBackgroundCategory,
+  type CompanionBackgroundItem,
 } from '../composables/useCompanion'
 
 interface LegacyMotif {
@@ -26,6 +37,8 @@ interface LegacyMotif {
   detail: string
 }
 
+const { availableFocusPoints } = useCompanion()
+
 const companionExpanded = ref(false)
 const showScene = ref(true)
 const chooser = ref<HTMLDialogElement | null>(null)
@@ -33,6 +46,86 @@ const chooserTrigger = ref<HTMLButtonElement | null>(null)
 const family = ref<'all' | 'cat' | 'dog' | 'fox' | 'other'>('all')
 const legacyMotifs = ref<LegacyMotif[]>([])
 const loadingLegacy = ref(false)
+
+// 背景兑换与搭配面板
+const bgDialogOpen = ref(false)
+const bgDialog = ref<HTMLDialogElement | null>(null)
+const bgTrigger = ref<HTMLButtonElement | null>(null)
+const bgCategory = ref<'all' | CompanionBackgroundCategory>('all')
+const bgFeedback = ref<string | null>(null)
+let bgFeedbackTimer: number | null = null
+
+const bgCategories = [
+  { id: 'all', label: '全部场景' },
+  { id: 'indoor', label: '暖室室内' },
+  { id: 'outdoor', label: '自然户外' },
+  { id: 'night', label: '星夜氛围' },
+] as const
+
+const visibleBackgrounds = computed(() =>
+  bgCategory.value === 'all'
+    ? companionBackgrounds
+    : companionBackgrounds.filter(b => b.category === bgCategory.value),
+)
+
+const currentBgId = computed(() => effectiveBackgroundId(activeId.value))
+const currentBgName = computed(() => effectiveBackgroundName(activeId.value))
+const hasCustomBg = computed(() => currentBgId.value !== activeId.value)
+
+async function openBgDialog() {
+  bgDialogOpen.value = true
+  bgFeedback.value = null
+  await nextTick()
+  bgDialog.value?.showModal()
+}
+
+function closeBgDialog() {
+  bgDialog.value?.close()
+}
+
+function bgDialogClosed() {
+  bgDialogOpen.value = false
+  bgTrigger.value?.focus({ preventScroll: true })
+}
+
+function flashBgFeedback(msg: string) {
+  bgFeedback.value = msg
+  if (bgFeedbackTimer !== null) window.clearTimeout(bgFeedbackTimer)
+  bgFeedbackTimer = window.setTimeout(() => {
+    bgFeedback.value = null
+    bgFeedbackTimer = null
+  }, 2600)
+}
+
+function handleSelectBackground(bg: CompanionBackgroundItem, event: MouseEvent) {
+  const animalId = activeId.value
+  if (isBackgroundUnlockedFor(animalId, bg.id)) {
+    equipBackground(animalId, bg.id)
+    showScene.value = true
+    triggerPixelBurstFromEvent(event, 'accent', 6)
+    flashBgFeedback(`已换上「${bg.name}」背景`)
+    return
+  }
+  const balance = availableFocusPoints.value
+  if (balance < bg.cost) {
+    const gap = bg.cost - balance
+    flashBgFeedback(`还差 ${gap} 星光（再专注 ${gap} 分钟即可兑换）`)
+    return
+  }
+  if (redeemBackground(bg.id, balance)) {
+    equipBackground(animalId, bg.id)
+    showScene.value = true
+    triggerPixelBurstFromEvent(event, 'gold', 12)
+    flashBgFeedback(`✦ 已兑换并换上「${bg.name}」`)
+  }
+}
+
+function handleResetBackground(event: MouseEvent) {
+  resetBackground(activeId.value)
+  showScene.value = true
+  triggerPixelBurstFromEvent(event, 'accent', 5)
+  flashBgFeedback('已恢复伙伴默认背景')
+}
 
 const families = [
   { id: 'all', label: '全部动物' },
@@ -195,6 +288,7 @@ onBeforeUnmount(() => {
   if (petHopTimer !== null) window.clearTimeout(petHopTimer)
   if (petWhisperTimer !== null) window.clearTimeout(petWhisperTimer)
   if (rapidPetTimer !== null) window.clearTimeout(rapidPetTimer)
+  if (bgFeedbackTimer !== null) window.clearTimeout(bgFeedbackTimer)
 })
 
 watch(activeId, () => {
@@ -243,10 +337,9 @@ async function collect(event?: MouseEvent) {
               aria-label="给伙伴起个名字"
               @click="startRenameCompanion"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                <rect x="8" y="1" width="2" height="2" /><rect x="6" y="3" width="2" height="2" />
-                <rect x="4" y="5" width="2" height="2" /><rect x="2" y="7" width="2" height="2" />
-                <rect x="1" y="9" width="2" height="2" /><rect x="5" y="10" width="6" height="1" />
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+                <path d="M11 2.25l2.75 2.75L6 12.75H3.25V10L11 2.25z" />
+                <line x1="9" y1="13.75" x2="14" y2="13.75" />
               </svg>
             </button>
           </div>
@@ -276,7 +369,7 @@ async function collect(event?: MouseEvent) {
           <div class="collection-art">
             <CompanionScene
               :name="displayName"
-              :background-url="selectedCompanion.backgroundUrl"
+              :background-url="effectiveBackgroundUrl(selectedCompanion)"
               :portrait-url="selectedCompanion.portraitUrl"
               :placement="selectedCompanion.placement"
               :family="selectedCompanion.family"
@@ -292,6 +385,16 @@ async function collect(event?: MouseEvent) {
         <div class="visual-tools">
           <button class="text-button" :aria-pressed="!showScene" @click="showScene = !showScene">
             {{ showScene ? '查看立绘' : '查看场景' }}
+          </button>
+          <button
+            ref="bgTrigger"
+            type="button"
+            class="text-button bg-wardrobe-btn"
+            :aria-expanded="bgDialogOpen"
+            aria-haspopup="dialog"
+            @click="openBgDialog"
+          >
+            更换背景 · {{ currentBgName }}
           </button>
         </div>
       </div>
@@ -376,7 +479,7 @@ async function collect(event?: MouseEvent) {
             >
               <CompanionScene
                 :name="animal.name"
-                :background-url="animal.backgroundUrl"
+                :background-url="effectiveBackgroundUrl(animal)"
                 :portrait-url="animal.portraitUrl"
                 :placement="animal.placement"
                 mode="scene"
@@ -403,6 +506,91 @@ async function collect(event?: MouseEvent) {
       </template>
     </dialog>
 
+    <dialog
+      ref="bgDialog"
+      id="companion-backgrounds"
+      class="companion-chooser"
+      aria-labelledby="bg-dialog-title"
+      @close="bgDialogClosed"
+      @keydown.esc.stop
+      @click="($event.target === bgDialog) && closeBgDialog()"
+    >
+      <template v-if="bgDialogOpen">
+        <div class="chooser-header">
+          <div class="bg-header-title">
+            <h3 id="bg-dialog-title">场景背景</h3>
+            <span class="focus-points-pill" title="累计专注 1 分钟 = 1 星光，用于兑换其他伙伴的场景背景">
+              ✦ {{ availableFocusPoints }} 星光
+            </span>
+          </div>
+          <button class="quiet-button chooser-close" @click="closeBgDialog">完成</button>
+        </div>
+        <p class="choice-note">
+          每专注 1 分钟获得 1 星光 · 伙伴自带默认背景，兑换后可给任意伙伴搭配
+        </p>
+        <div class="family-filters" role="group" aria-label="背景分类">
+          <button
+            v-for="item in bgCategories"
+            :key="item.id"
+            :aria-pressed="bgCategory === item.id"
+            @click="bgCategory = item.id"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div class="chooser-content">
+          <div class="companion-grid" role="group" aria-label="选择或兑换场景背景">
+            <button
+              v-for="bg in visibleBackgrounds"
+              :key="bg.id"
+              type="button"
+              class="companion-option bg-option"
+              :class="{
+                'is-locked': !isBackgroundUnlockedFor(activeId, bg.id),
+                'can-afford': !isBackgroundUnlockedFor(activeId, bg.id) && availableFocusPoints >= bg.cost,
+              }"
+              :aria-pressed="currentBgId === bg.id"
+              :aria-label="bg.name"
+              @click="handleSelectBackground(bg, $event)"
+            >
+              <div class="bg-thumb-wrap">
+                <img :src="bg.url" :alt="bg.name" width="72" height="72" class="bg-thumb-img" />
+                <span v-if="bg.id === activeId" class="bg-tag default">默认</span>
+                <span v-else-if="isBackgroundUnlockedFor(activeId, bg.id)" class="bg-tag owned">已拥有</span>
+                <span v-else class="bg-tag cost">✦ {{ bg.cost }}</span>
+              </div>
+              <span class="option-name bg-option-name">{{ bg.name }}</span>
+              <span class="option-mins">
+                {{
+                  currentBgId === bg.id
+                    ? '正在使用'
+                    : isBackgroundUnlockedFor(activeId, bg.id)
+                      ? '点击替换'
+                      : availableFocusPoints >= bg.cost
+                        ? '点击兑换'
+                        : `需 ${bg.cost} 分`
+                }}
+              </span>
+              <span class="companion-check" aria-hidden="true">{{ currentBgId === bg.id ? '✓' : '' }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="chooser-note bg-chooser-footer">
+          <span class="bg-footer-msg">
+            {{ bgFeedback || `${displayName} · 当前场景「${currentBgName}」` }}
+          </span>
+          <button
+            v-if="hasCustomBg"
+            type="button"
+            class="quiet-button bg-reset-btn"
+            @click="handleResetBackground($event)"
+          >
+            恢复默认
+          </button>
+        </div>
+      </template>
+    </dialog>
+
     <section class="saved-album" aria-label="已收藏的纪念画">
       <div class="album-heading">
         <h3>我的相册</h3>
@@ -419,7 +607,7 @@ async function collect(event?: MouseEvent) {
             <CompanionScene
               class="album-thumbnail"
               :name="animal.name"
-              :background-url="animal.backgroundUrl"
+              :background-url="effectiveBackgroundUrl(animal)"
               :portrait-url="animal.portraitUrl"
               :placement="animal.placement"
               mode="scene"
@@ -449,7 +637,7 @@ async function collect(event?: MouseEvent) {
         <button class="viewer-close quiet-button" aria-label="关闭纪念画" @click="closeViewer">✕</button>
         <CompanionScene
           :name="viewed.name"
-          :background-url="viewed.backgroundUrl"
+          :background-url="effectiveBackgroundUrl(viewed)"
           :portrait-url="viewed.portraitUrl"
           :placement="viewed.placement"
           mode="scene"
@@ -1147,6 +1335,99 @@ button:focus-visible, summary:focus-visible {
   padding: 8px 16px 12px;
   border-top: 1px solid var(--v2-line);
   flex-shrink: 0;
+  font-size: 11px;
+}
+
+.bg-header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.focus-points-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-accent);
+  background: color-mix(in srgb, var(--v2-accent) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--v2-accent) 26%, transparent);
+}
+
+.bg-thumb-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--v2-line);
+}
+
+.bg-thumb-img {
+  display: block;
+  width: 72px;
+  height: 72px;
+  image-rendering: pixelated;
+}
+
+.bg-option.is-locked .bg-thumb-img {
+  filter: saturate(0.75) brightness(0.92);
+}
+
+.bg-option.can-afford:hover .bg-thumb-img {
+  filter: none;
+}
+
+.bg-tag {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  backdrop-filter: blur(4px);
+}
+
+.bg-tag.default,
+.bg-tag.owned {
+  background: color-mix(in srgb, var(--v2-popover) 88%, transparent);
+  color: var(--v2-ink);
+  border: 1px solid var(--v2-line);
+}
+
+.bg-tag.cost {
+  background: color-mix(in srgb, #1c1917 78%, transparent);
+  color: #fde68a;
+  border: 1px solid color-mix(in srgb, #fde68a 35%, transparent);
+}
+
+.bg-option-name {
+  min-height: 20px;
+}
+
+.bg-chooser-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bg-footer-msg {
+  color: var(--v2-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-reset-btn {
+  padding: 3px 8px;
   font-size: 11px;
 }
 

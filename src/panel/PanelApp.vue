@@ -178,9 +178,9 @@ const navItems = [
     label: '首页',
     title: '首页',
     iconPaths: [
-      'M7 2h2v1H7z M5 3h6v1H5z M3 4h10v1H3z M2 5h12v2H2z',
-      'M3 7h2v7H3z M11 7h2v7h-2z M3 13h10v1H3z',
-      'M6 9h4v1H6z M6 10h1v4H6z M9 10h1v4H9z',
+      'M2.5 7.5L8 2.5l5.5 5',
+      'M4 6.5V13.5h8V6.5',
+      'M6.75 13.5V9.5h2.5v4',
     ],
   },
   {
@@ -188,8 +188,8 @@ const navItems = [
     label: 'TODO',
     title: 'TODO',
     iconPaths: [
-      'M2 2h12v2H2z M2 12h12v2H2z M2 4h2v8H2z M12 4h2v8h-2z',
-      'M5 8h1v2H5z M6 9h1v2H6z M7 10h1v1H7z M8 8h1v2H8z M9 7h1v2H9z M10 6h1v2h-1z',
+      'M2.5 2.5h11v11h-11z',
+      'M5.25 8.25l2 2 3.75-4.25',
     ],
   },
   {
@@ -197,8 +197,10 @@ const navItems = [
     label: '备忘',
     title: '备忘录',
     iconPaths: [
-      'M3 2h7v2H3z M10 3h2v2h-2z M11 5h2v9h-2z M3 4h2v10H3z M3 12h10v2H3z',
-      'M9 4h2v2H9z M6 7h4v1H6z M6 9h4v1H6z M6 11h3v1H6z',
+      'M3.5 2.25h6.25l2.75 2.75v8.75H3.5z',
+      'M9.5 2.25v3h3',
+      'M5.75 8h4.5',
+      'M5.75 10.75h3.25',
     ],
   },
   {
@@ -206,8 +208,10 @@ const navItems = [
     label: '统计',
     title: '统计',
     iconPaths: [
-      'M2 13h12v1H2z',
-      'M3 8h2v5H3z M7 4h2v9H7z M11 6h2v7h-2z',
+      'M2.25 13.5h11.5',
+      'M4.25 13.5V9',
+      'M8 13.5V4.25',
+      'M11.75 13.5V6.75',
     ],
   },
   {
@@ -215,8 +219,9 @@ const navItems = [
     label: '电台',
     title: '专注电台',
     iconPaths: [
-      'M5 2h9v2H5z M5 4h2v7H5z M12 4h2v6h-2z',
-      'M2 10h5v3H2z M9 9h5v3H9z',
+      'M6 11.75V4l7-1.25v7.5',
+      'M3.5 11.75a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
+      'M10 10.25a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
     ],
   },
   {
@@ -224,8 +229,8 @@ const navItems = [
     label: '通知',
     title: '通知中心',
     iconPaths: [
-      'M7 2h2v1H7z M5 3h6v2H5z M4 5h8v5H4z',
-      'M2 10h12v2H2z M6 13h4v1H6z',
+      'M8 2.25a3.75 3.75 0 0 0-3.75 3.75v3.25L2.75 11.25h10.5l-1.5-2V6A3.75 3.75 0 0 0 8 2.25z',
+      'M6.5 13.5h3',
     ],
   },
   {
@@ -233,9 +238,8 @@ const navItems = [
     label: '设置',
     title: '设置',
     iconPaths: [
-      'M7 1h2v2H7z M7 13h2v2H7z M1 7h2v2H1z M13 7h2v2h-2z',
-      'M3 3h2v2H3z M11 3h2v2h-2z M3 11h2v2H3z M11 11h2v2h-2z',
-      'M5 4h6v2H5z M5 10h6v2H5z M4 5h2v6H4z M10 5h2v6h-2z',
+      'M8 5.25a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5z',
+      'M8 1.75v1.5M8 12.75v1.5M1.75 8h1.5M12.75 8h1.5M3.58 3.58l1.1 1.1M11.32 11.32l1.1 1.1M12.42 3.58l-1.1 1.1M4.68 11.32l-1.1 1.1',
     ],
   },
 ] as const
@@ -517,7 +521,7 @@ async function closeWindow() {
           @click="navigateTo(item.key)"
         >
           <span class="nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square" stroke-linejoin="miter">
               <path
                 v-for="(path, pathIndex) in item.iconPaths"
                 :key="`${item.key}-icon-${pathIndex}`"

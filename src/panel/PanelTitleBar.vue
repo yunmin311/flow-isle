@@ -35,7 +35,7 @@ const emit = defineEmits<{
   'update:searchQuery': [value: string]
 }>()
 
-const fallbackIconPaths = ['M2 2h12v2H2z', 'M2 12h12v2H2z', 'M2 4h2v8H2z', 'M12 4h2v8h-2z']
+const fallbackIconPaths = ['M2.5 2.5h11v11h-11z']
 const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPaths : fallbackIconPaths)
 </script>
 
@@ -43,7 +43,7 @@ const displayIconPaths = computed(() => props.iconPaths?.length ? props.iconPath
   <div class="titlebar">
     <div class="titlebar-main">
       <span class="titlebar-icon" aria-hidden="true">
-        <svg viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter">
           <path
             v-for="(path, index) in displayIconPaths"
             :key="`title-icon-${index}`"

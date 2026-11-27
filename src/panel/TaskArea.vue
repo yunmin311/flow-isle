@@ -338,10 +338,10 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
       <div class="hero-actions">
         <template v-if="pendingNotification === 'focus-done'">
           <button class="primary-action" @click="triggerPixelBurstFromEvent($event, 'break', 8); confirmNotification()">
-            <svg class="px-btn-icon" width="11" height="11" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="3" y="1" width="1" height="1" /><rect x="5" y="1" width="1" height="1" />
-              <rect x="2" y="3" width="5" height="4" /><rect x="7" y="4" width="1" height="2" />
-              <rect x="1" y="7" width="6" height="1" />
+            <svg class="px-btn-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="square" aria-hidden="true">
+              <path d="M3 6h7.5v4.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" />
+              <path d="M10.5 7.25h1.75a1.5 1.5 0 0 1 0 3H10.5" />
+              <path d="M5.25 3v1.25M8.25 3v1.25" />
             </svg>
             <span>开始休息</span>
           </button>
@@ -468,16 +468,13 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
                 </svg>
               </button>
               <button class="queue-btn icon-only done" @click="handleDoneTask(task.id, $event)" title="完成" aria-label="完成">
-                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                  <rect x="1" y="4" width="1" height="2" /><rect x="2" y="5" width="1" height="2" />
-                  <rect x="3" y="6" width="1" height="2" /><rect x="4" y="5" width="1" height="2" />
-                  <rect x="5" y="4" width="1" height="2" /><rect x="6" y="3" width="1" height="2" />
-                  <rect x="7" y="2" width="1" height="2" />
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+                  <polyline points="3 8.5 6.5 12 13 4.5" />
                 </svg>
               </button>
               <button class="queue-btn icon-only subtle" @click="abandon()" title="停止" aria-label="停止">
-                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-                  <rect x="2" y="2" width="5" height="5" />
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <rect x="3.5" y="3.5" width="9" height="9" rx="1" />
                 </svg>
               </button>
             </template>
@@ -501,9 +498,8 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
     <div class="quick-add-zone">
       <div class="quick-add-row">
         <div class="quick-add-search">
-          <svg class="search-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-            <rect x="5" y="2" width="2" height="8" />
-            <rect x="2" y="5" width="8" height="2" />
+          <svg class="search-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="square" aria-hidden="true">
+            <path d="M8 3v10M3 8h10" />
           </svg>
           <input
             ref="quickAddRef"

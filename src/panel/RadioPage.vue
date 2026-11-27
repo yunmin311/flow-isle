@@ -193,18 +193,14 @@ async function scrollToPlaying() {
             </svg>
           </button>
           <div class="volume-row">
-            <svg class="vol-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
-              <rect x="1" y="6" width="3" height="4" />
-              <rect x="4" y="5" width="2" height="6" />
-              <rect x="6" y="3" width="2" height="10" />
+            <svg class="vol-icon" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">
+              <path d="M2.25 6h2.75l3.25-2.75v9.5L5 10H2.25V6z" />
               <template v-if="volume === 0">
-                <rect x="10" y="5" width="2" height="2" /><rect x="14" y="5" width="2" height="2" />
-                <rect x="12" y="7" width="2" height="2" />
-                <rect x="10" y="9" width="2" height="2" /><rect x="14" y="9" width="2" height="2" />
+                <path d="M11 6l3 4M14 6l-3 4" />
               </template>
               <template v-else>
-                <rect x="10" y="6" width="2" height="4" />
-                <rect v-if="volume > 45" x="13" y="4" width="2" height="8" />
+                <path d="M11 6.25a2.6 2.6 0 0 1 0 3.5" />
+                <path v-if="volume > 45" d="M13 4.25a5.2 5.2 0 0 1 0 7.5" />
               </template>
             </svg>
             <input
@@ -294,92 +290,72 @@ async function scrollToPlaying() {
             @click="switchStation(station.id)"
           >
             <div class="item-icon">
-              <!-- Code Radio: pixel brackets </> -->
-              <svg v-if="station.icon === 'code'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="5" y="4" width="1" height="2" /><rect x="4" y="5" width="1" height="2" />
-                <rect x="3" y="7" width="1" height="2" /><rect x="4" y="9" width="1" height="2" />
-                <rect x="5" y="10" width="1" height="2" />
-                <rect x="10" y="4" width="1" height="2" /><rect x="11" y="5" width="1" height="2" />
-                <rect x="12" y="7" width="1" height="2" /><rect x="11" y="9" width="1" height="2" />
-                <rect x="10" y="10" width="1" height="2" />
-                <rect x="8" y="4" width="1" height="3" /><rect x="7" y="7" width="1" height="5" />
+              <!-- Code Radio -->
+              <svg v-if="station.icon === 'code'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter">
+                <polyline points="5.5 4.5 2.25 8 5.5 11.5" />
+                <polyline points="10.5 4.5 13.75 8 10.5 11.5" />
+                <line x1="9" y1="3.75" x2="7" y2="12.25" />
               </svg>
-              <!-- Groove Salad: pixel equalizer bars -->
-              <svg v-else-if="station.icon === 'wave'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="2" y="9" width="2" height="5" opacity="0.75" />
-                <rect x="5" y="6" width="2" height="8" opacity="0.9" />
-                <rect x="8" y="3" width="2" height="11" />
-                <rect x="11" y="7" width="2" height="7" opacity="0.8" />
+              <!-- Groove Salad -->
+              <svg v-else-if="station.icon === 'wave'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square">
+                <line x1="3.25" y1="9.5" x2="3.25" y2="13" opacity="0.75" />
+                <line x1="6.5" y1="6" x2="6.5" y2="13" />
+                <line x1="9.75" y1="3" x2="9.75" y2="13" />
+                <line x1="13" y1="7.5" x2="13" y2="13" opacity="0.8" />
               </svg>
-              <!-- Drone Zone: pixel concentric ripple -->
-              <svg v-else-if="station.icon === 'drone'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="7" y="7" width="2" height="2" />
-                <rect x="5" y="4" width="6" height="1" opacity="0.65" /><rect x="5" y="11" width="6" height="1" opacity="0.65" />
-                <rect x="4" y="5" width="1" height="6" opacity="0.65" /><rect x="11" y="5" width="1" height="6" opacity="0.65" />
-                <rect x="4" y="2" width="8" height="1" opacity="0.3" /><rect x="4" y="13" width="8" height="1" opacity="0.3" />
-                <rect x="2" y="4" width="1" height="8" opacity="0.3" /><rect x="13" y="4" width="1" height="8" opacity="0.3" />
+              <!-- Drone Zone -->
+              <svg v-else-if="station.icon === 'drone'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45">
+                <circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" />
+                <circle cx="8" cy="8" r="3.8" opacity="0.75" />
+                <circle cx="8" cy="8" r="6.2" opacity="0.38" />
               </svg>
-              <!-- Deep Space One: pixel ringed planet -->
-              <svg v-else-if="station.icon === 'planet'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="6" y="4" width="4" height="1" /><rect x="5" y="5" width="6" height="6" />
-                <rect x="6" y="11" width="4" height="1" />
-                <rect x="2" y="9" width="3" height="1" opacity="0.7" /><rect x="11" y="6" width="3" height="1" opacity="0.7" />
-                <rect x="3" y="8" width="10" height="1" opacity="0.5" />
+              <!-- Deep Space One -->
+              <svg v-else-if="station.icon === 'planet'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="8" cy="8" r="3.6" />
+                <ellipse cx="8" cy="8" rx="6.6" ry="2.1" transform="rotate(-22 8 8)" opacity="0.75" />
               </svg>
-              <!-- Space Station: pixel 4-point star -->
-              <svg v-else-if="station.icon === 'star'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="7" y="2" width="2" height="12" /><rect x="2" y="7" width="12" height="2" />
-                <rect x="5" y="5" width="6" height="6" />
+              <!-- Space Station -->
+              <svg v-else-if="station.icon === 'star'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter">
+                <path d="M8 2l1.6 4.4L14 8l-4.4 1.6L8 14l-1.6-4.4L2 8l4.4-1.6Z" />
               </svg>
-              <!-- Ambient Pill: pixel capsule -->
-              <svg v-else-if="station.icon === 'pill'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="4" y="5" width="8" height="1" /><rect x="4" y="10" width="8" height="1" />
-                <rect x="3" y="6" width="1" height="4" /><rect x="12" y="6" width="1" height="4" />
-                <rect x="4" y="6" width="4" height="4" opacity="0.55" />
+              <!-- Ambient Pill -->
+              <svg v-else-if="station.icon === 'pill'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55">
+                <rect x="2.25" y="5" width="11.5" height="6" rx="3" />
+                <line x1="8" y1="5" x2="8" y2="11" />
               </svg>
-              <!-- Lo-Fi / Coffee: pixel coffee mug -->
-              <svg v-else-if="station.icon === 'coffee'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="4" y="2" width="1" height="2" opacity="0.65" /><rect x="7" y="2" width="1" height="2" opacity="0.65" />
-                <rect x="3" y="5" width="8" height="7" /><rect x="11" y="6" width="2" height="1" />
-                <rect x="12" y="7" width="1" height="2" /><rect x="11" y="9" width="2" height="1" />
-                <rect x="2" y="12" width="10" height="1" />
+              <!-- Lo-Fi / Coffee -->
+              <svg v-else-if="station.icon === 'coffee'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square">
+                <path d="M3 5.5h7.5v4.75a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5.5z" />
+                <path d="M10.5 6.75h1.75a1.5 1.5 0 0 1 0 3H10.5" />
+                <path d="M5.25 2.75v1M8.25 2.75v1" opacity="0.7" />
               </svg>
-              <!-- Jazz: pixel eighth note -->
-              <svg v-else-if="station.icon === 'jazz'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="6" y="3" width="6" height="2" />
-                <rect x="6" y="5" width="2" height="6" /><rect x="11" y="5" width="2" height="5" />
-                <rect x="4" y="10" width="4" height="3" /><rect x="9" y="9" width="4" height="3" />
+              <!-- Jazz -->
+              <svg v-else-if="station.icon === 'jazz'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square">
+                <path d="M6 11.75V4l7-1.25v7.5" />
+                <circle cx="4.75" cy="11.75" r="1.5" />
+                <circle cx="11.75" cy="10.25" r="1.5" />
               </svg>
-              <!-- Secret Agent: pixel spy glass -->
-              <svg v-else-if="station.icon === 'spy'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="5" y="3" width="4" height="1" /><rect x="5" y="10" width="4" height="1" />
-                <rect x="3" y="5" width="1" height="4" /><rect x="10" y="5" width="1" height="4" />
-                <rect x="4" y="4" width="1" height="1" /><rect x="9" y="4" width="1" height="1" />
-                <rect x="4" y="9" width="1" height="1" /><rect x="9" y="9" width="1" height="1" />
-                <rect x="6" y="6" width="2" height="2" opacity="0.65" />
-                <rect x="10" y="10" width="2" height="2" /><rect x="12" y="12" width="2" height="2" />
+              <!-- Secret Agent -->
+              <svg v-else-if="station.icon === 'spy'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
+                <circle cx="7" cy="7" r="4.25" />
+                <line x1="10.25" y1="10.25" x2="13.75" y2="13.75" />
               </svg>
-              <!-- DEF CON: pixel terminal -->
-              <svg v-else-if="station.icon === 'hacker'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="2" y="3" width="12" height="1" /><rect x="2" y="11" width="12" height="1" />
-                <rect x="2" y="4" width="1" height="7" /><rect x="13" y="4" width="1" height="7" />
-                <rect x="4" y="6" width="1" height="1" /><rect x="5" y="7" width="1" height="1" /><rect x="4" y="8" width="1" height="1" />
-                <rect x="7" y="8" width="4" height="1" />
-                <rect x="5" y="13" width="6" height="1" />
+              <!-- DEF CON -->
+              <svg v-else-if="station.icon === 'hacker'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter">
+                <rect x="2" y="3" width="12" height="8.75" rx="1" />
+                <polyline points="4.5 6 6.5 7.5 4.5 9" />
+                <line x1="8" y1="9" x2="11" y2="9" />
+                <line x1="5.5" y1="13.5" x2="10.5" y2="13.5" />
               </svg>
-              <!-- 导入条目: pixel link -->
-              <svg v-else-if="station.icon === 'link'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="3" y="6" width="4" height="1" /><rect x="3" y="9" width="4" height="1" />
-                <rect x="2" y="7" width="1" height="2" />
-                <rect x="9" y="6" width="4" height="1" /><rect x="9" y="9" width="4" height="1" />
-                <rect x="13" y="7" width="1" height="2" />
-                <rect x="6" y="7" width="4" height="2" />
+              <!-- 导入条目 -->
+              <svg v-else-if="station.icon === 'link'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square">
+                <path d="M6.75 10.5H4.75a2.5 2.5 0 0 1 0-5h2" />
+                <path d="M9.25 5.5h2a2.5 2.5 0 0 1 0 5h-2" />
+                <line x1="5.75" y1="8" x2="10.25" y2="8" />
               </svg>
-              <!-- 本地音乐: pixel folder -->
-              <svg v-else-if="station.icon === 'folder'" viewBox="0 0 16 16" fill="currentColor" shape-rendering="crispEdges">
-                <rect x="2" y="4" width="5" height="2" />
-                <rect x="2" y="6" width="12" height="7" />
-                <rect x="4" y="8" width="8" height="1" opacity="0.35" />
+              <!-- 本地音乐 -->
+              <svg v-else-if="station.icon === 'folder'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square">
+                <path d="M2.25 4a1.25 1.25 0 0 1 1.25-1.25h3l1.5 1.5h4.5a1.25 1.25 0 0 1 1.25 1.25v6.25a1.25 1.25 0 0 1-1.25 1.25h-9a1.25 1.25 0 0 1-1.25-1.25V4z" />
               </svg>
               <div v-if="currentStation?.id === station.id && playing" class="playing-indicator">
                 <span /><span /><span />
