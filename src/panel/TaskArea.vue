@@ -327,7 +327,14 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
       </div>
 
       <div class="pixel-progress" aria-hidden="true">
-        <i v-for="(filled, index) in progressBars" :key="index" :class="{ filled }" />
+        <i
+          v-for="(filled, index) in progressBars"
+          :key="index"
+          :class="{
+            filled,
+            'is-head': running && !filled && (index === 0 || progressBars[index - 1]),
+          }"
+        />
       </div>
 
       <div class="hero-meta">
@@ -569,6 +576,42 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   transition: background 420ms ease, border-color 360ms ease, box-shadow 360ms ease;
 }
 
+/* 像素×玻璃 专注进行中微角标取景框（仅计时运行时点亮） */
+.focus-hero::before,
+.focus-hero::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms steps(3, end), border-color 240ms ease;
+}
+
+.focus-hero::before {
+  top: 7px;
+  left: 7px;
+  border-top: 2px solid var(--v2-accent);
+  border-left: 2px solid var(--v2-accent);
+}
+
+.focus-hero::after {
+  right: 7px;
+  bottom: 7px;
+  border-right: 2px solid var(--v2-accent);
+  border-bottom: 2px solid var(--v2-accent);
+}
+
+.focus-hero.is-running::before,
+.focus-hero.is-running::after {
+  opacity: 0.72;
+}
+
+.focus-hero.is-break::before,
+.focus-hero.is-break::after {
+  border-color: var(--v2-break);
+}
+
 .focus-hero.is-break .pixel-status,
 .focus-hero.is-break .pixel-progress i.filled {
   background-color: var(--v2-break);
@@ -668,6 +711,20 @@ function handleDoneTask(taskId: string, event?: MouseEvent) {
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, #fff 36%, transparent),
     inset 0 -1px 0 color-mix(in srgb, #000 22%, transparent);
+}
+
+.focus-hero.is-running .pixel-progress i.is-head {
+  background: var(--v2-accent);
+  animation: pixel-cursor-blink 1.05s steps(2, end) infinite;
+}
+
+.focus-hero.is-break.is-running .pixel-progress i.is-head {
+  background: var(--v2-break);
+}
+
+@keyframes pixel-cursor-blink {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 0.18; }
 }
 
 .hero-meta {

@@ -1110,34 +1110,57 @@ onUnmounted(() => {
   position: relative;
   width: 42px;
   height: 24px;
-  border-radius: 999px;
-  background: var(--ui-hover);
+  border-radius: 7px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
   border: 1px solid var(--v2-line);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  box-shadow: var(--pixel-lcd-well);
+  transition: background-color 160ms steps(4, end), border-color 160ms steps(4, end);
+}
+
+.switch-track::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  width: 3px;
+  height: 3px;
+  transform: translateY(-50%);
+  background: var(--v2-on-accent);
+  opacity: 0;
+  transition: opacity 140ms steps(2, end);
 }
 
 .switch-track::after {
   content: '';
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: var(--pixel-bevel-sm);
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background-color: var(--v2-surface);
+  background-image: var(--pixel-dither);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
+  transition: transform 170ms steps(5, end), background-color 160ms steps(3, end), border-color 160ms ease;
 }
 
 .switch input:checked + .switch-track {
   background-color: var(--focus-color);
   background-image: var(--pixel-dither);
   border-color: color-mix(in srgb, #000 18%, var(--focus-color));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 22%, transparent);
+}
+
+.switch input:checked + .switch-track::before {
+  opacity: 0.88;
 }
 
 .switch input:checked + .switch-track::after {
-  transform: translateX(18px);
-  background: var(--v2-on-accent);
+  transform: translate3d(18px, 0, 0);
+  background-color: var(--v2-on-accent);
+  border-color: color-mix(in srgb, #000 14%, transparent);
 }
 
 .switch input:focus-visible + .switch-track {

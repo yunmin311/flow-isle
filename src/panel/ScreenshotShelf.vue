@@ -165,35 +165,42 @@ async function clearAll() {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
-  width: 28px;
-  height: 16px;
+  width: 30px;
+  height: 18px;
   margin: 0;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid var(--v2-line);
-  background: color-mix(in srgb, var(--v2-ink) 14%, transparent);
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  box-shadow: var(--pixel-lcd-well);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 180ms ease, border-color 180ms ease;
+  transition: background-color 150ms steps(4, end), border-color 150ms steps(4, end);
 }
 .capture-switch::after {
   content: '';
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  background: var(--v2-on-accent);
-  box-shadow: var(--pixel-bevel-sm);
-  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background-color: var(--v2-surface);
+  background-image: var(--pixel-dither);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-keycap);
+  transition: transform 160ms steps(4, end), background-color 140ms steps(3, end);
 }
 .capture-switch:checked {
   background-color: var(--v2-accent);
   background-image: var(--pixel-dither);
   border-color: color-mix(in srgb, #000 16%, var(--v2-accent));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 20%, transparent);
 }
 .capture-switch:checked::after {
   transform: translate3d(12px, 0, 0);
+  background-color: var(--v2-on-accent);
+  border-color: color-mix(in srgb, #000 12%, transparent);
 }
 .capture-scope { font-size: 10.5px; color: var(--v2-muted); }
 .clear-screenshots {

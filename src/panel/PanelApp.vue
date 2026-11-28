@@ -76,7 +76,6 @@ const notificationFocusRequest = ref<{ recordId?: string; openSource?: boolean; 
 const panelContent = ref<HTMLElement | null>(null)
 let notificationRouteFocus: string | undefined
 const viewScrollMemory = new Map<string, number>()
-let activeViewAnim: Animation | null = null
 
 const viewOrder: Record<string, number> = {
   tasks: 0,
@@ -105,7 +104,12 @@ const activeNavIndex = computed(() => {
 })
 const navGliding = ref(false)
 const navSlideDir = ref<1 | -1>(1)
+const viewSlideDir = ref<1 | -1>(1)
 let navGlideTimer: number | null = null
+
+const viewTransitionName = computed(() =>
+  viewSlideDir.value > 0 ? 'view-glide-next' : 'view-glide-prev',
+)
 
 function triggerNavGlide(dir: 1 | -1) {
   navSlideDir.value = dir
@@ -117,6 +121,11 @@ function triggerNavGlide(dir: 1 | -1) {
   }, 230)
 }
 
+function onViewBeforeEnter(el: Element) {
+  const htmlEl = el as HTMLElement
+  htmlEl.scrollTop = viewScrollMemory.get(currentView.value) ?? 0
+}
+
 function navigateTo(nextView: typeof currentView.value) {
   const prevView = currentView.value
   if (prevView === nextView) return
@@ -124,32 +133,13 @@ function navigateTo(nextView: typeof currentView.value) {
   const prevChild = panelContent.value?.firstElementChild as HTMLElement | null
   if (prevChild) viewScrollMemory.set(prevView, prevChild.scrollTop)
 
-  const dir: 1 | -1 = (viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1
   const isDetailDrill = nextView === 'taskDetail' || prevView === 'taskDetail'
+  const dir: 1 | -1 = isDetailDrill
+    ? (nextView === 'taskDetail' ? 1 : -1)
+    : ((viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1)
+  viewSlideDir.value = dir
   if (!isDetailDrill) triggerNavGlide(dir)
   currentView.value = nextView
-
-  void nextTick(() => {
-    const nextChild = panelContent.value?.firstElementChild as HTMLElement | null
-    if (!nextChild) return
-    const savedScroll = viewScrollMemory.get(nextView) ?? 0
-    nextChild.scrollTop = savedScroll
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    activeViewAnim?.cancel()
-    if (typeof nextChild.animate === 'function') {
-      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 22 : -18) : dir * 16
-      activeViewAnim = nextChild.animate(
-        [
-          { opacity: 0.35, transform: `translate3d(${startX}px, 0, 0)` },
-          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
-        ],
-        {
-          duration: 165,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-        },
-      )
-    }
-  })
 }
 
 function openCompanionPanel() {
@@ -499,23 +489,26 @@ async function closeWindow() {
         @close="closeWindow"
       />
       <div ref="panelContent" class="panel-body" tabindex="-1">
-        <KeepAlive :include="cachedPanelViews" :max="3">
-          <TaskArea v-if="currentView === 'tasks'" category="today" @close="closeWindow" @open-companion="openCompanionPanel" />
-          <TodoPage v-else-if="currentView === 'todo'" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; navigateTo('taskDetail') }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
-          <TaskDetailPage v-else-if="currentView === 'taskDetail'" :task-id="taskIdForDetail" @back="navigateTo('todo')" />
-          <SettingsPage v-else-if="currentView === 'settings'" @back="navigateTo('tasks')" />
-          <MemoPage v-else-if="currentView === 'memos'" :search-query="memoSearchQuery" @back="navigateTo('tasks')" />
-          <StatsPage v-else-if="currentView === 'stats'" @back="navigateTo('tasks')" />
-          <RadioPage v-else-if="currentView === 'radio'" @back="navigateTo('tasks')" />
-          <NotificationsPage
-            v-else-if="currentView === 'notifications'"
-            :focus-request="panelAnimState === 'steady' ? notificationFocusRequest : undefined"
-            @back="navigateTo('tasks')"
-            @open-task="taskId => openNotificationDestination('taskDetail', taskId)"
-            @open-home="openNotificationDestination('tasks')"
-            @open-todo="openNotificationDestination('todo')"
-          />
-        </KeepAlive>
+        <Transition :name="viewTransitionName" mode="out-in" @before-enter="onViewBeforeEnter">
+          <KeepAlive :include="cachedPanelViews" :max="3">
+            <TaskArea v-if="currentView === 'tasks'" key="tasks" category="today" @close="closeWindow" @open-companion="openCompanionPanel" />
+            <TodoPage v-else-if="currentView === 'todo'" key="todo" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; navigateTo('taskDetail') }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
+            <TaskDetailPage v-else-if="currentView === 'taskDetail'" key="taskDetail" :task-id="taskIdForDetail" @back="navigateTo('todo')" />
+            <SettingsPage v-else-if="currentView === 'settings'" key="settings" @back="navigateTo('tasks')" />
+            <MemoPage v-else-if="currentView === 'memos'" key="memos" :search-query="memoSearchQuery" @back="navigateTo('tasks')" />
+            <StatsPage v-else-if="currentView === 'stats'" key="stats" @back="navigateTo('tasks')" />
+            <RadioPage v-else-if="currentView === 'radio'" key="radio" @back="navigateTo('tasks')" />
+            <NotificationsPage
+              v-else-if="currentView === 'notifications'"
+              key="notifications"
+              :focus-request="panelAnimState === 'steady' ? notificationFocusRequest : undefined"
+              @back="navigateTo('tasks')"
+              @open-task="taskId => openNotificationDestination('taskDetail', taskId)"
+              @open-home="openNotificationDestination('tasks')"
+              @open-todo="openNotificationDestination('todo')"
+            />
+          </KeepAlive>
+        </Transition>
       </div>
       <nav class="panel-nav" aria-label="主导航">
         <div
@@ -847,6 +840,37 @@ async function closeWindow() {
   background: transparent;
 }
 
+/* 主页面顺滑阻尼切换（out-in 避免首帧闪回抽动，与底栏像素滑块 210ms 节奏协同） */
+.view-glide-next-leave-active,
+.view-glide-prev-leave-active {
+  transition: opacity 85ms cubic-bezier(0.4, 0, 1, 1), transform 85ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+.view-glide-next-enter-active,
+.view-glide-prev-enter-active {
+  transition: opacity 185ms cubic-bezier(0.22, 1, 0.36, 1), transform 195ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.view-glide-next-leave-to {
+  opacity: 0;
+  transform: translate3d(-9px, 0, 0);
+}
+
+.view-glide-next-enter-from {
+  opacity: 0;
+  transform: translate3d(13px, 0, 0);
+}
+
+.view-glide-prev-leave-to {
+  opacity: 0;
+  transform: translate3d(9px, 0, 0);
+}
+
+.view-glide-prev-enter-from {
+  opacity: 0;
+  transform: translate3d(-13px, 0, 0);
+}
+
 .panel-nav {
   position: relative;
   z-index: 7;
@@ -894,6 +918,17 @@ async function closeWindow() {
   transition: transform 210ms steps(7, end), box-shadow 140ms steps(3, end);
   pointer-events: none;
   z-index: 0;
+}
+
+.nav-pixel-slider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 5px;
+  height: 2px;
+  background: var(--v2-specular);
+  opacity: 0.9;
 }
 
 .nav-pixel-slider::after {
@@ -986,6 +1021,14 @@ async function closeWindow() {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .view-glide-next-leave-active,
+  .view-glide-prev-leave-active,
+  .view-glide-next-enter-active,
+  .view-glide-prev-enter-active,
+  .nav-pixel-slider {
+    transition: none;
+  }
+
   .motion-opening {
     animation: panel-fade-in 120ms ease-out both;
   }
