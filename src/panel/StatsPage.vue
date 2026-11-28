@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useDailyStats } from '../composables/useDailyStats'
 import { useAchievements, type Achievement } from '../composables/useAchievements'
 import { useTasks, getTaskTimeCategory, todayString, isRepeatActiveOn } from '../composables/useTasks'
@@ -35,6 +35,50 @@ const timeRangeOptions: { value: TimeRange; label: string }[] = [
   { value: 'month', label: '本月' },
   { value: 'all', label: '全部' },
 ]
+
+// 像素滑块联动状态（专注记录/陪伴相册 + 时间范围）
+const sectionIndex = computed(() => (statsSection.value === 'companions' ? 1 : 0))
+const sectionSlideDir = ref<1 | -1>(1)
+const sectionGliding = ref(false)
+let sectionGlideTimer: number | null = null
+
+const rangeIndex = computed(() => Math.max(0, timeRangeOptions.findIndex(o => o.value === timeRange.value)))
+const rangeSlideDir = ref<1 | -1>(1)
+const rangeGliding = ref(false)
+let rangeGlideTimer: number | null = null
+
+const sectionTransitionName = computed(() =>
+  sectionSlideDir.value > 0 ? 'pixel-swap-next' : 'pixel-swap-prev',
+)
+
+watch(statsSection, (next, prev) => {
+  if (next === prev) return
+  sectionSlideDir.value = next === 'companions' ? 1 : -1
+  sectionGliding.value = true
+  if (sectionGlideTimer !== null) window.clearTimeout(sectionGlideTimer)
+  sectionGlideTimer = window.setTimeout(() => {
+    sectionGliding.value = false
+    sectionGlideTimer = null
+  }, 210)
+})
+
+watch(timeRange, (next, prev) => {
+  if (next === prev) return
+  const nextIdx = timeRangeOptions.findIndex(o => o.value === next)
+  const prevIdx = timeRangeOptions.findIndex(o => o.value === prev)
+  rangeSlideDir.value = nextIdx >= prevIdx ? 1 : -1
+  rangeGliding.value = true
+  if (rangeGlideTimer !== null) window.clearTimeout(rangeGlideTimer)
+  rangeGlideTimer = window.setTimeout(() => {
+    rangeGliding.value = false
+    rangeGlideTimer = null
+  }, 210)
+})
+
+onUnmounted(() => {
+  if (sectionGlideTimer !== null) window.clearTimeout(sectionGlideTimer)
+  if (rangeGlideTimer !== null) window.clearTimeout(rangeGlideTimer)
+})
 
 const currentStats = computed(() => {
   switch (timeRange.value) {
@@ -236,7 +280,13 @@ function steppedBarHeight(pomodoros: number): string {
     <div class="page-header">
       <BackButton @click="emit('back')" />
       <h2 class="page-title">记录与陪伴</h2>
-      <div class="section-tabs" role="tablist" aria-label="记录板块">
+      <div
+        class="section-tabs"
+        role="tablist"
+        aria-label="记录板块"
+        :style="{ '--seg-index': sectionIndex, '--seg-count': 2, '--seg-dir': sectionSlideDir }"
+      >
+        <span class="seg-pixel-thumb" :class="{ 'is-gliding': sectionGliding }" aria-hidden="true" />
         <button
           role="tab"
           :aria-selected="statsSection === 'stats'"
@@ -256,22 +306,27 @@ function steppedBarHeight(pomodoros: number): string {
       </div>
     </div>
 
-    <CompanionPanel v-if="statsSection === 'companions'" />
+    <Transition :name="sectionTransitionName" mode="out-in">
+      <CompanionPanel v-if="statsSection === 'companions'" key="companions" />
 
-    <template v-else>
-      <div class="range-bar">
-        <span class="range-caption">时间范围</span>
-        <div class="time-range-tabs">
-          <button
-            v-for="opt in timeRangeOptions"
-            :key="opt.value"
-            :class="['tab', { active: timeRange === opt.value }]"
-            @click="timeRange = opt.value"
+      <div v-else key="stats" class="stats-records-body">
+        <div class="range-bar">
+          <span class="range-caption">时间范围</span>
+          <div
+            class="time-range-tabs"
+            :style="{ '--seg-index': rangeIndex, '--seg-count': timeRangeOptions.length, '--seg-dir': rangeSlideDir }"
           >
-            {{ opt.label }}
-          </button>
+            <span class="seg-pixel-thumb" :class="{ 'is-gliding': rangeGliding }" aria-hidden="true" />
+            <button
+              v-for="opt in timeRangeOptions"
+              :key="opt.value"
+              :class="['tab', { active: timeRange === opt.value }]"
+              @click="timeRange = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
-      </div>
 
       <!-- 4-Up Overview -->
       <div class="stats-cards">
@@ -505,7 +560,8 @@ function steppedBarHeight(pomodoros: number): string {
           </div>
         </Transition>
       </div>
-    </template>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -537,17 +593,55 @@ function steppedBarHeight(pomodoros: number): string {
   min-width: 0;
 }
 
+.stats-records-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
 .section-tabs,
 .time-range-tabs {
-  display: inline-flex;
-  background: var(--ui-well);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--seg-count, 2), minmax(0, 1fr));
+  align-items: center;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
   border: 1px solid var(--v2-line);
-  border-radius: 8px;
-  padding: 2px;
-  gap: 2px;
+  box-shadow: var(--pixel-lcd-well);
+  border-radius: 9px;
+  padding: 3px;
+}
+
+.seg-pixel-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--seg-count, 2));
+  border-radius: 6px;
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  transform: translate3d(calc(var(--seg-index, 0) * 100%), 0, 0);
+  transition: transform 190ms steps(6, end), box-shadow 130ms steps(3, end);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+
+.seg-pixel-thumb.is-gliding {
+  box-shadow:
+    calc(var(--seg-dir, 1) * -4px) 0 0 color-mix(in srgb, var(--v2-accent) 34%, transparent),
+    calc(var(--seg-dir, 1) * -8px) 0 0 color-mix(in srgb, var(--v2-accent) 14%, transparent),
+    var(--pixel-bevel-sm);
 }
 
 .tab {
+  position: relative;
+  z-index: 1;
   padding: 4px 9px;
   font-size: 11px;
   font-weight: 500;
@@ -557,18 +651,59 @@ function steppedBarHeight(pomodoros: number): string {
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 140ms ease, background 140ms ease;
+  text-align: center;
+  transition: color 130ms steps(3, end);
 }
 
 .tab:hover {
-  color: var(--v2-secondary);
+  color: var(--v2-ink);
 }
 
 .tab.active {
-  background-color: var(--v2-accent);
-  background-image: var(--pixel-dither);
-  box-shadow: var(--pixel-bevel-sm);
   color: var(--v2-on-accent);
+  font-weight: 650;
+}
+
+.tab.active:hover {
+  color: var(--v2-on-accent);
+}
+
+/* 专注记录 ↔ 陪伴相册 像素步进横向切换 */
+.pixel-swap-next-enter-active,
+.pixel-swap-next-leave-active,
+.pixel-swap-prev-enter-active,
+.pixel-swap-prev-leave-active {
+  transition: opacity 150ms steps(4, end), transform 160ms steps(5, end);
+}
+
+.pixel-swap-next-enter-from {
+  opacity: 0;
+  transform: translate3d(18px, 0, 0);
+}
+
+.pixel-swap-next-leave-to {
+  opacity: 0;
+  transform: translate3d(-14px, 0, 0);
+}
+
+.pixel-swap-prev-enter-from {
+  opacity: 0;
+  transform: translate3d(-18px, 0, 0);
+}
+
+.pixel-swap-prev-leave-to {
+  opacity: 0;
+  transform: translate3d(14px, 0, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-pixel-thumb,
+  .pixel-swap-next-enter-active,
+  .pixel-swap-next-leave-active,
+  .pixel-swap-prev-enter-active,
+  .pixel-swap-prev-leave-active {
+    transition: none;
+  }
 }
 
 .range-bar {

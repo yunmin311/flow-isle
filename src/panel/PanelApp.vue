@@ -98,6 +98,25 @@ function pulsePanelGlass(ms = 240) {
   }, ms)
 }
 
+const activeNavIndex = computed(() => {
+  const key = currentView.value === 'taskDetail' ? 'todo' : currentView.value
+  const idx = navItems.findIndex(item => item.key === key)
+  return idx >= 0 ? idx : 0
+})
+const navGliding = ref(false)
+const navSlideDir = ref<1 | -1>(1)
+let navGlideTimer: number | null = null
+
+function triggerNavGlide(dir: 1 | -1) {
+  navSlideDir.value = dir
+  navGliding.value = true
+  if (navGlideTimer !== null) window.clearTimeout(navGlideTimer)
+  navGlideTimer = window.setTimeout(() => {
+    navGliding.value = false
+    navGlideTimer = null
+  }, 230)
+}
+
 function navigateTo(nextView: typeof currentView.value) {
   const prevView = currentView.value
   if (prevView === nextView) return
@@ -105,8 +124,9 @@ function navigateTo(nextView: typeof currentView.value) {
   const prevChild = panelContent.value?.firstElementChild as HTMLElement | null
   if (prevChild) viewScrollMemory.set(prevView, prevChild.scrollTop)
 
-  const dir = (viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1
+  const dir: 1 | -1 = (viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1
   const isDetailDrill = nextView === 'taskDetail' || prevView === 'taskDetail'
+  if (!isDetailDrill) triggerNavGlide(dir)
   currentView.value = nextView
 
   void nextTick(() => {
@@ -115,18 +135,17 @@ function navigateTo(nextView: typeof currentView.value) {
     const savedScroll = viewScrollMemory.get(nextView) ?? 0
     nextChild.scrollTop = savedScroll
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    pulsePanelGlass(300)
     activeViewAnim?.cancel()
     if (typeof nextChild.animate === 'function') {
-      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 22 : -18) : dir * 16
+      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 24 : -20) : dir * 18
       activeViewAnim = nextChild.animate(
         [
-          { opacity: 0, transform: `translate3d(${startX}px, 3px, 0) scale(0.988)` },
-          { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1)' },
+          { opacity: 0.2, transform: `translate3d(${startX}px, 0, 0)` },
+          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
         ],
         {
-          duration: 320,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          duration: 185,
+          easing: 'steps(6, end)',
         },
       )
     }
@@ -434,6 +453,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('keydown', onPanelKeydown)
   clearCloseFallback()
+  if (navGlideTimer !== null) window.clearTimeout(navGlideTimer)
   if (uninstallPixelSpark) uninstallPixelSpark()
   if (unlistenTransition) unlistenTransition()
   if (unlistenOpenNotifications) unlistenOpenNotifications()
@@ -497,25 +517,39 @@ async function closeWindow() {
           />
         </KeepAlive>
       </div>
-      <nav class="panel-nav">
-        <button
-          v-for="item in navItems"
-          :key="item.key"
-          class="nav-btn"
-          :class="{ active: currentView === item.key }"
-          @click="navigateTo(item.key)"
+      <nav class="panel-nav" aria-label="主导航">
+        <div
+          class="panel-nav-track"
+          :style="{
+            '--nav-index': activeNavIndex,
+            '--nav-count': navItems.length,
+            '--nav-dir': navSlideDir,
+          }"
         >
-          <span class="nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square" stroke-linejoin="miter">
-              <path
-                v-for="(path, pathIndex) in item.iconPaths"
-                :key="`${item.key}-icon-${pathIndex}`"
-                :d="path"
-              />
-            </svg>
-          </span>
-          <span class="nav-label">{{ item.label }}</span>
-        </button>
+          <span
+            class="nav-pixel-slider"
+            :class="{ 'is-gliding': navGliding }"
+            aria-hidden="true"
+          />
+          <button
+            v-for="item in navItems"
+            :key="item.key"
+            class="nav-btn"
+            :class="{ active: (currentView === 'taskDetail' ? 'todo' : currentView) === item.key }"
+            @click="navigateTo(item.key)"
+          >
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square" stroke-linejoin="miter">
+                <path
+                  v-for="(path, pathIndex) in item.iconPaths"
+                  :key="`${item.key}-icon-${pathIndex}`"
+                  :d="path"
+                />
+              </svg>
+            </span>
+            <span class="nav-label">{{ item.label }}</span>
+          </button>
+        </div>
       </nav>
       </div>
     </div>
@@ -817,12 +851,10 @@ async function closeWindow() {
   position: relative;
   z-index: 7;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 6px;
   /* 底栏并入面板外壳：不再做第二张悬浮卡片 */
   margin: 0;
-  padding: 8px 16px;
+  padding: 6px 10px 8px;
   border: 0;
   border-top: 1px solid var(--v2-line);
   border-radius: 0;
@@ -831,15 +863,67 @@ async function closeWindow() {
   flex-shrink: 0;
 }
 
+.panel-nav-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  padding: 3px;
+  border-radius: 10px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
+}
+
+.nav-pixel-slider {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--nav-count, 7));
+  border-radius: 7px;
+  background-color: var(--v2-surface);
+  background-image: var(--pixel-dither);
+  border: 1.5px solid color-mix(in srgb, var(--v2-accent) 74%, var(--v2-line));
+  box-shadow:
+    var(--pixel-keycap),
+    0 0 0 1px color-mix(in srgb, var(--v2-accent) 14%, transparent);
+  transform: translate3d(calc(var(--nav-index, 0) * 100%), 0, 0);
+  transition: transform 210ms steps(7, end), box-shadow 140ms steps(3, end);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+
+.nav-pixel-slider::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 14px;
+  height: 2px;
+  background: var(--v2-accent);
+  transform: translateX(-50%);
+}
+
+.nav-pixel-slider.is-gliding {
+  box-shadow:
+    calc(var(--nav-dir, 1) * -4px) 0 0 color-mix(in srgb, var(--v2-accent) 26%, transparent),
+    calc(var(--nav-dir, 1) * -9px) 0 0 color-mix(in srgb, var(--v2-accent) 11%, transparent),
+    var(--pixel-keycap);
+}
+
 .nav-btn {
   position: relative;
+  z-index: 1;
   display: inline-flex;
-  flex: 1 1 0;
   min-width: 0;
   justify-content: center;
   align-items: center;
   gap: 4px;
-  padding: 6px 4px;
+  padding: 6px 3px 7px;
   background: transparent;
   border: none;
   outline: none;
@@ -847,52 +931,37 @@ async function closeWindow() {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 8px;
-  transition: color 0.24s ease, background 0.24s ease, transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 7px;
+  transition: color 140ms steps(3, end);
   font-family: inherit;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .nav-btn:hover {
   color: var(--v2-ink);
-  background: var(--ui-well);
 }
 
-.nav-btn:active {
-  transform: translate3d(0, 1px, 0) scale(0.93);
+.nav-btn:active .nav-icon,
+.nav-btn:active .nav-label {
+  transform: translate3d(0, 1px, 0);
 }
 
 .nav-btn.active {
   color: var(--v2-accent);
-  background: color-mix(in srgb, var(--v2-accent) 10%, transparent);
+  font-weight: 650;
 }
 
-.nav-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: 2px;
-  left: 50%;
-  width: 12px;
-  height: 3px;
-  border-radius: 0;
-  background: var(--v2-accent);
-  transform: translateX(-50%);
-  animation: nav-pip-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.nav-btn.active .nav-icon {
+  animation: nav-icon-snap 160ms steps(2, end) both;
 }
 
-@keyframes nav-pip-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) scaleX(0.3);
+@keyframes nav-icon-snap {
+  0% {
+    transform: translate3d(0, -2px, 0);
   }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) scaleX(1);
+  100% {
+    transform: translate3d(0, 0, 0);
   }
-}
-
-.nav-btn.active:hover {
-  background: color-mix(in srgb, var(--v2-accent) 14%, transparent);
 }
 
 .nav-icon {

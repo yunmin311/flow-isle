@@ -188,22 +188,19 @@ const PREMIUM_BACKGROUND_SPECS: Array<{
 }> = [
   { id: 'motif-star', file: 'motif-star.png', name: '星际信号', cost: 120, effect: 'stars', effectLabel: '流星闪烁' },
   { id: 'motif-camp', file: 'motif-camp.png', name: '篝火营地', cost: 100, effect: 'fireflies', effectLabel: '营火萤光' },
-  { id: 'motif-night', file: 'motif-night.png', name: '月夜梦境', cost: 110, effect: 'stars', effectLabel: '月夜星芒' },
-  { id: 'motif-crystal', file: 'motif-crystal.png', name: '晶石收藏', cost: 120, effect: 'sparkle', effectLabel: '晶石微尘' },
+  { id: 'motif-crystal', file: 'motif-crystal.png', name: '晶石星洞', cost: 120, effect: 'sparkle', effectLabel: '晶石微尘' },
   { id: 'motif-sea', file: 'motif-sea.png', name: '海底来信', cost: 110, effect: 'bubbles', effectLabel: '海蓝气泡' },
   { id: 'motif-island', file: 'motif-island.png', name: '海岸灯塔', cost: 90, effect: 'bubbles', effectLabel: '海风微光' },
-  { id: 'motif-weather', file: 'motif-weather.png', name: '雨后天气', cost: 90, effect: 'rain', effectLabel: '晴雨虹光' },
-  { id: 'motif-flower', file: 'motif-flower.png', name: '花事慢开', cost: 90, effect: 'petals', effectLabel: '花瓣轻飘' },
-  { id: 'motif-sprout', file: 'motif-sprout.png', name: '森林幼苗', cost: 80, effect: 'fireflies', effectLabel: '林间萤点' },
-  { id: 'motif-mountain', file: 'motif-mountain.png', name: '山野旅程', cost: 90, effect: 'sparkle', effectLabel: '山风微雪' },
+  { id: 'motif-weather', file: 'motif-weather.png', name: '雨后虹光', cost: 90, effect: 'rain', effectLabel: '晴雨虹光' },
+  { id: 'motif-flower', file: 'motif-flower.png', name: '玻璃花房', cost: 90, effect: 'petals', effectLabel: '花瓣轻飘' },
+  { id: 'motif-sprout', file: 'motif-sprout.png', name: '森林小径', cost: 80, effect: 'fireflies', effectLabel: '林间萤点' },
+  { id: 'motif-mountain', file: 'motif-mountain.png', name: '雪山旅程', cost: 90, effect: 'sparkle', effectLabel: '山风微雪' },
   { id: 'motif-coffee', file: 'motif-coffee.png', name: '咖啡手账', cost: 80, effect: 'steam', effectLabel: '咖啡热气' },
   { id: 'motif-tea', file: 'motif-tea.png', name: '茶室清欢', cost: 80, effect: 'steam', effectLabel: '竹影茶雾' },
   { id: 'motif-tomato', file: 'motif-tomato.png', name: '番茄温室', cost: 60, effect: 'sparkle', effectLabel: '温室日光' },
   { id: 'motif-post', file: 'motif-post.png', name: '信笺邮局', cost: 70, effect: 'petals', effectLabel: '微风信笺' },
   { id: 'motif-game', file: 'motif-game.png', name: '复古存档', cost: 100, effect: 'sparkle', effectLabel: '像素星光' },
   { id: 'motif-paper', file: 'motif-paper.png', name: '纸船远行', cost: 80, effect: 'bubbles', effectLabel: '涟漪微光' },
-  { id: 'motif-cat', file: 'motif-cat.png', name: '猫舍小窗', cost: 70, effect: 'steam', effectLabel: '暖阳微尘' },
-  { id: 'motif-rabbit', file: 'motif-rabbit.png', name: '兔兔花园', cost: 70, effect: 'petals', effectLabel: '花园落瓣' },
 ]
 
 export const companionPremiumBackgrounds: CompanionBackgroundItem[] = PREMIUM_BACKGROUND_SPECS.map((spec) => ({
