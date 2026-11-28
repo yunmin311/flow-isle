@@ -137,15 +137,15 @@ function navigateTo(nextView: typeof currentView.value) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     activeViewAnim?.cancel()
     if (typeof nextChild.animate === 'function') {
-      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 24 : -20) : dir * 18
+      const startX = isDetailDrill ? (nextView === 'taskDetail' ? 22 : -18) : dir * 16
       activeViewAnim = nextChild.animate(
         [
-          { opacity: 0.2, transform: `translate3d(${startX}px, 0, 0)` },
+          { opacity: 0.35, transform: `translate3d(${startX}px, 0, 0)` },
           { opacity: 1, transform: 'translate3d(0, 0, 0)' },
         ],
         {
-          duration: 185,
-          easing: 'steps(6, end)',
+          duration: 165,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
         },
       )
     }
@@ -894,7 +894,6 @@ async function closeWindow() {
   transition: transform 210ms steps(7, end), box-shadow 140ms steps(3, end);
   pointer-events: none;
   z-index: 0;
-  will-change: transform;
 }
 
 .nav-pixel-slider::after {

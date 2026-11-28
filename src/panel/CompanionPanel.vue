@@ -437,7 +437,13 @@ async function collect(event?: MouseEvent) {
           <button class="quiet-button chooser-close" @click="closeChooser">完成</button>
         </div>
         <p class="choice-note">选一位陪你专注</p>
-        <div class="family-filters" role="group" aria-label="图案分类">
+        <div
+          class="family-filters"
+          role="group"
+          aria-label="图案分类"
+          :style="{ '--seg-count': families.length, '--seg-index': Math.max(0, families.findIndex(f => f.id === family)) }"
+        >
+          <span class="filter-pixel-thumb" aria-hidden="true" />
           <button
             v-for="item in families"
             :key="item.id"
@@ -531,7 +537,13 @@ async function collect(event?: MouseEvent) {
         <p class="choice-note">
           每专注 1 分钟获得 1 星光 · 伙伴自带默认背景，兑换后可给任意伙伴搭配
         </p>
-        <div class="family-filters" role="group" aria-label="背景分类">
+        <div
+          class="family-filters"
+          role="group"
+          aria-label="背景分类"
+          :style="{ '--seg-count': bgCategories.length, '--seg-index': Math.max(0, bgCategories.findIndex(c => c.id === bgCategory)) }"
+        >
+          <span class="filter-pixel-thumb" aria-hidden="true" />
           <button
             v-for="item in bgCategories"
             :key="item.id"
@@ -1230,29 +1242,59 @@ button:focus-visible, summary:focus-visible {
 }
 
 .family-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 12px 12px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--seg-count, 5), minmax(0, 1fr));
+  align-items: center;
+  margin: 0 12px 10px;
+  padding: 3px;
+  border-radius: 9px;
+  background-color: var(--ui-well);
+  background-image: var(--pixel-dot-grid);
+  border: 1px solid var(--v2-line);
+  box-shadow: var(--pixel-lcd-well);
   flex-shrink: 0;
 }
 
+.filter-pixel-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--seg-count, 5));
+  border-radius: 6px;
+  background-color: var(--v2-accent);
+  background-image: var(--pixel-dither);
+  border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
+  box-shadow: var(--pixel-bevel-sm);
+  transform: translate3d(calc(var(--seg-index, 0) * 100%), 0, 0);
+  transition: transform 190ms steps(6, end);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .family-filters button {
-  font-size: 12px;
-  padding: 5px 9px;
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 2px;
   border-radius: 6px;
   background: transparent;
   color: var(--v2-secondary);
-  border: 1px solid transparent;
+  border: 0;
+  white-space: nowrap;
+  text-align: center;
+  transition: color 130ms steps(3, end);
 }
 
 .family-filters button:hover {
-  background: var(--ui-hover);
+  color: var(--v2-ink);
 }
 
 .family-filters button[aria-pressed='true'] {
   color: var(--v2-on-accent);
-  background: var(--v2-accent);
+  font-weight: 650;
 }
 
 .chooser-content {

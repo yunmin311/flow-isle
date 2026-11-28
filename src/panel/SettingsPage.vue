@@ -13,9 +13,32 @@ import { triggerPixelBurstFromEvent } from '../utils/pixelSpark'
 const settingsTab = ref('notifications')
 const emailEditing = ref(false)
 const settingsRoot = ref<HTMLElement | null>(null)
-watch([settingsTab, emailEditing], () => { void nextTick(() => settingsRoot.value?.scrollTo(0, 0)) })
-watch(settingsTab, () => { emailEditing.value = false })
 const settingsTabs = [{ id: 'notifications', label: '通知' }, { id: 'appearance', label: '外观' }, { id: 'focus', label: '专注' }, { id: 'general', label: '通用' }]
+const settingsTabIndex = computed(() => Math.max(0, settingsTabs.findIndex(t => t.id === settingsTab.value)))
+
+watch([settingsTab, emailEditing], () => { void nextTick(() => settingsRoot.value?.scrollTo(0, 0)) })
+watch(settingsTab, (next, prev) => {
+  emailEditing.value = false
+  if (next === prev) return
+  if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const nextIdx = settingsTabs.findIndex(t => t.id === next)
+  const prevIdx = settingsTabs.findIndex(t => t.id === prev)
+  const dir = nextIdx >= prevIdx ? 1 : -1
+  void nextTick(() => {
+    const sections = settingsRoot.value?.querySelectorAll<HTMLElement>('.settings-section')
+    if (!sections) return
+    sections.forEach((sec) => {
+      if (sec.offsetParent === null || typeof sec.animate !== 'function') return
+      sec.animate(
+        [
+          { opacity: 0.35, transform: `translate3d(${dir * 14}px, 0, 0)` },
+          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+        ],
+        { duration: 155, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      )
+    })
+  })
+})
 
 const emit = defineEmits<{ back: [] }>()
 
@@ -423,12 +446,19 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <nav class="settings-tabs" aria-label="设置分类">
+    <nav class="settings-tabs" aria-label="设置分类" :style="{ '--seg-index': settingsTabIndex }">
+      <span class="settings-tab-thumb" aria-hidden="true" />
       <button v-for="tab in settingsTabs" :key="tab.id" :aria-pressed="settingsTab === tab.id" @click="settingsTab = tab.id">{{ tab.label }}</button>
     </nav>
     <div v-show="settingsTab === 'appearance'" class="settings-section">
       <div class="section-title">显示模式</div>
-      <div class="mode-toggle" role="group" aria-label="主题模式">
+      <div
+        class="mode-toggle"
+        role="group"
+        aria-label="主题模式"
+        :style="{ '--seg-count': colorModeOptions.length, '--seg-index': Math.max(0, colorModeOptions.findIndex(o => o.id === settings.colorMode)) }"
+      >
+        <span class="seg-pixel-thumb" aria-hidden="true" />
         <button
           v-for="option in colorModeOptions"
           :key="option.id"
@@ -442,7 +472,13 @@ onUnmounted(() => {
       </div>
 
       <div class="section-subtitle">显示方式</div>
-      <div class="mode-toggle" role="group" aria-label="灵动岛显示方式">
+      <div
+        class="mode-toggle"
+        role="group"
+        aria-label="灵动岛显示方式"
+        :style="{ '--seg-count': displayModeOptions.length, '--seg-index': Math.max(0, displayModeOptions.findIndex(o => o.id === settings.islandDisplayMode)) }"
+      >
+        <span class="seg-pixel-thumb" aria-hidden="true" />
         <button
           v-for="opt in displayModeOptions"
           :key="opt.id"
@@ -457,7 +493,13 @@ onUnmounted(() => {
       </div>
 
       <div class="section-subtitle">玻璃质感<HintTip :text="activeGlassHint" /></div>
-      <div class="mode-toggle" role="group" aria-label="面板玻璃质感">
+      <div
+        class="mode-toggle"
+        role="group"
+        aria-label="面板玻璃质感"
+        :style="{ '--seg-count': glassOptions.length, '--seg-index': Math.max(0, glassOptions.findIndex(o => o.id === settings.panelGlass)) }"
+      >
+        <span class="seg-pixel-thumb" aria-hidden="true" />
         <button
           v-for="opt in glassOptions"
           :key="opt.id"
@@ -525,7 +567,11 @@ onUnmounted(() => {
       </div>
       <div v-if="settings.systemNotificationMirror" class="setting-option-row">
         <span class="update-label">镜像范围</span>
-        <div class="mode-toggle">
+        <div
+          class="mode-toggle"
+          :style="{ '--seg-count': 2, '--seg-index': settings.systemNotificationMirrorMode === 'selected' ? 1 : 0 }"
+        >
+          <span class="seg-pixel-thumb" aria-hidden="true" />
           <button
             type="button"
             class="mode-btn"

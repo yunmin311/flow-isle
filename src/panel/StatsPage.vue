@@ -629,7 +629,6 @@ function steppedBarHeight(pomodoros: number): string {
   transition: transform 190ms steps(6, end), box-shadow 130ms steps(3, end);
   pointer-events: none;
   z-index: 0;
-  will-change: transform;
 }
 
 .seg-pixel-thumb.is-gliding {
@@ -668,32 +667,32 @@ function steppedBarHeight(pomodoros: number): string {
   color: var(--v2-on-accent);
 }
 
-/* 专注记录 ↔ 陪伴相册 像素步进横向切换 */
+/* 专注记录 ↔ 陪伴相册 顺滑阻尼横向切换（与顶部像素滑块协同，不抽帧） */
 .pixel-swap-next-enter-active,
 .pixel-swap-next-leave-active,
 .pixel-swap-prev-enter-active,
 .pixel-swap-prev-leave-active {
-  transition: opacity 150ms steps(4, end), transform 160ms steps(5, end);
+  transition: opacity 135ms cubic-bezier(0.22, 1, 0.36, 1), transform 155ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pixel-swap-next-enter-from {
   opacity: 0;
-  transform: translate3d(18px, 0, 0);
+  transform: translate3d(16px, 0, 0);
 }
 
 .pixel-swap-next-leave-to {
   opacity: 0;
-  transform: translate3d(-14px, 0, 0);
+  transform: translate3d(-12px, 0, 0);
 }
 
 .pixel-swap-prev-enter-from {
   opacity: 0;
-  transform: translate3d(-18px, 0, 0);
+  transform: translate3d(-16px, 0, 0);
 }
 
 .pixel-swap-prev-leave-to {
   opacity: 0;
-  transform: translate3d(14px, 0, 0);
+  transform: translate3d(12px, 0, 0);
 }
 
 @media (prefers-reduced-motion: reduce) {
