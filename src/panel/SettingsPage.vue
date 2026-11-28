@@ -862,10 +862,11 @@ onUnmounted(() => {
         </button>
       </div>
     </div>
+    <!-- 关于弹窗：Teleport 到 body，既保证单根节点又不被 .settings-page.blurred 虚化 -->
+    <Teleport to="body">
+      <AboutDialog v-if="showAbout" @close="showAbout = false" />
+    </Teleport>
   </div>
-
-  <!-- 关于弹窗 -->
-  <AboutDialog v-if="showAbout" @close="showAbout = false" />
 </template>
 
 <style scoped>
@@ -1143,7 +1144,7 @@ onUnmounted(() => {
   background-image: var(--pixel-dither);
   border: 1px solid var(--v2-line);
   box-shadow: var(--pixel-keycap);
-  transition: transform 170ms steps(5, end), background-color 160ms steps(3, end), border-color 160ms ease;
+  transition: transform 200ms cubic-bezier(0.22, 1.08, 0.36, 1), background-color 180ms ease, border-color 160ms ease;
 }
 
 .switch input:checked + .switch-track {

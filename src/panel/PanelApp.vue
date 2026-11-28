@@ -105,11 +105,9 @@ const activeNavIndex = computed(() => {
 const navGliding = ref(false)
 const navSlideDir = ref<1 | -1>(1)
 const viewSlideDir = ref<1 | -1>(1)
+const viewEnterClass = ref('')
 let navGlideTimer: number | null = null
-
-const viewTransitionName = computed(() =>
-  viewSlideDir.value > 0 ? 'view-glide-next' : 'view-glide-prev',
-)
+let viewEnterTimer: number | null = null
 
 function triggerNavGlide(dir: 1 | -1) {
   navSlideDir.value = dir
@@ -118,12 +116,27 @@ function triggerNavGlide(dir: 1 | -1) {
   navGlideTimer = window.setTimeout(() => {
     navGliding.value = false
     navGlideTimer = null
-  }, 230)
+  }, 240)
 }
 
-function onViewBeforeEnter(el: Element) {
-  const htmlEl = el as HTMLElement
-  htmlEl.scrollTop = viewScrollMemory.get(currentView.value) ?? 0
+function triggerViewEnter(dir: 1 | -1) {
+  if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  viewSlideDir.value = dir
+  viewEnterClass.value = ''
+  if (viewEnterTimer !== null) window.clearTimeout(viewEnterTimer)
+  const el = panelContent.value
+  if (el) {
+    el.classList.remove('view-enter-next', 'view-enter-prev')
+    void el.offsetWidth
+    const cls = dir > 0 ? 'view-enter-next' : 'view-enter-prev'
+    viewEnterClass.value = cls
+    el.classList.add(cls)
+    viewEnterTimer = window.setTimeout(() => {
+      el.classList.remove('view-enter-next', 'view-enter-prev')
+      viewEnterClass.value = ''
+      viewEnterTimer = null
+    }, 230)
+  }
 }
 
 function navigateTo(nextView: typeof currentView.value) {
@@ -137,9 +150,14 @@ function navigateTo(nextView: typeof currentView.value) {
   const dir: 1 | -1 = isDetailDrill
     ? (nextView === 'taskDetail' ? 1 : -1)
     : ((viewOrder[nextView] ?? 0) >= (viewOrder[prevView] ?? 0) ? 1 : -1)
-  viewSlideDir.value = dir
   if (!isDetailDrill) triggerNavGlide(dir)
   currentView.value = nextView
+  triggerViewEnter(dir)
+
+  void nextTick(() => {
+    const nextChild = panelContent.value?.firstElementChild as HTMLElement | null
+    if (nextChild) nextChild.scrollTop = viewScrollMemory.get(nextView) ?? 0
+  })
 }
 
 function openCompanionPanel() {
@@ -444,6 +462,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onPanelKeydown)
   clearCloseFallback()
   if (navGlideTimer !== null) window.clearTimeout(navGlideTimer)
+  if (viewEnterTimer !== null) window.clearTimeout(viewEnterTimer)
   if (uninstallPixelSpark) uninstallPixelSpark()
   if (unlistenTransition) unlistenTransition()
   if (unlistenOpenNotifications) unlistenOpenNotifications()
@@ -489,26 +508,24 @@ async function closeWindow() {
         @close="closeWindow"
       />
       <div ref="panelContent" class="panel-body" tabindex="-1">
-        <Transition :name="viewTransitionName" mode="out-in" @before-enter="onViewBeforeEnter">
-          <KeepAlive :include="cachedPanelViews" :max="3">
-            <TaskArea v-if="currentView === 'tasks'" key="tasks" category="today" @close="closeWindow" @open-companion="openCompanionPanel" />
-            <TodoPage v-else-if="currentView === 'todo'" key="todo" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; navigateTo('taskDetail') }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
-            <TaskDetailPage v-else-if="currentView === 'taskDetail'" key="taskDetail" :task-id="taskIdForDetail" @back="navigateTo('todo')" />
-            <SettingsPage v-else-if="currentView === 'settings'" key="settings" @back="navigateTo('tasks')" />
-            <MemoPage v-else-if="currentView === 'memos'" key="memos" :search-query="memoSearchQuery" @back="navigateTo('tasks')" />
-            <StatsPage v-else-if="currentView === 'stats'" key="stats" @back="navigateTo('tasks')" />
-            <RadioPage v-else-if="currentView === 'radio'" key="radio" @back="navigateTo('tasks')" />
-            <NotificationsPage
-              v-else-if="currentView === 'notifications'"
-              key="notifications"
-              :focus-request="panelAnimState === 'steady' ? notificationFocusRequest : undefined"
-              @back="navigateTo('tasks')"
-              @open-task="taskId => openNotificationDestination('taskDetail', taskId)"
-              @open-home="openNotificationDestination('tasks')"
-              @open-todo="openNotificationDestination('todo')"
-            />
-          </KeepAlive>
-        </Transition>
+        <KeepAlive :include="cachedPanelViews" :max="3">
+          <TaskArea v-if="currentView === 'tasks'" key="tasks" category="today" @close="closeWindow" @open-companion="openCompanionPanel" />
+          <TodoPage v-else-if="currentView === 'todo'" key="todo" :initial-tab="todoInitialTab" :search-query="todoSearchQuery" @view-detail="taskId => { taskIdForDetail = taskId; navigateTo('taskDetail') }" @tab-change="tab => { todoInitialTab = tab }" @active-tab-label="todoActiveTabLabel = $event" />
+          <TaskDetailPage v-else-if="currentView === 'taskDetail'" key="taskDetail" :task-id="taskIdForDetail" @back="navigateTo('todo')" />
+          <SettingsPage v-else-if="currentView === 'settings'" key="settings" @back="navigateTo('tasks')" />
+          <MemoPage v-else-if="currentView === 'memos'" key="memos" :search-query="memoSearchQuery" @back="navigateTo('tasks')" />
+          <StatsPage v-else-if="currentView === 'stats'" key="stats" @back="navigateTo('tasks')" />
+          <RadioPage v-else-if="currentView === 'radio'" key="radio" @back="navigateTo('tasks')" />
+          <NotificationsPage
+            v-else-if="currentView === 'notifications'"
+            key="notifications"
+            :focus-request="panelAnimState === 'steady' ? notificationFocusRequest : undefined"
+            @back="navigateTo('tasks')"
+            @open-task="taskId => openNotificationDestination('taskDetail', taskId)"
+            @open-home="openNotificationDestination('tasks')"
+            @open-todo="openNotificationDestination('todo')"
+          />
+        </KeepAlive>
       </div>
       <nav class="panel-nav" aria-label="主导航">
         <div
@@ -840,35 +857,35 @@ async function closeWindow() {
   background: transparent;
 }
 
-/* 主页面顺滑阻尼切换（out-in 避免首帧闪回抽动，与底栏像素滑块 210ms 节奏协同） */
-.view-glide-next-leave-active,
-.view-glide-prev-leave-active {
-  transition: opacity 85ms cubic-bezier(0.4, 0, 1, 1), transform 85ms cubic-bezier(0.4, 0, 1, 1);
+/* 主页面顺滑阻尼切换（同步挂载期施加于容器，永不死锁且无首帧闪回抽动） */
+.panel-body.view-enter-next {
+  animation: view-enter-next 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.view-glide-next-enter-active,
-.view-glide-prev-enter-active {
-  transition: opacity 185ms cubic-bezier(0.22, 1, 0.36, 1), transform 195ms cubic-bezier(0.22, 1, 0.36, 1);
+.panel-body.view-enter-prev {
+  animation: view-enter-prev 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.view-glide-next-leave-to {
-  opacity: 0;
-  transform: translate3d(-9px, 0, 0);
+@keyframes view-enter-next {
+  from {
+    opacity: 0.45;
+    transform: translate3d(12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
-.view-glide-next-enter-from {
-  opacity: 0;
-  transform: translate3d(13px, 0, 0);
-}
-
-.view-glide-prev-leave-to {
-  opacity: 0;
-  transform: translate3d(9px, 0, 0);
-}
-
-.view-glide-prev-enter-from {
-  opacity: 0;
-  transform: translate3d(-13px, 0, 0);
+@keyframes view-enter-prev {
+  from {
+    opacity: 0.45;
+    transform: translate3d(-12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 .panel-nav {
@@ -915,7 +932,7 @@ async function closeWindow() {
     var(--pixel-keycap),
     0 0 0 1px color-mix(in srgb, var(--v2-accent) 14%, transparent);
   transform: translate3d(calc(var(--nav-index, 0) * 100%), 0, 0);
-  transition: transform 210ms steps(7, end), box-shadow 140ms steps(3, end);
+  transition: transform 230ms cubic-bezier(0.22, 1.06, 0.36, 1), box-shadow 180ms ease;
   pointer-events: none;
   z-index: 0;
 }
@@ -1021,10 +1038,11 @@ async function closeWindow() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .view-glide-next-leave-active,
-  .view-glide-prev-leave-active,
-  .view-glide-next-enter-active,
-  .view-glide-prev-enter-active,
+  .panel-body.view-enter-next,
+  .panel-body.view-enter-prev {
+    animation: none;
+  }
+
   .nav-pixel-slider {
     transition: none;
   }

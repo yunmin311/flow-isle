@@ -189,7 +189,7 @@ async function clearAll() {
   background-image: var(--pixel-dither);
   border: 1px solid var(--v2-line);
   box-shadow: var(--pixel-keycap);
-  transition: transform 160ms steps(4, end), background-color 140ms steps(3, end);
+  transition: transform 200ms cubic-bezier(0.22, 1.08, 0.36, 1), background-color 160ms ease;
 }
 .capture-switch:checked {
   background-color: var(--v2-accent);

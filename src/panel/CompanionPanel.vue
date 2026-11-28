@@ -1268,7 +1268,7 @@ button:focus-visible, summary:focus-visible {
   border: 1px solid color-mix(in srgb, #000 18%, var(--v2-accent));
   box-shadow: var(--pixel-bevel-sm);
   transform: translate3d(calc(var(--seg-index, 0) * 100%), 0, 0);
-  transition: transform 190ms steps(6, end);
+  transition: transform 220ms cubic-bezier(0.22, 1.06, 0.36, 1);
   pointer-events: none;
   z-index: 0;
 }
